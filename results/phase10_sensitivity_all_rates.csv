@@ -1,0 +1,16 @@
+rate,error_type,n_weight_combos,mean_rank,min_rank,max_rank,rank_1_pct,rank_stable
+0.05,label_errors,15,1.8,1,4,0.5333333333333333,False
+0.05,missing_values,15,2.1333333333333333,1,4,0.26666666666666666,False
+0.05,duplicates,15,2.466666666666667,1,4,0.2,False
+0.05,outliers,15,3.6,3,4,0.0,True
+0.05,feature_corruption,15,5.0,5,5,0.0,True
+0.1,label_errors,15,1.0,1,1,1.0,True
+0.1,duplicates,15,2.066666666666667,2,3,0.0,True
+0.1,outliers,15,2.933333333333333,2,3,0.0,True
+0.1,missing_values,15,4.0,4,4,0.0,True
+0.1,feature_corruption,15,5.0,5,5,0.0,True
+0.2,label_errors,15,1.4,1,3,0.6666666666666666,False
+0.2,duplicates,15,1.6666666666666667,1,2,0.3333333333333333,True
+0.2,outliers,15,2.933333333333333,2,3,0.0,True
+0.2,missing_values,15,4.266666666666667,4,5,0.0,True
+0.2,feature_corruption,15,4.733333333333333,4,5,0.0,True
