@@ -1,98 +1,317 @@
-# TaskClean
+# Task-Aware Data Quality: Impact Analysis and Repair Prioritization for AI-Ready Datasets
 
-**An impact-aware data quality assessment, repair, and AI-readiness framework.**
-TaskClean measures how specific data-quality problems (missing values, duplicates, outliers, label errors,
-feature anomalies) actually affect a machine-learning task, decides which repairs are safe to apply
-automatically, and reports its confidence honestly, including where repair makes things worse.
+**TaskClean** measures how specific data-quality problems actually affect a machine-learning task, decides which
+repairs are safe to apply automatically, and reports its confidence honestly, including where a repair makes
+things worse.
 
-It is both a research project (controlled experiments on UCI Adult) and a usable tool (upload a CSV,
-get a cleaned dataset, a repair log, and a multidimensional readiness report).
+It is both a **research project** (controlled experiments on UCI Adult, 11 phases) and a **usable tool**
+(upload a CSV, get a cleaned dataset, a full repair log, and a multidimensional readiness report).
+
+> **Research question.** Most cleaning pipelines ask *"is this data wrong?"* TaskClean asks *"is this problem
+> actually hurting my ML task, can it be repaired safely, and is it worth the effort?"*
+
+---
+
+## Contents
+
+1. [Key ideas](#key-ideas)
+2. [How it works](#how-it-works)
+3. [The app](#the-app)
+4. [Quick start](#quick-start)
+5. [Outputs](#outputs)
+6. [How the repair policy decides](#how-the-repair-policy-decides)
+7. [Research results](#research-results)
+8. [Reproducing the experiments](#reproducing-the-experiments)
+9. [Project structure](#project-structure)
+10. [Limitations](#limitations)
+11. [Not done yet](#not-done-yet)
+
+---
+
+## Key ideas
+
+1. **Task-aware impact analysis.** Inject one error type at a time into clean data, retrain, and measure the F1
+   loss on an untouched clean test set. Impact is measured, not assumed.
+2. **Evidence-based repair, not blanket cleaning.** "Detected" does not mean "safe to repair". A repair is applied
+   automatically only if, in the controlled benchmark, it showed zero observed harm and high precision.
+3. **Honest uncertainty.** Every dimension carries an *evidence status* (validated / weak / inverted /
+   not estimable) separate from its observed rate. No single readiness score is reported, because the evidence
+   did not justify one.
+
+## How it works
+
+```mermaid
+flowchart TD
+    A[Upload CSV + choose target] --> B[Quality audit<br/>6 detectors]
+    B --> C[Benchmark-based task-impact estimate]
+    B --> D[Repair proposals<br/>with detector scores]
+    C --> E{Evidence-based<br/>repair policy}
+    D --> E
+    E -->|zero observed harm<br/>and precision at least 0.95| F[Apply automatically]
+    E -->|everything else| G[Flag for human review<br/>logged, not changed]
+    F --> H[Cleaned dataset + repair log]
+    G --> H
+    H --> I[Multidimensional readiness report]
+```
+
+The research that backs each box was built phase by phase:
+
+```
+Phase 1-2   clean baseline on UCI Adult (70/15/15 split, test set never touched)
+Phase 3-4   controlled corruption engine + ground-truth log of every changed cell
+Phase 5     blind detectors, graded against that ground truth
+Phase 6     quality report (flagged rate kept separate from detector reliability)
+Phase 7     per-error impact on F1 (5 error types x 3 rates x 5 seeds)
+Phase 8     oracle repair: how much performance is theoretically recoverable
+Phase 9     real automated repair, graded on repair correctness AND ML recovery
+Phase 10    repair prioritization over impact, repairability and risk
+Phase 11    AI-readiness: define, validate against ML impact, build the report
+```
+
+## The app
+
+| Quality audit | Repair plan | Repair log |
+|---|---|---|
+| ![Quality audit](docs/screenshots/quality-audit.jpg) | ![Repair plan](docs/screenshots/repair-plan.jpg) | ![Repair log](docs/screenshots/repair-log.jpg) |
+
+Detectors are shown with their benchmark precision/recall; each repair type shows the evidence behind its
+auto-repair or review decision; every change (and non-change) lands in the repair log.
 
 ## Quick start
+
+Developed and tested on Python 3.14, pandas 3.0, scikit-learn 1.9, Streamlit 1.64.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-streamlit run app.py          # the app: upload CSV -> audit -> review plan -> download
+streamlit run app.py
 ```
 
-Or from the command line:
+Use **"Use demo dataset"** in the app for a one-click run (6,300 Adult rows with all five error types injected).
+
+> If your checkout path contains a space, launch with `.venv/bin/python -m streamlit run app.py`;
+> the `streamlit` console script's shebang breaks on spaces.
+
+**Command line**
 
 ```bash
 cd src
 python3 taskclean.py ../data/demo_dirty_adult.csv --target class --out ../taskclean_output_demo
-# --feature-anomalies   also run the slow feature-anomaly detector
-# --apply missing_values,label_errors   explicit human override of the evidence-based policy
 ```
 
-> If your checkout path contains a space, run Streamlit as `.venv/bin/python -m streamlit run app.py`;
-> the `streamlit` console script's shebang breaks on spaces.
+| Flag | Meaning |
+|---|---|
+| `--feature-anomalies` | also run the slow feature-anomaly detector (its auto-repair is never recommended) |
+| `--apply missing_values,label_errors` | explicit human override of the evidence-based policy |
+| `--seed 42` | random seed for the model-based detectors |
 
-## What the product produces
+**Python**
+
+```python
+import sys; sys.path.insert(0, "src")
+import pandas as pd
+from taskclean import audit_dataset, apply_repairs, write_outputs
+
+df = pd.read_csv("my_data.csv")
+state = audit_dataset(df, target="churned")     # expensive: detect + propose
+result = apply_repairs(state)                   # cheap: applies what the evidence approves
+write_outputs(result, "out/")
+```
+
+`audit_dataset` and `apply_repairs` are separate stages so a UI can change the repair plan without paying for the
+model-based audit again.
+
+## Outputs
 
 | File | Contents |
 |---|---|
 | `dataset_cleaned.csv` | the dataset after the repairs that were applied |
-| `repair_log.csv` | every proposed, applied, skipped, and flagged-only change (row, column, original, proposed, applied value, method, tier, detector score, evidence status, human-override flag) |
-| `quality_report.csv` | flagged counts/rates per dimension with benchmark precision/recall of each detector |
-| `impact_report.csv` | benchmark-based task-impact estimate, repair evidence, and decision per issue |
-| `readiness_report.json` / `.csv` | the multidimensional readiness report with evidence status and limitations |
+| `repair_log.csv` | every proposed, applied, skipped, and flag-only change: row, column, original, proposed and applied value, method, confidence tier, detector score, evidence status, human-override flag |
+| `quality_report.csv` | flagged counts and rates per dimension, with each detector's benchmark precision/recall |
+| `impact_report.csv` | benchmark-based task-impact estimate, repair evidence, and the decision per issue |
+| `readiness_report.json` / `.csv` | the multidimensional readiness report with evidence status, after-cleaning rates, and limitations |
 
-The repair log is the product's proof of what it did: `src/test_taskclean.py` checks that every cell that
-differs between the uploaded and cleaned file is a logged, applied repair, and that nothing else changed.
+`row_id` in the log is the 0-based row position in the **uploaded** file. A sample set is in
+[`taskclean_output_demo/`](taskclean_output_demo/).
 
-## How it decides what to repair
+The repair log is the product's proof of what it did. [`src/test_taskclean.py`](src/test_taskclean.py) checks that
+every cell that differs between the uploaded and cleaned file is a logged, applied repair, that the log never
+claims a repair on a row absent from the output, and that detection matches the injected ground truth on the demo.
 
-A repair type is applied **automatically** only if, in the controlled benchmark, it showed **zero observed
-harm** and **repair precision >= 0.95**. On the benchmark evidence that is exact duplicate removal only.
-Everything else is logged as a proposal and flagged for human review; you can override in the app, and
-overrides are recorded. Feature-anomaly repair was demonstrably harmful, so its override carries an explicit warning.
+## How the repair policy decides
 
-## The research arc (what each phase established)
+A repair type is applied **automatically** only if, in the Phase 9 controlled benchmark at the nearest evaluated
+corruption rate, all of these hold:
 
-| Phase | Question | Result |
+- no seed ever showed net harm (risk = 0),
+- repair precision was at least **0.95** (it rarely overwrote legitimate data),
+- the repairability status was not *negative*.
+
+On the benchmark evidence this is satisfied by **exact duplicate removal only**. Everything else is logged as a
+proposal and flagged for human review; nothing is changed. You can override per issue type in the app, and
+overrides are recorded in the log. The 0.95 threshold is a documented policy parameter in
+[`src/taskclean.py`](src/taskclean.py) (`SAFE_REPAIR_MIN_PRECISION`).
+
+*"Repair not recommended" means the evaluated strategy was harmful in testing, not that the underlying error is
+inherently unrepairable.*
+
+## Research results
+
+All experiments use UCI Adult with a Random Forest (300 trees). The clean baseline is **F1 = 0.680**
+(accuracy 0.851, ROC-AUC 0.903); Logistic Regression reaches F1 = 0.662. Corruption rates are 5/10/20%;
+experiments use seeds 42-46 and the train/test split is fixed.
+
+### Impact: how much does each error hurt F1? (Phase 7)
+
+Mean F1 damage vs. the clean baseline, mean ± std over 5 seeds:
+
+| Error type | 5% | 10% | 20% |
+|---|---|---|---|
+| Label errors | 0.0098 ± 0.0054 | 0.0248 ± 0.0032 | **0.0649 ± 0.0105** |
+| Feature corruption | 0.0036 ± 0.0042 | 0.0059 ± 0.0018 | 0.0144 ± 0.0063 |
+| Outliers | 0.0028 ± 0.0035 | 0.0051 ± 0.0036 | 0.0091 ± 0.0027 |
+| Missing values | 0.0042 ± 0.0051 | 0.0006 ± 0.0046 | 0.0071 ± 0.0032 |
+| Duplicates | 0.0005 ± 0.0040 | 0.0020 ± 0.0050 | 0.0020 ± 0.0052 |
+
+Label errors dominate. Duplicates' damage is smaller than its own standard deviation, so it is statistically
+indistinguishable from zero.
+
+### Detection: can each error be found without ground truth? (Phase 5)
+
+| Error type | Unit | Precision | Recall |
+|---|---|---|---|
+| Missing values | rows | 1.00 | 1.00 |
+| Duplicates | rows | 0.99 | 1.00 |
+| Label errors | rows | 0.77 | 0.28 |
+| Outliers | cells | 0.18 | 0.67 |
+| Feature anomalies | cells | 0.28 | 0.26 |
+
+Grading is cell-level where corruption is cell-level (an earlier row-level grading inflated the feature-anomaly
+score from 0.26 to 0.67). Outlier precision is low partly because `capital-gain` is top-coded in the real census data,
+so injected extremes are indistinguishable from legitimate ones.
+
+### Repair: does automatic repair help? (Phase 9, mean over 5 seeds)
+
+| Error type | Rate | ML recovery (ΔF1) | Repair precision | Repair recall |
+|---|---|---|---|---|
+| Duplicates | 10% | +0.0032 | 0.99 | 1.00 |
+| Missing values | 10% | -0.0003 | 1.00 | 1.00 |
+| Label errors | 10% | +0.0031 | 0.86 | 0.06 |
+| Outliers | 10% | +0.0017 | 0.31 | 0.57 |
+| **Feature corruption** | 10% | **-0.0071** | 0.33 | 0.12 |
+
+- **Detected is not safe to repair.** Feature-corruption repair is net-harmful at every rate: most of what it
+  "fixes" was never corrupted, and the substitutes are worse than the original data.
+- **The most damaging error is the hardest to repair automatically.** Label-error repair is precise but its
+  recall is 0.01-0.18 under the conservative policy, so it recovers almost none of the damage.
+- Missing-value imputation turns net-harmful at 20% (ΔF1 = -0.0054).
+- Recovery ratios (recovery ÷ damage) are not reported for duplicates/outliers/missing: numerator and denominator
+  are both near the noise floor, so the ratio is unstable.
+
+### Prioritization (Phase 10)
+
+`Priority = w_impact·Impact − w_risk·Risk + w_repair·Repairability`, each min-max normalised within a corruption
+rate. Headline at 10% with equal weights: **label errors (0.66) > duplicates (0.35) > outliers (0.31) > missing
+values (0.16) > feature corruption (-0.26)**.
+
+Across a grid of 15 weight combinations at 10%, label errors rank first and feature corruption last in **100%** of
+them. That robustness is **severity-dependent**: at 5% label errors rank first in 53% of combinations, and at 20%
+missing-value repair turns harmful and competes with feature corruption for last place.
+
+### AI-readiness (Phase 11)
+
+No single readiness score is reported. Across 15 (error type, rate) points the pooled correlation between
+*detected rate* and *measured damage* was **r = -0.24 (p = 0.39)**, and detector baselines sit on incomparable scales.
+
+| Error type | r (detected rate vs. damage) | Reading |
 |---|---|---|
-| 1-2 | Clean baseline (UCI Adult, 70/15/15 split, untouched test set) | Random Forest F1 = 0.680, LogReg F1 = 0.662 |
-| 3-4 | Controlled corruption with a ground-truth log | 5 error types x 5/10/20%, every changed cell logged with a unique id |
-| 5 | Can each error be detected, blind? | exact for missing/duplicates; label noise P=0.77/R=0.28; outliers P=0.18/R=0.67; feature anomalies P=0.28/R=0.26 (cell-level) |
-| 6 | Quality report | flagged rate is not a true rate; detector reliability reported separately |
-| 7 | How much does each error hurt F1? (5 seeds) | at 20%: label errors 0.065 >> feature corruption 0.014 > outliers 0.009 > missing 0.007 > duplicates 0.002 |
-| 8 | Theoretical recoverability (oracle repair) | ceiling = clean F1 for every type |
-| 9 | Real automated repair | only duplicate removal is reliably safe; feature-corruption repair is net-harmful at every rate; label repair precision is fine but recall is 0.01-0.18 |
-| 10 | Repair prioritization (impact, repairability, risk) | at 10%, label errors rank first and feature corruption last in 100% of a weight grid; the ordering is **severity-dependent** (less stable at 5% and 20%) |
-| 11 | AI-readiness | no single score is justified (pooled r = -0.24); the label-error detector's flagged rate is **inverted** relative to real damage |
+| Outliers | 0.99 | tracks damage |
+| Feature corruption | 0.95 | tracks damage, high false-positive floor (~46% flagged on clean data) |
+| Duplicates | 0.78 | tracks damage |
+| Missing values | 0.61 | weak / inconclusive |
+| **Label errors** | **-0.95** | **inverted** |
 
-Notes that matter when citing these results:
-- Per-error-type validation uses n = 3 corruption rates: directional evidence, not significance.
-- Impact estimates are *benchmark-based* (Adult + Random Forest) and are flagged as boundary estimates beyond the validated 0-20% range.
-- Logistic Regression validation and a second dataset (Heart Disease) are **not yet done**.
+The label-error detector's flagged rate *falls* as true corruption (and real damage) rises, most likely because its
+cross-validated model is degraded by the label noise it is auditing. A low flagged label-error rate must therefore
+not be read as reassurance. Each correlation rests on 3 rates, so it is directional evidence, not significance.
 
-## Known limitations
+The product therefore reports a multidimensional readiness table (observed rate, false-positive floor, evidence
+status, status, after-cleaning rate) instead of one number. Impact figures are labelled **benchmark-based
+task-impact estimates**; for observed rates beyond the validated 0-20% range they are **boundary estimates**.
 
-- Estimate-based audit: on an uploaded dataset the true errors are unknown; every rate comes from a detector with known limits.
-- False-positive floors for statistical detectors come from clean Adult data and are not recalibrated per dataset.
-- No before/after model metrics: an uploaded dataset has no clean held-out test set, and evaluating on a slice of the same dirty data would mislead.
-- Classification targets only (<= 20 classes). Duplicates are full-record duplicates (features + target).
-- Inconsistent-value detection is report-only: no repair evidence exists for it.
+## Reproducing the experiments
 
-## Project layout
+Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`).
+
+| Phase | Command | Notes |
+|---|---|---|
+| 2 | `python3 baseline.py` | clean baselines |
+| 3-4 | `python3 phase3_4_test.py` | writes `results/corruption_log.csv` |
+| 5 | `python3 phase5_test.py` | several minutes (cross-feature detector) |
+| 6 | `python3 quality_report.py` | several minutes |
+| 7 | `python3 phase7_impact.py --full` | omit `--full` for a quick single-seed run |
+| 8 | `python3 phase8_oracle_repair.py --full` | |
+| 9 | `python3 phase9_repair_engine.py --full` | long-running (tens of minutes) |
+| 10 | `python3 phase10_prioritization.py` | aggregation only, seconds |
+| 11 | `python3 phase11_readiness.py` | validation, several minutes |
+| 11 | `python3 phase11c_report_demo.py` | renders the readiness report |
+| product | `python3 test_taskclean.py` | end-to-end invariants |
+
+Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
+hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
+The `*_full.csv` files in `results/` are the authoritative 5-seed results; `*_single_seed.csv` are validation runs.
+
+## Project structure
 
 ```
-app.py                       Streamlit front end
-src/taskclean.py             product layer: audit -> policy -> repair -> reports (CLI too)
-src/test_taskclean.py        end-to-end invariants + generic-CSV robustness
-src/data.py  baseline.py     Phase 1-2: data, split, clean baseline
-src/corruption/              Phase 3-4: error injection with ground-truth logs
-src/detect.py                Phase 5: detectors
-src/quality_report.py        Phase 6
-src/phase7_impact.py  phase8_oracle_repair.py  phase9_repair_engine.py
-src/phase10_prioritization.py  phase11_readiness.py  phase11c_report_demo.py
-src/training_log.py          provenance log of every model fit (results/training_log.csv)
-src/make_demo_dataset.py     builds data/demo_dirty_adult.csv (+ its corruption log)
-data/                        Adult (original + clean) and the demo dataset
-results/                     every experiment's raw and summary CSVs
+app.py                         Streamlit front end
+src/
+  taskclean.py                 product layer: audit -> policy -> repair -> reports (also a CLI)
+  test_taskclean.py            end-to-end invariants and generic-CSV robustness
+  data.py  baseline.py         Phase 1-2: data, split, clean baselines
+  corruption/                  Phase 3-4: error injection with ground-truth logs
+  detect.py                    Phase 5: detectors
+  quality_report.py            Phase 6
+  phase7_impact.py             Phase 7
+  phase8_oracle_repair.py      Phase 8
+  phase9_repair_engine.py      Phase 9
+  phase10_prioritization.py    Phase 10
+  phase11_readiness.py         Phase 11 (+ phase11c_report_demo.py)
+  training_log.py              provenance log of every model fit
+  make_demo_dataset.py         builds data/demo_dirty_adult.csv
+  errors.py train.py impact.py repair.py readiness.py pipeline.py
+                               superseded v1 prototype (breast-cancer data); not used by the current pipeline
+data/                          Adult (original + clean) and the demo dataset with its corruption log
+results/                       raw and summary CSVs for every experiment
+taskclean_output_demo/         sample outputs of the product on the demo dataset
+docs/screenshots/              app screenshots
 ```
 
-`src/errors.py`, `train.py`, `impact.py`, `repair.py`, `readiness.py`, and `pipeline.py` are the superseded v1
-prototype (breast-cancer data) and are not used by the current pipeline.
+## Limitations
+
+- **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
+  with the precision/recall limits above. A flagged rate is not a confirmed error rate.
+- **Benchmark transfer.** Impact estimates and repair evidence come from Adult + Random Forest. They do not
+  transfer automatically to another dataset or model.
+- **False-positive floors** for the statistical detectors were measured on clean Adult data and are not
+  recalibrated per dataset, so "Attention / Good" for outliers, labels and feature anomalies is indicative only.
+- **Small validation sample.** Detector-vs-damage correlations use 3 corruption rates per error type.
+- **No before/after model metrics for uploads.** An uploaded dataset has no clean held-out test set, and evaluating
+  on a slice of the same dirty data would mislead.
+- **Scope.** Classification targets only (up to 20 classes). Duplicates are full-record duplicates (features +
+  target). Inconsistent-value detection is report-only because no repair evidence exists for it. The
+  feature-anomaly detector is off by default (slow, low precision, harmful repair).
+- **No composite score.** The tested aggregate of detected rates was not supported by the evidence; this does not
+  prove no composite could ever work.
+
+## Not done yet
+
+- Logistic Regression validation of the Random Forest findings.
+- A second dataset (e.g. Heart Disease) to test whether the prioritization transfers.
+- Calibrating detector false-positive floors per dataset.
+
+## Data
+
+UCI Adult (Census Income), loaded through OpenML (`fetch_openml("adult", version=2)`). The demo dataset is a
+6,000-row sample with all five error types injected at 5%, generated by `src/make_demo_dataset.py`.
