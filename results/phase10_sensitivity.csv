@@ -1,0 +1,6 @@
+error_type,n_weight_combos,mean_rank,min_rank,max_rank,rank_1_pct,rank_stable
+label_errors,15,1.0,1,1,1.0,True
+duplicates,15,2.066666666666667,2,3,0.0,True
+outliers,15,2.933333333333333,2,3,0.0,True
+missing_values,15,4.0,4,4,0.0,True
+feature_corruption,15,5.0,5,5,0.0,True
