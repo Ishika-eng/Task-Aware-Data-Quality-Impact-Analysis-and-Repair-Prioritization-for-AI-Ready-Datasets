@@ -1,0 +1,219 @@
+{
+  "taskclean_version": "1.0",
+  "generated_at_utc": "2026-10-02T17:24:17+00:00",
+  "dataset_overview": {
+    "rows_uploaded": 6300,
+    "rows_analysed": 6300,
+    "rows_missing_target_excluded_from_analysis": 0,
+    "columns": 15,
+    "target": "class",
+    "task": "classification",
+    "n_classes": 2,
+    "columns_not_analysed": {},
+    "columns_skipped_by_model_based_detectors": {},
+    "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=300), UCI Adult"
+  },
+  "dimensions": [
+    {
+      "dimension": "Completeness",
+      "issue_key": "missing_values",
+      "observed_rate": 0.05006802721088435,
+      "baseline_false_positive_floor": 0.0,
+      "baseline_source": "0 by construction (exact check)",
+      "evidence_status": "weak",
+      "evidence_note": "Weak/inconclusive relationship with measured impact across tested rates (r=0.61, n=3 -- not statistically significant at this sample size).",
+      "status": "Attention",
+      "rate_after_cleaning": 0.05
+    },
+    {
+      "dimension": "Uniqueness",
+      "issue_key": "duplicates",
+      "observed_rate": 0.047619047619047616,
+      "baseline_false_positive_floor": 0.0,
+      "baseline_source": "0 by construction (exact check)",
+      "evidence_status": "weak",
+      "evidence_note": "Direction consistent with impact rising at higher rates, but not statistically significant at n=3 (r=0.78).",
+      "status": "Attention",
+      "rate_after_cleaning": 0.0
+    },
+    {
+      "dimension": "Anomaly burden",
+      "issue_key": "outliers",
+      "observed_rate": 0.32666666666666666,
+      "baseline_false_positive_floor": 0.2982151318906966,
+      "baseline_source": "Adult benchmark floor -- NOT recalibrated for this dataset",
+      "evidence_status": "weak",
+      "evidence_note": "Strongest observed trend among all dimensions (r=0.99, n=3) but still not statistically significant at this sample size; detector also has a known high false-positive baseline even on clean data (Phase 5/6).",
+      "status": "Good",
+      "rate_after_cleaning": 0.30816666666666664
+    },
+    {
+      "dimension": "Consistency",
+      "issue_key": "inconsistency",
+      "observed_rate": 0.0,
+      "baseline_false_positive_floor": 0.0,
+      "baseline_source": "0 by construction (exact check)",
+      "evidence_status": "not_estimable",
+      "evidence_note": "Not independently validated -- no corruption type exists in this project to test this detector against a known ground truth.",
+      "status": "Evidence-limited",
+      "rate_after_cleaning": 0.0
+    },
+    {
+      "dimension": "Label reliability",
+      "issue_key": "label_errors",
+      "observed_rate": 0.011904761904761904,
+      "baseline_false_positive_floor": 0.01990206918338335,
+      "baseline_source": "Adult benchmark floor -- NOT recalibrated for this dataset",
+      "evidence_status": "inverted",
+      "evidence_note": "INVERTED relationship: detected rate DECREASES as true corruption (and real measured damage) increases, most likely because the cross-validated detector's own model is degraded by the label noise it's trying to audit. Do not use the detected rate as a proxy for label-error severity.",
+      "status": "High uncertainty",
+      "rate_after_cleaning": null
+    },
+    {
+      "dimension": "Feature reliability",
+      "issue_key": "feature_corruption",
+      "observed_rate": 0.47873015873015873,
+      "baseline_false_positive_floor": 0.46172800505449374,
+      "baseline_source": "Adult benchmark floor -- NOT recalibrated for this dataset",
+      "evidence_status": "weak",
+      "evidence_note": "Strong observed trend (r=0.95, n=3, not statistically significant) but the detector has a known high false-positive baseline (~50%+ flagged even on clean data -- see Phase 5/6); treat the raw flagged rate cautiously.",
+      "status": "Good",
+      "rate_after_cleaning": null
+    }
+  ],
+  "benchmark_task_impact": [
+    {
+      "issue": "Missing value",
+      "detected_rate": 0.05006802721088435,
+      "benchmark_impact_estimate": 0.004199065345279828,
+      "is_boundary_estimate": false,
+      "repairability_status": "weak",
+      "policy_decision": "flagged for human review (not applied)",
+      "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+    },
+    {
+      "issue": "Duplicate row",
+      "detected_rate": 0.047619047619047616,
+      "benchmark_impact_estimate": 0.00047954768615790467,
+      "is_boundary_estimate": false,
+      "repairability_status": "weak",
+      "policy_decision": "applied",
+      "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+    },
+    {
+      "issue": "Potential outlier",
+      "detected_rate": 0.32666666666666666,
+      "benchmark_impact_estimate": 0.0090595010698906,
+      "is_boundary_estimate": true,
+      "repairability_status": "weak",
+      "policy_decision": "flagged for human review (not applied)",
+      "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+    },
+    {
+      "issue": "Potential label error",
+      "detected_rate": 0.011904761904761904,
+      "benchmark_impact_estimate": 0.0023389948658212377,
+      "is_boundary_estimate": false,
+      "repairability_status": "weak",
+      "policy_decision": "flagged for human review (not applied)",
+      "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+    },
+    {
+      "issue": "Potential feature anomaly",
+      "detected_rate": 0.47873015873015873,
+      "benchmark_impact_estimate": 0.0144064695489737,
+      "is_boundary_estimate": true,
+      "repairability_status": "negative",
+      "policy_decision": "flagged for human review (not applied)",
+      "recommendation": "Automatic repair NOT recommended under the evaluated repair strategy -- controlled testing demonstrated it is net-harmful. This does not mean the underlying error is inherently unrepairable, only that the strategy we evaluated was harmful here. Flag for manual review instead of auto-repairing."
+    }
+  ],
+  "impact_estimate_note": "Benchmark-based task-impact estimate: the detected rate is mapped onto the controlled Phase 7 damage curve (UCI Adult / Random Forest, rates 5-20%). It is not a measured or validated prediction of F1 loss for this dataset. Where the observed rate exceeds the validated 0-20% range the value is a boundary estimate (the 20% benchmark), not an extrapolation.",
+  "repair_policy": {
+    "safe_auto_requires": "benchmark risk == 0, repair precision >= 0.95, status != negative",
+    "issues_applied": [
+      "duplicates"
+    ],
+    "human_overrides": [],
+    "decisions": [
+      {
+        "issue": "Missing value",
+        "default_action": "flag for human review",
+        "repairability_status": "weak",
+        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 1.00, observed harm risk 0.0021, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+      },
+      {
+        "issue": "Duplicate row",
+        "default_action": "auto-repair",
+        "repairability_status": "weak",
+        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 0.98, observed harm risk 0.0000, status 'weak' -- meets the bar for safe automatic repair"
+      },
+      {
+        "issue": "Potential outlier",
+        "default_action": "flag for human review",
+        "repairability_status": "weak",
+        "reason": "benchmark evidence at nearest evaluated rate (20%): repair precision 0.48, observed harm risk 0.0008, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+      },
+      {
+        "issue": "Potential label error",
+        "default_action": "flag for human review",
+        "repairability_status": "weak",
+        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 0.78, observed harm risk 0.0016, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+      },
+      {
+        "issue": "Potential feature anomaly",
+        "default_action": "flag for human review",
+        "repairability_status": "negative",
+        "reason": "benchmark evidence at nearest evaluated rate (20%): repair precision 0.42, observed harm risk 0.0075, status 'negative' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+      }
+    ]
+  },
+  "changes_summary": {
+    "rows_uploaded": 6300,
+    "rows_after_cleaning": 6000,
+    "rows_dropped": 300,
+    "cells_modified": 0,
+    "repairs_applied_by_issue": {
+      "Duplicate row": 300
+    },
+    "flagged_for_review": 6984,
+    "flagged_only": 3217,
+    "skipped_conflicts": 0,
+    "skipped_row_dropped": 0,
+    "issues_applied": [
+      "duplicates"
+    ],
+    "human_overrides": []
+  },
+  "run": {
+    "seed": 42,
+    "n_rows_uploaded": 6300,
+    "n_rows_analysed": 6300,
+    "n_rows_missing_target": 0,
+    "n_columns": 15,
+    "include_feature_anomalies": true,
+    "detector_seconds": {
+      "missing_values": 0.0,
+      "duplicates": 0.0,
+      "outliers": 0.0,
+      "inconsistency": 0.01,
+      "label_noise": 2.41,
+      "feature_corruption": 26.18
+    },
+    "audit_seconds": 28.91,
+    "python": "3.14.6",
+    "pandas": "3.0.6",
+    "scikit_learn": "1.9.1"
+  },
+  "limitations": [
+    "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector with known precision/recall limits (Phase 5). A flagged rate is not a confirmed error rate.",
+    "Benchmark-based impact estimates come from UCI Adult + Random Forest and do not transfer automatically to another dataset or model.",
+    "The false-positive floors used for 'Attention/Good' status on statistical detectors (outliers, feature anomalies, labels) were measured on clean Adult data and are NOT recalibrated for this dataset.",
+    "The label-error detector's flagged rate showed an INVERTED relationship with real damage in validation; a low flagged label-error rate must not be read as reassurance.",
+    "Validation evidence per error type rests on 3 corruption rates (n=3): directional, not statistically significant.",
+    "No single AI-readiness score is reported: the tested aggregate of detected rates was not supported by the evidence (pooled r = -0.24). This does not prove no composite could ever work.",
+    "No before/after model metrics are reported: an uploaded dataset has no clean held-out test set, and evaluating on a held-out slice of the same dirty data would be misleading.",
+    "Automatic repair is applied only for issue types whose benchmark repair showed zero observed harm and high precision. 'Repair not recommended' means the evaluated repair strategy was harmful in testing -- not that the underlying error is inherently unrepairable.",
+    "Classification targets only. Duplicates are full-record duplicates (features + target)."
+  ]
+}
