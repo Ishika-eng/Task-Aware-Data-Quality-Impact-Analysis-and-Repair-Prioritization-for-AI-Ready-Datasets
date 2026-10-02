@@ -1,0 +1,7 @@
+dimension,issue_key,detector_type,detected_rate,detected_count,count_unit,benchmark_precision,benchmark_recall,evidence_status,note
+Completeness,missing_values,exact check,0.05006802721088435,4416,cells,1.0,1.0,weak,
+Uniqueness,duplicates,exact check,0.047619047619047616,300,rows,0.9924741298212606,1.0,weak,
+Anomaly burden,outliers,statistical estimate,0.32666666666666666,2058,rows,0.183177248904545,0.6736176935229068,weak,"flagged rate, not a confirmed error rate"
+Consistency,inconsistency,exact check,0.0,0,rows,,,not_estimable,"report-only: no repair evidence exists for this issue type, so no repair is proposed"
+Label reliability,label_errors,statistical estimate,0.011904761904761904,75,rows,0.7738825591586328,0.2789889415481832,inverted,"flagged rate, not a confirmed error rate"
+Feature reliability,feature_corruption,statistical estimate,0.47873015873015873,3016,rows,0.2768621748263047,0.2642964562526511,weak,"flagged rate, not a confirmed error rate"
