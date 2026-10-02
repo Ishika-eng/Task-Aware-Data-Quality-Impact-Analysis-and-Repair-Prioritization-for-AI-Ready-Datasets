@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+# local tooling config (contains absolute machine paths)
+.claude/
