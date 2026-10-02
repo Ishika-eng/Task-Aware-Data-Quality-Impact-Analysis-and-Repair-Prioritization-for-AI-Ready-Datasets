@@ -1,0 +1,8 @@
+{
+  "missing_values": 0.0,
+  "duplicates": 0.0008213552361396304,
+  "outliers": 0.2982151318906966,
+  "inconsistency": 0.0,
+  "label_noise": 0.01990206918338335,
+  "feature_corruption": 0.46172800505449374
+}
