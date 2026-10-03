@@ -17,8 +17,9 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from taskclean import (ISSUES, MAX_MODEL_ROWS, PROBLEM_TEXT, apply_repairs, audit_dataset,  # noqa: E402
-                       default_apply_issues, load_csv, outputs_as_bytes, outputs_zip)
+from selfbench import NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
+from taskclean import (ISSUES, MAX_MODEL_ROWS, PROBLEM_TEXT, apply_repairs, attach_self_benchmark,  # noqa: E402
+                       audit_dataset, default_apply_issues, load_csv, outputs_as_bytes, outputs_zip)
 
 DEMO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "demo_dirty_adult.csv")
 
@@ -98,7 +99,14 @@ with c3:
         help="One model per column. In the benchmark this detector had ~28% precision and its automatic repair "
              "was harmful, so it is off by default; if enabled, its findings are flag-only unless you override.")
 
+calibrate = st.checkbox(
+    "Calibrate on this dataset (self-benchmark)", value=False, disabled=target is None,
+    help="Builds a clean-ish reference from your own data, injects errors into it, and measures how much each "
+         "hurts a model and whether repair helps or harms -- then bases the repair policy on THOSE numbers "
+         "instead of the UCI Adult benchmark. Adds roughly 20 seconds to a few minutes. Needs a target.")
 with st.expander("Advanced"):
+    seeds_n = st.radio("Calibration seeds", [3, 5], horizontal=True,
+                       help="More seeds give steadier harm/benefit estimates but take longer.")
     max_rows = st.number_input(
         "Row limit for the slow model-based detectors", min_value=2_000, max_value=500_000,
         value=MAX_MODEL_ROWS, step=5_000,
@@ -121,6 +129,11 @@ if st.button("Run audit", type="primary"):
         state = audit_dataset(df, target, include_feature_anomalies=feat, max_model_rows=int(max_rows),
                               progress=lambda f, m: bar.progress(min(f, 1.0), text=m),
                               input_info=st.session_state.get("input_info"))
+        if calibrate and target is not None:
+            bar.progress(0.0, text="Calibrating on your data")
+            sb = run_self_benchmark(state, n_seeds=int(seeds_n),
+                                    progress=lambda f, m: bar.progress(min(f, 1.0), text=f"Calibrating: {m}"))
+            attach_self_benchmark(state, sb)
         st.session_state["state"] = state
         st.session_state["audit_id"] = st.session_state.get("audit_id", 0) + 1
         st.session_state["result"] = apply_repairs(state)          # evidence-based default policy
@@ -138,7 +151,7 @@ if state is None or result is None:
     st.stop()
 
 # ------------------------------------------------------------------ 3. results
-VIEWS = ["Overview", "Quality audit", "Readiness", "Task impact", "Repair plan", "Outputs"]
+VIEWS = ["Overview", "Quality audit", "Calibration", "Readiness", "Task impact", "Repair plan", "Outputs"]
 
 
 def apply_selection():
@@ -183,12 +196,64 @@ elif view == "Quality audit":
         "Dimension": q.dimension, "Detector": q.detector_type,
         "Flagged": [("-" if pd.isna(c) else f"{int(c):,} {u}") for c, u in zip(q.detected_count, q.count_unit)],
         "Rate": [pct(r) for r in q.detected_rate],
-        "Benchmark precision": [pct(p, 0) for p in q.benchmark_precision],
-        "Benchmark recall": [pct(r, 0) for r in q.benchmark_recall],
+        "Detector precision": [pct(p, 0) for p in q.benchmark_precision],
+        "Detector recall": [pct(r, 0) for r in q.benchmark_recall],
+        "Measured on": q.reliability_source.fillna("-"),
         "Evidence": q.evidence_status, "Note": q.note})
     st.dataframe(show, width="stretch", hide_index=True)
-    st.caption("Flagged rate is not a confirmed error rate. Benchmark precision/recall are from the controlled "
-               "Phase 5 experiment (known corruption injected into clean Adult data).")
+    st.caption("Flagged rate is not a confirmed error rate. Detector precision/recall come from controlled "
+               "experiments with known injected errors: on your own data if you calibrated, otherwise on UCI Adult.")
+
+elif view == "Calibration":
+    sb = state.selfbench
+    if sb is None:
+        st.info("Not calibrated: every decision currently uses the UCI Adult benchmark evidence. Tick "
+                "'Calibrate on this dataset' (needs a target) and rerun the audit to replace it with measurements "
+                "from your own data.")
+    elif not sb.ok:
+        st.warning(f"Calibration did not run: {sb.reason}. Decisions keep using the UCI Adult benchmark evidence.")
+        if sb.reference:
+            st.caption("Reference build: " + ", ".join(f"{k}: {v}" for k, v in sb.reference.items()
+                                                       if k in ("rows_labeled", "rows_complete", "rows_after_dedup")))
+    else:
+        ref = sb.reference
+        m = st.columns(4)
+        m[0].metric("Reference rows", f"{ref['rows_used']:,}")
+        m[1].metric("Clean-trained macro-F1", f"{np.mean(list(sb.baseline_f1.values())):.3f}")
+        m[2].metric("Chance level", f"{sb.chance_f1:.3f}")
+        m[3].metric("Noise floor", f"{sb.noise_floor:.4f}")
+        st.caption(
+            f"Built from your data: {ref['rows_labeled']:,} labeled rows -> {ref['rows_complete']:,} complete -> "
+            f"{ref['rows_after_dedup']:,} without duplicates -> {ref['rows_used']:,} used "
+            f"({ref['rows_train']:,} train / {ref['rows_test']:,} held-out test; the test rows are never corrupted). "
+            f"The noise floor ({sb.noise_floor:.4f}) is the typical F1 change from randomly dropping "
+            f"{NULL_DROP_FRACTION:.0%} of the training rows: effects smaller than that are treated as noise, so a "
+            "repair only counts as harmful if it costs more than that. This is a clean-ish reference, not ground truth.")
+        if ref["columns_left_out"]:
+            st.write("Left out of the reference:", ref["columns_left_out"])
+        if sb.skipped_issues:
+            st.warning("Not measured: " + "; ".join(f"{k} ({v})" for k, v in sb.skipped_issues.items())
+                       + ". These keep using the UCI Adult evidence.")
+        st.subheader("Damage and repair evidence measured on your data")
+        ev = sb.evidence
+        st.dataframe(pd.DataFrame({
+            "Error": ev.error_type, "Rate": [pct(r, 0) for r in ev.rate],
+            "Damage (macro-F1)": [num(x) for x in ev.mean_damage],
+            "Repair precision": [pct(x, 0) for x in ev.repair_precision],
+            "Repair recall": [pct(x, 0) for x in ev.repair_recall],
+            "Recovery": [num(x) for x in ev.mean_recovery], "Repair evidence": ev.repairability_status,
+            "Material harm risk": [f"{x:.4f}" for x in ev.material_risk]}), width="stretch", hide_index=True)
+        st.caption(f"Means over {sb.n_seeds} seeds. 'Damage' is how much each error lowers macro-F1 versus a model "
+                   "trained on the clean reference; 'Recovery' is how much of that the real TaskClean repair wins "
+                   "back; 'Material harm risk' counts only harm larger than the noise floor.")
+        st.subheader("Does each detector's flagged rate track real damage on your data?")
+        tr = sb.detector_tracking
+        st.dataframe(pd.DataFrame({"Error": tr.error_type, "Evidence": tr.evidence_status, "Note": tr.note}),
+                     width="stretch", hide_index=True)
+        st.subheader("Detector false-positive floors on the reference")
+        st.write({k: pct(v) for k, v in sb.baseline_floors.items()})
+        st.caption("What each detector flags on data that is clean-ish by construction: an observed rate close to "
+                   "this is not evidence of a problem.")
 
 elif view == "Readiness":
     dims = pd.DataFrame(result.readiness["dimensions"])
@@ -212,9 +277,10 @@ elif view == "Task impact":
     imp = result.impact_report.copy()
     show = pd.DataFrame({
         "Issue": imp.issue, "Detected rate": [pct(x) for x in imp.detected_rate],
-        "Benchmark impact estimate (F1)": [
+        "Impact estimate": [
             ("-" if pd.isna(e) else num(e) + ("  [boundary estimate]" if b else ""))
             for e, b in zip(imp.benchmark_impact_estimate, imp.is_boundary_estimate)],
+        "Unit": imp.impact_unit, "Based on": imp.impact_source,
         "Repair evidence": imp.repairability_status, "Decision": imp.policy_decision,
         "Recommendation": imp.recommendation})
     st.dataframe(show, width="stretch", hide_index=True)
