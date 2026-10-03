@@ -17,8 +17,8 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from taskclean import (ISSUES, MAX_CLASSES, PROBLEM_TEXT, apply_repairs, audit_dataset,  # noqa: E402
-                       default_apply_issues, outputs_as_bytes, outputs_zip)
+from taskclean import (ISSUES, MAX_MODEL_ROWS, PROBLEM_TEXT, apply_repairs, audit_dataset,  # noqa: E402
+                       default_apply_issues, load_csv, outputs_as_bytes, outputs_zip)
 
 DEMO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "demo_dirty_adult.csv")
 
@@ -59,12 +59,14 @@ with c2:
 
 if uploaded is not None and st.session_state.get("source") != f"upload:{uploaded.name}:{uploaded.size}":
     try:
-        st.session_state.update(df=pd.read_csv(uploaded), source=f"upload:{uploaded.name}:{uploaded.size}",
+        loaded, info = load_csv(uploaded.getvalue())
+        st.session_state.update(df=loaded, input_info=info, source=f"upload:{uploaded.name}:{uploaded.size}",
                                 name=uploaded.name, state=None, result=None)
     except Exception as e:  # malformed CSV is user input, not a bug
         st.error(f"Could not read that file as CSV: {e}")
 if use_demo:
-    st.session_state.update(df=pd.read_csv(DEMO_PATH), source="demo", name="demo_dirty_adult.csv",
+    loaded, info = load_csv(DEMO_PATH)
+    st.session_state.update(df=loaded, input_info=info, source="demo", name="demo_dirty_adult.csv",
                             state=None, result=None)
 
 df = st.session_state.get("df")
@@ -72,16 +74,22 @@ if df is None:
     st.info("Upload a CSV or try the demo dataset to begin.")
     st.stop()
 
+info = st.session_state.get("input_info", {})
 st.write(f"**{st.session_state['name']}** -- {len(df):,} rows x {df.shape[1]} columns")
+if info:
+    st.caption(f"Detected: {info['encoding']} text, '{info['delimiter']}' delimiter, "
+               f"'{info['decimal']}' decimal mark.")
 st.dataframe(df.head(10), width="stretch")
 
 # ------------------------------------------------------------------ 2. configure
 st.header("2. Target and task")
+NO_TARGET = "(no target -- unlabeled dataset)"
 cols = list(df.columns)
-default_target = cols.index("class") if "class" in cols else len(cols) - 1
+default_target = cols.index("class") + 1 if "class" in cols else len(cols)
 c1, c2, c3 = st.columns([2, 2, 3])
 with c1:
-    target = st.selectbox("Target column", cols, index=default_target)
+    chosen_target = st.selectbox("Target column", [NO_TARGET] + cols, index=default_target)
+    target = None if chosen_target == NO_TARGET else chosen_target
 with c2:
     task = st.selectbox("ML task", ["Classification", "Regression (not supported)"])
 with c3:
@@ -90,7 +98,17 @@ with c3:
         help="One model per column. In the benchmark this detector had ~28% precision and its automatic repair "
              "was harmful, so it is off by default; if enabled, its findings are flag-only unless you override.")
 
-if task != "Classification":
+with st.expander("Advanced"):
+    max_rows = st.number_input(
+        "Row limit for the slow model-based detectors", min_value=2_000, max_value=500_000,
+        value=MAX_MODEL_ROWS, step=5_000,
+        help="Above this many rows the label and feature detectors run on a stratified random sample; the cheap "
+             "checks (missing values, duplicates, outliers) always use every row.")
+if target is None:
+    st.info("No target selected: missing values, duplicates, outliers and inconsistent values are checked; the "
+            "label-error check needs a target and is skipped.")
+
+if task != "Classification" and target is not None:
     st.error("Only classification is supported: the benchmark evidence behind every threshold and impact "
              "estimate was gathered on a classification task.")
     st.stop()
@@ -100,8 +118,9 @@ if len(df) > 50_000:
 if st.button("Run audit", type="primary"):
     bar = st.progress(0.0, text="Starting")
     try:
-        state = audit_dataset(df, target, include_feature_anomalies=feat,
-                              progress=lambda f, m: bar.progress(min(f, 1.0), text=m))
+        state = audit_dataset(df, target, include_feature_anomalies=feat, max_model_rows=int(max_rows),
+                              progress=lambda f, m: bar.progress(min(f, 1.0), text=m),
+                              input_info=st.session_state.get("input_info"))
         st.session_state["state"] = state
         st.session_state["audit_id"] = st.session_state.get("audit_id", 0) + 1
         st.session_state["result"] = apply_repairs(state)          # evidence-based default policy
@@ -146,12 +165,11 @@ if view == "Overview":
     m = st.columns(5)
     m[0].metric("Rows analysed", f"{ov['rows_analysed']:,}")
     m[1].metric("Columns", ov["columns"])
-    m[2].metric("Target", ov["target"])
-    m[3].metric("Classes", ov["n_classes"])
+    m[2].metric("Target", ov["target"] or "none")
+    m[3].metric("Classes", ov["n_classes"] if ov["n_classes"] is not None else "-")
     m[4].metric("Audit time", f"{state.meta['audit_seconds']:.0f}s")
-    if ov["rows_missing_target_excluded_from_analysis"]:
-        st.warning(f"{ov['rows_missing_target_excluded_from_analysis']:,} rows have no target value and were "
-                   "excluded from the analysis (they are left untouched in the output).")
+    for note in ov["notes"]:
+        st.info(note)
     if ov["columns_not_analysed"]:
         st.write("Columns not analysed:", ov["columns_not_analysed"])
     if ov["columns_skipped_by_model_based_detectors"]:
@@ -232,20 +250,36 @@ elif view == "Repair plan":
 
 elif view == "Outputs":
     s = result.summary
-    st.caption(f"Repairs applied using: {st.session_state.get('selection_label', 'policy default')}")
-    m = st.columns(4)
-    m[0].metric("Rows", f"{s['rows_after_cleaning']:,}", delta=f"-{s['rows_dropped']:,}" if s["rows_dropped"] else None,
-                delta_color="off")
-    m[1].metric("Cells modified", f"{s['cells_modified']:,}")
-    m[2].metric("Proposals flagged for review", f"{s['flagged_for_review']:,}")
-    m[3].metric("Flag-only (low confidence)", f"{s['flagged_only']:,}")
+    sa = result.summary_aggressive
+    st.write("TaskClean produces **two cleaned files**. Pick the one that matches how much risk you accept:")
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Evidence-based** (`dataset_cleaned.csv`)")
+        st.caption(f"Repairs applied using: {st.session_state.get('selection_label', 'policy default')}. Only "
+                   "repairs that never showed harm in the benchmark; everything else is logged, not changed.")
+        m = st.columns(3)
+        m[0].metric("Rows", f"{s['rows_after_cleaning']:,}",
+                    delta=f"-{s['rows_dropped']:,}" if s["rows_dropped"] else None, delta_color="off")
+        m[1].metric("Cells modified", f"{s['cells_modified']:,}")
+        m[2].metric("Flagged for review", f"{s['flagged_for_review']:,}")
+    with right:
+        st.markdown("**Aggressive** (`dataset_cleaned_aggressive.csv`)")
+        st.caption("Every proposed repair except feature-anomaly repairs (harmful in the benchmark): missing values "
+                   "imputed, outliers clipped, high-confidence label flips applied. Model-ready, but most of these "
+                   "repairs did not clear the safety bar -- review the log before trusting it.")
+        m = st.columns(3)
+        m[0].metric("Rows", f"{sa['rows_after_cleaning']:,}",
+                    delta=f"-{sa['rows_dropped']:,}" if sa["rows_dropped"] else None, delta_color="off")
+        m[1].metric("Cells modified", f"{sa['cells_modified']:,}")
+        m[2].metric("Left flag-only", f"{sa['flagged_only']:,}")
     if s["human_overrides"]:
-        st.warning("Human overrides applied: " + ", ".join(s["human_overrides"]))
+        st.warning("Human overrides applied to the evidence-based file: " + ", ".join(s["human_overrides"]))
     if s["skipped_row_dropped"]:
         st.caption(f"{s['skipped_row_dropped']:,} cell repairs were skipped because their row was removed as a duplicate.")
 
     st.subheader("Repair log")
-    log = result.repair_log
+    which = st.radio("Log for", ["Evidence-based file", "Aggressive file"], horizontal=True)
+    log = result.repair_log if which == "Evidence-based file" else result.repair_log_aggressive
     actions = sorted(log.action.unique())
     chosen = st.multiselect("Filter by action", actions, default=actions)
     st.dataframe(log[log.action.isin(chosen)].head(1000), width="stretch", hide_index=True)
