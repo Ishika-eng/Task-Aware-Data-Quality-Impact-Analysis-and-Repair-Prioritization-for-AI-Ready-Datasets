@@ -10102,7 +10102,7 @@ R010100,398,age,Potential feature anomaly,25.0,,,flagged_only,"flag only: disagr
 R010101,427,age,Potential feature anomaly,61.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.753151687158604,negative,False
 R010102,588,age,Potential feature anomaly,55.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.444085657866464,negative,False
 R010103,695,age,Potential feature anomaly,-47.7819770088162,37.119399233627206,,flagged_for_review,replace with cross-feature model prediction,strict,6.919945633808224,negative,False
-R010104,755,age,Potential feature anomaly,111.7819770088162,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.440683188107564,negative,False
+R010104,755,age,Potential feature anomaly,111.7819770088162,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.440683188107562,negative,False
 R010105,833,age,Potential feature anomaly,122.7819770088162,38.18666666666667,,flagged_for_review,replace with cross-feature model prediction,strict,6.902449576408815,negative,False
 R010106,895,age,Potential feature anomaly,-42.7819770088162,38.56,,flagged_for_review,replace with cross-feature model prediction,strict,6.629677877490851,negative,False
 R010107,1195,age,Potential feature anomaly,37.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.470475499100566,negative,False
@@ -10119,7 +10119,7 @@ R010117,5245,age,Potential feature anomaly,90.0,,,flagged_only,"flag only: disag
 R010118,5461,age,Potential feature anomaly,50.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.073301025770268,negative,False
 R010119,5572,age,Potential feature anomaly,120.7819770088162,41.22,,flagged_for_review,replace with cross-feature model prediction,strict,6.49198301237147,negative,False
 R010120,5838,age,Potential feature anomaly,-58.7819770088162,28.585333333333335,,flagged_for_review,replace with cross-feature model prediction,strict,7.121041692824561,negative,False
-R010121,6002,age,Potential feature anomaly,111.7819770088162,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.440683188107564,negative,False
+R010121,6002,age,Potential feature anomaly,111.7819770088162,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.440683188107562,negative,False
 R010122,6010,age,Potential feature anomaly,-45.7819770088162,29.64,,flagged_for_review,replace with cross-feature model prediction,strict,6.146903958464146,negative,False
 R010123,6041,age,Potential feature anomaly,101.7819770088162,21.033333333333335,,flagged_for_review,replace with cross-feature model prediction,strict,6.588755261906103,negative,False
 R010124,6050,age,Potential feature anomaly,136.7819770088162,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.2557067301934595,negative,False
@@ -10131,7 +10131,7 @@ R010129,6151,age,Potential feature anomaly,-25.7819770088162,,,flagged_only,"fla
 R010130,6162,age,Potential feature anomaly,-41.7819770088162,41.973333333333336,,flagged_for_review,replace with cross-feature model prediction,strict,6.8264843624994835,negative,False
 R010131,6248,age,Potential feature anomaly,120.7819770088162,41.22,,flagged_for_review,replace with cross-feature model prediction,strict,6.49198301237147,negative,False
 R010132,6295,age,Potential feature anomaly,-58.7819770088162,28.585333333333335,,flagged_for_review,replace with cross-feature model prediction,strict,7.121041692824561,negative,False
-R010133,39,fnlwgt,Potential feature anomaly,1455435.0,258775.82555555558,,flagged_for_review,replace with cross-feature model prediction,strict,10.149390639322705,negative,False
+R010133,39,fnlwgt,Potential feature anomaly,1455435.0,258775.82555555552,,flagged_for_review,replace with cross-feature model prediction,strict,10.149390639322705,negative,False
 R010134,115,fnlwgt,Potential feature anomaly,-604129.9330611756,148427.42333333334,,flagged_for_review,replace with cross-feature model prediction,strict,6.355468514971733,negative,False
 R010135,371,fnlwgt,Potential feature anomaly,772919.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.1925862017925075,negative,False
 R010136,641,fnlwgt,Potential feature anomaly,737315.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.73575889800885,negative,False
@@ -10145,7 +10145,7 @@ R010143,1373,fnlwgt,Potential feature anomaly,680390.0,,,flagged_only,"flag only
 R010144,1599,fnlwgt,Potential feature anomaly,-477278.9330611756,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.645084893320362,negative,False
 R010145,1662,fnlwgt,Potential feature anomaly,693066.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.12745619859541,negative,False
 R010146,1810,fnlwgt,Potential feature anomaly,791084.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.356540925473139,negative,False
-R010147,2233,fnlwgt,Potential feature anomaly,704108.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.0874711012806895,negative,False
+R010147,2233,fnlwgt,Potential feature anomaly,704108.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.08747110128069,negative,False
 R010148,2287,fnlwgt,Potential feature anomaly,111283.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.531320638615841,negative,False
 R010149,2527,fnlwgt,Potential feature anomaly,801639.9330611756,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.934438430186944,negative,False
 R010150,2787,fnlwgt,Potential feature anomaly,806552.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.404591289755726,negative,False
@@ -10171,7 +10171,7 @@ R010169,6230,fnlwgt,Potential feature anomaly,800322.9330611756,,,flagged_only,"
 R010170,6236,fnlwgt,Potential feature anomaly,916645.9330611756,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.8771453849618265,negative,False
 R010171,6257,fnlwgt,Potential feature anomaly,-432488.9330611756,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.847696705002007,negative,False
 R010172,6287,fnlwgt,Potential feature anomaly,-620024.9330611756,189313.1,,flagged_for_review,replace with cross-feature model prediction,strict,6.836255054713168,negative,False
-R010173,129,education-num,Potential feature anomaly,28.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.217112629068962,negative,False
+R010173,129,education-num,Potential feature anomaly,28.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.217112629068966,negative,False
 R010174,440,education-num,Potential feature anomaly,24.4862381985065,9.153333333333334,,flagged_for_review,replace with cross-feature model prediction,strict,9.907606936298698,negative,False
 R010175,489,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.804447882521532,negative,False
 R010176,728,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.137497389216659,negative,False
@@ -10183,7 +10183,7 @@ R010181,1504,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag on
 R010182,1529,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.040271834121083,negative,False
 R010183,1610,education-num,Potential feature anomaly,0.5137618014935015,16.0,,flagged_for_review,replace with cross-feature model prediction,strict,10.001853068846678,negative,False
 R010184,1617,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.871568671809331,negative,False
-R010185,1686,education-num,Potential feature anomaly,14.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.982923188321669,negative,False
+R010185,1686,education-num,Potential feature anomaly,14.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.9829231883216645,negative,False
 R010186,2243,education-num,Potential feature anomaly,28.4862381985065,12.98,,flagged_for_review,replace with cross-feature model prediction,strict,10.019581920821402,negative,False
 R010187,2294,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.150222851685443,negative,False
 R010188,2558,education-num,Potential feature anomaly,27.4862381985065,11.973333333333333,,flagged_for_review,replace with cross-feature model prediction,strict,10.023888650995353,negative,False
@@ -10196,14 +10196,14 @@ R010194,2968,education-num,Potential feature anomaly,11.0,,,flagged_only,"flag o
 R010195,3133,education-num,Potential feature anomaly,3.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.041615302612759,negative,False
 R010196,3267,education-num,Potential feature anomaly,-11.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.065993678433298,negative,False
 R010197,3493,education-num,Potential feature anomaly,16.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.338008277165432,negative,False
-R010198,3643,education-num,Potential feature anomaly,24.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.066377072980721,negative,False
+R010198,3643,education-num,Potential feature anomaly,24.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.066377072980719,negative,False
 R010199,3718,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.732944171738186,negative,False
 R010200,3861,education-num,Potential feature anomaly,25.4862381985065,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.204192438547122,negative,False
 R010201,3964,education-num,Potential feature anomaly,-6.4862381985064985,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.27469228677266,negative,False
 R010202,4023,education-num,Potential feature anomaly,-5.4862381985064985,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.132688727763784,negative,False
 R010203,4162,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.937837981182508,negative,False
-R010204,4165,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.066419418390628,negative,False
-R010205,4170,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.027233106867765,negative,False
+R010204,4165,education-num,Potential feature anomaly,10.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.066419418390623,negative,False
+R010205,4170,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.0272331068677625,negative,False
 R010206,4186,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.358732793530434,negative,False
 R010207,4213,education-num,Potential feature anomaly,14.0,24.503975308317823,,flagged_for_review,replace with cross-feature model prediction,strict,6.783263780287527,negative,False
 R010208,4316,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.8732370285732545,negative,False
@@ -10214,9 +10214,9 @@ R010212,4602,education-num,Potential feature anomaly,24.4862381985065,,,flagged_
 R010213,4629,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.268172923146011,negative,False
 R010214,4661,education-num,Potential feature anomaly,-1.4862381985064983,14.049908254656712,,flagged_for_review,replace with cross-feature model prediction,strict,10.034094276785567,negative,False
 R010215,4780,education-num,Potential feature anomaly,7.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.027944327256625,negative,False
-R010216,4968,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.119768537241952,negative,False
-R010217,5074,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.122099707426135,negative,False
-R010218,5103,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.0298714802777855,negative,False
+R010216,4968,education-num,Potential feature anomaly,13.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.119768537241947,negative,False
+R010217,5074,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.122099707426131,negative,False
+R010218,5103,education-num,Potential feature anomaly,9.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.029871480277784,negative,False
 R010219,5172,education-num,Potential feature anomaly,2.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.511048891573326,negative,False
 R010220,5577,education-num,Potential feature anomaly,24.4862381985065,9.32,,flagged_for_review,replace with cross-feature model prediction,strict,9.799938681949945,negative,False
 R010221,5597,education-num,Potential feature anomaly,4.0,-5.2917429191039,,flagged_for_review,replace with cross-feature model prediction,strict,6.0049587704703065,negative,False
@@ -10279,7 +10279,7 @@ R010277,4543,capital-gain,Potential feature anomaly,99999.0,22868.44926008111,,f
 R010278,4585,capital-gain,Potential feature anomaly,99999.0,264.7866666666667,,flagged_for_review,replace with cross-feature model prediction,strict,11.503345472869263,negative,False
 R010279,4670,capital-gain,Potential feature anomaly,99999.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.305309791107521,negative,False
 R010280,4705,capital-gain,Potential feature anomaly,99999.0,-1791.0961709218452,,flagged_for_review,replace with cross-feature model prediction,strict,11.739731493303703,negative,False
-R010281,5059,capital-gain,Potential feature anomaly,0.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.01977425142492,negative,False
+R010281,5059,capital-gain,Potential feature anomaly,0.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.019774251424921,negative,False
 R010282,5233,capital-gain,Potential feature anomaly,99999.0,486.0,,flagged_for_review,replace with cross-feature model prediction,strict,11.477910297976205,negative,False
 R010283,5718,capital-gain,Potential feature anomaly,99999.0,3778.029382168146,,flagged_for_review,replace with cross-feature model prediction,strict,11.099391780006199,negative,False
 R010284,5877,capital-gain,Potential feature anomaly,0.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.450127888953749,negative,False
@@ -10476,7 +10476,7 @@ R010474,1525,hours-per-week,Potential feature anomaly,25.0,,,flagged_only,"flag 
 R010475,2002,hours-per-week,Potential feature anomaly,80.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.2990697543809775,negative,False
 R010476,2092,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.900388928917199,negative,False
 R010477,2581,hours-per-week,Potential feature anomaly,89.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.059339288017579,negative,False
-R010478,2668,hours-per-week,Potential feature anomaly,107.63219978905336,34.63264399578107,,flagged_for_review,replace with cross-feature model prediction,strict,6.2442082332752085,negative,False
+R010478,2668,hours-per-week,Potential feature anomaly,107.63219978905336,34.632643995781066,,flagged_for_review,replace with cross-feature model prediction,strict,6.2442082332752085,negative,False
 R010479,2957,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.899668940554896,negative,False
 R010480,3030,hours-per-week,Potential feature anomaly,80.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.6198099852521395,negative,False
 R010481,3279,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.035619117954785,negative,False
@@ -10489,11 +10489,11 @@ R010487,4315,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag 
 R010488,4516,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.698600905143465,negative,False
 R010489,4597,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.114436119108897,negative,False
 R010490,4631,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.451958166423219,negative,False
-R010491,5026,hours-per-week,Potential feature anomaly,80.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.065936942337363,negative,False
+R010491,5026,hours-per-week,Potential feature anomaly,80.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.065936942337361,negative,False
 R010492,5204,hours-per-week,Potential feature anomaly,-32.632199789053374,40.990191994374754,,flagged_for_review,replace with cross-feature model prediction,strict,6.279454903900157,negative,False
 R010493,5426,hours-per-week,Potential feature anomaly,66.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.15387148770179,negative,False
 R010494,5908,hours-per-week,Potential feature anomaly,99.0,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.3109487062283876,negative,False
-R010495,6102,hours-per-week,Potential feature anomaly,107.63219978905336,34.63264399578107,,flagged_for_review,replace with cross-feature model prediction,strict,6.2442082332752085,negative,False
+R010495,6102,hours-per-week,Potential feature anomaly,107.63219978905336,34.632643995781066,,flagged_for_review,replace with cross-feature model prediction,strict,6.2442082332752085,negative,False
 R010496,6108,hours-per-week,Potential feature anomaly,-32.632199789053374,40.990191994374754,,flagged_for_review,replace with cross-feature model prediction,strict,6.279454903900157,negative,False
 R010497,6134,hours-per-week,Potential feature anomaly,-12.632199789053374,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,4.6256766165997405,negative,False
 R010498,6163,hours-per-week,Potential feature anomaly,102.63219978905336,,,flagged_only,"flag only: disagrees with the other columns, below the high-confidence threshold",loose,5.36950328169299,negative,False
