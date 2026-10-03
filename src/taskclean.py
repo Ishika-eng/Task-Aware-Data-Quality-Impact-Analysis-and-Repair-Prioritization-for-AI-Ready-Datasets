@@ -81,6 +81,10 @@ SAFE_REPAIR_MIN_PRECISION = 0.95
 MAX_CAT_LEVELS = 50
 MAX_CLASSES = 20            # classification only; more distinct targets looks like regression/IDs
 KNN_MAX_ROWS = 40_000       # above this, numeric imputation falls back to the median (KNN is O(n^2))
+# Never applied automatically, whatever the measured evidence says: label repair rewrites the target, and the
+# benchmark injects RANDOM noise whereas real label errors are usually structured, so a measured precision
+# would be optimistic; feature-anomaly repair was net-harmful.
+NEVER_AUTO_APPLY = {"label_errors", "feature_corruption"}
 # Above this many rows the slow, cross-validated detectors (labels, feature anomalies) run on a stratified
 # random sample instead of every row, and repairs/flags are produced only for the sampled rows.
 MAX_MODEL_ROWS = 30_000
@@ -109,6 +113,7 @@ class AuditState:
     policy: pd.DataFrame                     # one row per issue type
     meta: dict = field(default_factory=dict)
     decimal_comma_columns: set = field(default_factory=set)
+    selfbench: object | None = None          # dataset-specific evidence (see selfbench.py), if calibrated
 
 
 @dataclass
@@ -125,6 +130,7 @@ class TaskCleanResult:
     cleaned_aggressive: pd.DataFrame | None = None
     repair_log_aggressive: pd.DataFrame | None = None
     summary_aggressive: dict | None = None
+    selfbench: object | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -425,20 +431,49 @@ def _propose_features(X, integer_like, res: DetectionResult) -> list[pd.DataFram
 # ---------------------------------------------------------------------------
 # Policy (Phase 9/10 evidence -> apply or review)
 # ---------------------------------------------------------------------------
-def _evidence_for(issue: str, observed_rate: float) -> dict | None:
-    path = os.path.join(RESULTS_DIR, "phase10_evidence_table.csv")
-    if not os.path.exists(path):
-        return None
-    ev = pd.read_csv(path)
+def _nearest_evidence_row(ev: pd.DataFrame, issue: str, observed_rate: float):
     sub = ev[ev.error_type == issue]
     if sub.empty:
         return None
-    row = sub.iloc[(sub["rate"] - observed_rate).abs().argsort().iloc[0]]
-    return {"rate": float(row["rate"]), "status": row["repairability_status"], "risk": float(row["risk"]),
-            "precision": float(row["repair_precision"]), "recall": float(row["repair_recall"])}
+    return sub.iloc[(sub["rate"] - observed_rate).abs().argsort().iloc[0]]
 
 
-def _build_policy(detections, proposals, skipped) -> pd.DataFrame:
+def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | None:
+    """Repair evidence for an issue at the nearest evaluated corruption rate. Uses this dataset's own
+    self-benchmark when it measured the issue; otherwise falls back to the UCI Adult benchmark."""
+    sources = []
+    if selfbench is not None and getattr(selfbench, "ok", False):
+        sources.append(("this dataset (self-benchmark)", selfbench.evidence))
+    path = os.path.join(RESULTS_DIR, "phase10_evidence_table.csv")
+    if os.path.exists(path):
+        sources.append(("UCI Adult benchmark" + (" (not measured on this dataset)" if sources else ""),
+                        pd.read_csv(path)))
+    for source, ev in sources:
+        row = _nearest_evidence_row(ev, issue, observed_rate)
+        if row is not None:
+            # dataset-specific evidence also carries a noise-aware "material" harm risk; use it when present
+            material = row.get("material_risk")
+            use_material = material is not None and not pd.isna(material)
+            return {"rate": float(row["rate"]), "status": row["repairability_status"],
+                    "risk": float(material if use_material else row["risk"]),
+                    "risk_kind": "harm beyond the noise floor" if use_material else "observed harm",
+                    "precision": float(row["repair_precision"]), "recall": float(row["repair_recall"]),
+                    "source": source}
+    return None
+
+
+def _impact_curve_estimate(curve: pd.DataFrame, issue: str, rate: float):
+    """Same interpolation as the Adult version (a (0,0) anchor; beyond the highest measured rate the value is a
+    boundary estimate), over this dataset's own measured damage curve. Returns None if the issue wasn't measured."""
+    c = curve[curve.error_type == issue].sort_values("rate")
+    if c.empty:
+        return None
+    rates = np.concatenate([[0.0], c["rate"].values])
+    damages = np.concatenate([[0.0], c["mean_damage"].values])
+    return float(np.interp(rate, rates, damages)), bool(rate > rates.max())
+
+
+def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFrame:
     rows = []
     for issue in ISSUES:
         det_key = "label_noise" if issue == "label_errors" else issue
@@ -451,21 +486,26 @@ def _build_policy(detections, proposals, skipped) -> pd.DataFrame:
                          "detected_rate": np.nan, "n_repair_candidates": 0, "n_flag_only": 0,
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
-                         "default_action": "not assessed",
+                         "default_action": "not assessed", "evidence_source": "-",
                          "reason": skipped.get(det_key, "detector did not run")})
             continue
-        ev = _evidence_for(issue, det.rate)
+        ev = _evidence_for(issue, det.rate, selfbench)
+        source = ev["source"] if ev else "-"
         if ev is None:
-            safe, reason = False, "no benchmark repair evidence available"
+            safe, reason = False, "no repair evidence available"
             status, risk, prec = "unknown", np.nan, np.nan
         else:
             status, risk, prec = ev["status"], ev["risk"], ev["precision"]
             safe = risk <= 1e-9 and prec >= SAFE_REPAIR_MIN_PRECISION and status != "negative"
-            reason = (f"benchmark evidence at nearest evaluated rate ({ev['rate']:.0%}): repair precision "
-                      f"{prec:.2f}, observed harm risk {risk:.4f}, status '{status}' -- "
-                      + ("meets the bar for safe automatic repair" if safe else
+            guarded = issue in NEVER_AUTO_APPLY
+            reason = (f"{source}, nearest evaluated rate ({ev['rate']:.0%}): repair precision "
+                      f"{prec:.2f}, {ev['risk_kind']} risk {risk:.4f}, status '{status}' -- "
+                      + ("always human review: this repair type is never applied automatically "
+                         "(it rewrites the target or was harmful in testing)" if guarded else
+                         "meets the bar for safe automatic repair" if safe else
                          f"does not meet the safe-auto bar (risk must be 0 and precision >= "
                          f"{SAFE_REPAIR_MIN_PRECISION:.2f}, status not 'negative')"))
+            safe = safe and not guarded
         if n_auto == 0 and n_flag == 0:
             action = "nothing to repair"
         elif safe and n_auto > 0:
@@ -476,7 +516,7 @@ def _build_policy(detections, proposals, skipped) -> pd.DataFrame:
                      "detected_rate": det.rate, "n_repair_candidates": n_auto, "n_flag_only": n_flag,
                      "repairability_status": status, "benchmark_risk": risk,
                      "benchmark_repair_precision": prec, "safe_auto": bool(safe),
-                     "default_action": action, "reason": reason})
+                     "default_action": action, "evidence_source": source, "reason": reason})
     return pd.DataFrame(rows)
 
 
@@ -496,13 +536,18 @@ def _stratified_sample_index(y: pd.Series | None, index: pd.Index, n: int, seed:
 
 def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalies: bool = False, seed: int = 42,
                   progress: Progress | None = None, max_model_rows: int = MAX_MODEL_ROWS,
-                  input_info: dict | None = None) -> AuditState:
+                  input_info: dict | None = None, detectors: set[str] | None = None) -> AuditState:
     """Detect problems and propose repairs. Expensive (model-based detectors).
 
     target=None runs in no-target mode: missing values, duplicates, outliers and inconsistent values are
     checked; the label detector cannot run. Datasets with more than `max_model_rows` rows run the slow
-    cross-validated detectors on a stratified sample (cheap checks always use every row)."""
+    cross-validated detectors on a stratified sample (cheap checks always use every row).
+
+    `detectors` restricts which detectors run (names: missing_values, duplicates, outliers, inconsistency,
+    label_noise, feature_corruption); None runs all of them. Used by the self-benchmark, which only needs the
+    detector matching the error it injected."""
     say = progress or (lambda f, m: None)
+    want = lambda name: detectors is None or name in detectors     # noqa: E731
     t0 = time.monotonic()
     df = df.reset_index(drop=True).copy()
     if df.empty:
@@ -538,16 +583,25 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         timings[name] = round(time.monotonic() - t, 2)
         return out
 
-    say(0.05, "Checking missing values")
-    detections["missing_values"] = timed("missing_values", lambda: detect_missing(X))
-    say(0.10, "Checking duplicate records")
     full = _full_record(X, y)
-    detections["duplicates"] = timed("duplicates", lambda: detect_duplicates(full))
-    say(0.15, "Checking outliers and inconsistent values")
-    detections["outliers"] = timed("outliers", lambda: detect_outliers_iqr(X))
-    detections["inconsistency"] = timed("inconsistency", lambda: detect_inconsistency(X))
+    if want("missing_values"):
+        say(0.05, "Checking missing values")
+        detections["missing_values"] = timed("missing_values", lambda: detect_missing(X))
+    if want("duplicates"):
+        say(0.10, "Checking duplicate records")
+        detections["duplicates"] = timed("duplicates", lambda: detect_duplicates(full))
+    if want("outliers"):
+        say(0.15, "Checking outliers")
+        detections["outliers"] = timed("outliers", lambda: detect_outliers_iqr(X))
+    if want("inconsistency"):
+        detections["inconsistency"] = timed("inconsistency", lambda: detect_inconsistency(X))
+    for name in ("missing_values", "duplicates", "outliers", "inconsistency"):
+        if name not in detections:
+            skipped[name] = "not requested"
 
-    if y_model is None:
+    if not want("label_noise"):
+        skipped["label_noise"] = "not requested"
+    elif y_model is None:
         skipped["label_noise"] = "no target column selected"
     elif X_model.shape[1] >= 1 and y_model.value_counts().min() >= 2:
         say(0.25, "Estimating label reliability (cross-validated model)")
@@ -557,7 +611,9 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         skipped["label_noise"] = ("no modellable feature columns" if X_model.shape[1] == 0
                                   else "a target class has fewer than 2 rows")
 
-    if include_feature_anomalies and X_model.shape[1] >= 2:
+    if not want("feature_corruption"):
+        skipped["feature_corruption"] = "not requested"
+    elif include_feature_anomalies and X_model.shape[1] >= 2:
         say(0.55, "Checking feature anomalies (one model per column -- slow)")
         detections["feature_corruption"] = timed("feature_corruption", lambda: detect_feature_corruption_crossfeature(
             X_model, seed=seed))
@@ -568,9 +624,12 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
 
     say(0.90, "Building repair proposals")
     frames: list[pd.DataFrame] = []
-    frames += _propose_missing(X, integer_like, detections["missing_values"].extra["cell_mask"], df)
-    frames += _propose_duplicates(full, detections["duplicates"].row_mask)
-    frames += _propose_outliers(X, integer_like, detections["outliers"])
+    if "missing_values" in detections:
+        frames += _propose_missing(X, integer_like, detections["missing_values"].extra["cell_mask"], df)
+    if "duplicates" in detections:
+        frames += _propose_duplicates(full, detections["duplicates"].row_mask)
+    if "outliers" in detections:
+        frames += _propose_outliers(X, integer_like, detections["outliers"])
     if "label_noise" in detections:
         frames += _propose_labels(y, detections["label_noise"])
     if "feature_corruption" in detections:
@@ -597,6 +656,14 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
 # ---------------------------------------------------------------------------
 # Stage 2: apply repairs
 # ---------------------------------------------------------------------------
+def attach_self_benchmark(state: AuditState, selfbench) -> AuditState:
+    """Make the policy, impact estimates and reports use this dataset's own measured evidence. If the
+    self-benchmark could not run (`ok` False) the Adult evidence stays in force and the reason is reported."""
+    state.selfbench = selfbench
+    state.policy = _build_policy(state.detections, state.proposals, state.skipped, selfbench)
+    return state
+
+
 def default_apply_issues(state: AuditState) -> set[str]:
     """Issue types the evidence says are safe to repair automatically."""
     p = state.policy
@@ -723,7 +790,7 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     return TaskCleanResult(cleaned=cleaned, repair_log=repair_log, quality_report=quality,
                            impact_report=impact, policy=state.policy, readiness=readiness, summary=summary,
                            cleaned_aggressive=cleaned_agg, repair_log_aggressive=log_agg,
-                           summary_aggressive=summary_agg)
+                           summary_aggressive=summary_agg, selfbench=state.selfbench)
 
 
 # ---------------------------------------------------------------------------
@@ -741,9 +808,25 @@ def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None) -> dict:
             "inconsistency": detect_inconsistency(X).rate}
 
 
+def _ok_selfbench(state: AuditState):
+    sb = state.selfbench
+    return sb if sb is not None and getattr(sb, "ok", False) else None
+
+
+def _evidence_status(issue: str, tracking: pd.DataFrame | None) -> tuple[str, str]:
+    """(status, note) for how far a detector's flagged rate can be trusted as a severity signal: measured on this
+    dataset when calibrated, else the UCI Adult validation (Phase 11B)."""
+    if tracking is not None and issue in tracking.index:
+        return tracking.loc[issue, "evidence_status"], tracking.loc[issue, "note"]
+    return EVIDENCE_STATUS.get(issue, "not_estimable"), EVIDENCE_NOTES.get(issue, "")
+
+
 def _quality_report(state: AuditState) -> pd.DataFrame:
     p5_path = os.path.join(RESULTS_DIR, "phase5_detection_scores.csv")
     p5 = pd.read_csv(p5_path).set_index("error_type") if os.path.exists(p5_path) else None
+    sb = _ok_selfbench(state)
+    reliability = sb.detector_reliability.set_index("error_type") if sb is not None else None
+    tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
     rows = []
     order = [("missing_values", "missing_values", "exact check", "cells"),
              ("duplicates", "duplicates", "exact check", "rows"),
@@ -756,37 +839,50 @@ def _quality_report(state: AuditState) -> pd.DataFrame:
         rec = {"dimension": LABELS.get(issue, issue), "issue_key": issue, "detector_type": dtype}
         if det is None:
             rec.update(detected_rate=np.nan, detected_count=np.nan, count_unit=unit, benchmark_precision=np.nan,
-                       benchmark_recall=np.nan, evidence_status="not_run",
+                       benchmark_recall=np.nan, reliability_source=None, evidence_status="not_run",
                        note=state.skipped.get(det_key, "detector did not run"))
         else:
             n_rows = len(state.X)
             count = (int(det.extra["cell_mask"].values.sum()) if det_key == "missing_values"
                      else int(det.row_mask.sum()))
             prec = rec_ = np.nan
-            if p5 is not None and issue in p5.index:
+            rel_source = None
+            if reliability is not None and issue in reliability.index:
+                prec, rec_ = float(reliability.loc[issue, "precision"]), float(reliability.loc[issue, "recall"])
+                rel_source = "this dataset (self-benchmark)"
+            elif p5 is not None and issue in p5.index:
                 prec, rec_ = float(p5.loc[issue, "precision"]), float(p5.loc[issue, "recall"])
+                rel_source = "UCI Adult benchmark"
+            ev_status, ev_note = _evidence_status(issue, tracking)
+            note = ("report-only: no repair evidence exists for this issue type, so no repair is proposed"
+                    if issue == "inconsistency" else
+                    "flagged rate, not a confirmed error rate" if dtype != "exact check" else "")
             rec.update(detected_rate=det.rate, detected_count=count, count_unit=unit,
-                       benchmark_precision=prec, benchmark_recall=rec_,
-                       evidence_status=EVIDENCE_STATUS.get(issue, "not_estimable"),
-                       note=("report-only: no repair evidence exists for this issue type, so no repair is proposed"
-                             if issue == "inconsistency" else
-                             "flagged rate, not a confirmed error rate" if dtype != "exact check" else ""))
+                       benchmark_precision=prec, benchmark_recall=rec_, reliability_source=rel_source,
+                       evidence_status=ev_status, note=note)
         rows.append(rec)
     return pd.DataFrame(rows)
 
 
 def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
     pol = state.policy.set_index("issue_key")
+    sb = _ok_selfbench(state)
     rows = []
     for issue in ISSUES:
         p = pol.loc[issue]
         if not p.detector_ran:
             rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": np.nan,
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
+                         "impact_source": "-", "impact_unit": "-",
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "policy_decision": "not assessed", "recommendation": p.reason})
             continue
-        est, boundary = _estimate_impact(issue, p.detected_rate)
+        own = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate) if sb is not None else None
+        if own is not None:
+            (est, boundary), source, unit = own, "this dataset (self-benchmark)", sb.metric
+        else:
+            est, boundary = _estimate_impact(issue, p.detected_rate)
+            source, unit = "UCI Adult benchmark", "F1 (positive class)"
         if issue in apply_issues and p.n_repair_candidates > 0:
             decision = "applied" + ("" if p.safe_auto else " (human override)")
         elif p.n_repair_candidates + p.n_flag_only == 0:
@@ -795,6 +891,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             decision = "flagged for human review (not applied)"
         rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
                      "benchmark_impact_estimate": est, "is_boundary_estimate": boundary,
+                     "impact_source": source, "impact_unit": unit,
                      "repairability_status": p.repairability_status, "benchmark_risk": p.benchmark_risk,
                      "policy_decision": decision,
                      "recommendation": RECOMMENDATION_TEXT.get(p.repairability_status, RECOMMENDATION_TEXT["unknown"])})
@@ -818,23 +915,28 @@ def _summary(state, repair_log, cleaned, apply_issues, overrides) -> dict:
 
 def _readiness(state, quality, impact, apply_issues, overrides, after, summary) -> dict:
     baseline = _load_baseline_rates()
+    sb = _ok_selfbench(state)
+    tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
     dims = []
     for _, q in quality.iterrows():
         issue = q.issue_key
         ran = not pd.isna(q.detected_rate)
-        evidence = EVIDENCE_STATUS.get(issue, "not_estimable") if ran else "not_run"
+        evidence, evidence_note = _evidence_status(issue, tracking) if ran else ("not_run", "")
         exact = q.detector_type == "exact check"
-        base = baseline.get(issue)
+        own_floor = sb is not None and issue in sb.baseline_floors
+        base = sb.baseline_floors[issue] if own_floor else baseline.get(issue)
         if exact:
             base = 0.0   # an exact check has no false positives by construction, on any dataset
         status = _status(issue, q.detected_rate, base, evidence) if ran else "Not assessed"
+        floor_source = ("0 by construction (exact check)" if exact else
+                        "this dataset's clean-ish reference (self-benchmark)" if own_floor else
+                        "Adult benchmark floor -- NOT recalibrated for this dataset")
         dims.append({
             "dimension": q.dimension, "issue_key": issue,
             "observed_rate": None if not ran else float(q.detected_rate),
             "baseline_false_positive_floor": base,
-            "baseline_source": ("0 by construction (exact check)" if exact else
-                                 "Adult benchmark floor -- NOT recalibrated for this dataset") if ran else None,
-            "evidence_status": evidence, "evidence_note": EVIDENCE_NOTES.get(issue, ""), "status": status,
+            "baseline_source": floor_source if ran else None,
+            "evidence_status": evidence, "evidence_note": evidence_note, "status": status,
             "rate_after_cleaning": after.get(issue),
         })
     meta = state.meta
@@ -853,29 +955,44 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "model_based_detectors_sampled": meta["model_detectors_sampled"],
             "columns_not_analysed": state.excluded_columns,
             "columns_skipped_by_model_based_detectors": state.unmodeled_columns,
-            "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=300), UCI Adult",
+            "model_used_for_benchmark_validation": (
+                f"RandomForestClassifier (n_estimators={sb.n_estimators}) on this dataset's clean-ish reference; "
+                f"{sb.metric}" if sb is not None else "RandomForestClassifier (n_estimators=300), UCI Adult"),
         },
         "dimensions": dims,
         "benchmark_task_impact": [{
             "issue": r.issue, "detected_rate": None if pd.isna(r.detected_rate) else float(r.detected_rate),
             "benchmark_impact_estimate": None if pd.isna(r.benchmark_impact_estimate) else float(r.benchmark_impact_estimate),
-            "is_boundary_estimate": bool(r.is_boundary_estimate), "repairability_status": r.repairability_status,
+            "is_boundary_estimate": bool(r.is_boundary_estimate), "impact_source": r.impact_source,
+            "impact_unit": r.impact_unit, "repairability_status": r.repairability_status,
             "policy_decision": r.policy_decision, "recommendation": r.recommendation,
         } for r in impact.itertuples()],
         "impact_estimate_note": (
+            "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a "
+            "clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 on held-out "
+            "reference rows). It is an estimate of relative harm for this data and a Random Forest, not a "
+            "validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary "
+            "estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve."
+            if sb is not None else
             "Benchmark-based task-impact estimate: the detected rate is mapped onto the controlled Phase 7 "
             "damage curve (UCI Adult / Random Forest, rates 5-20%). It is not a measured or validated "
             "prediction of F1 loss for this dataset. Where the observed rate exceeds the validated 0-20% "
             "range the value is a boundary estimate (the 20% benchmark), not an extrapolation."),
         "repair_policy": {
-            "safe_auto_requires": f"benchmark risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, status != negative",
+            "safe_auto_requires": (f"observed harm risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, "
+                                   "status != negative -- evaluated on "
+                                   + ("this dataset's self-benchmark where measured, else the UCI Adult benchmark"
+                                      if sb is not None else "the UCI Adult benchmark")),
             "issues_applied": sorted(apply_issues), "human_overrides": overrides,
-            "decisions": state.policy[["issue", "default_action", "repairability_status", "reason"]].to_dict("records"),
+            "decisions": state.policy[["issue", "default_action", "repairability_status", "evidence_source",
+                                       "reason"]].to_dict("records"),
         },
+        "self_benchmark": (state.selfbench.summary() if state.selfbench is not None else
+                           {"ran": False, "reason": "not requested: all evidence comes from the UCI Adult benchmark"}),
         "changes_summary": summary,
         "run": {**meta, "python": platform.python_version(), "pandas": pd.__version__,
                 "scikit_learn": sklearn.__version__},
-        "limitations": LIMITATIONS,
+        "limitations": _limitations(state),
     }
 
 
@@ -908,6 +1025,36 @@ LIMITATIONS = [
 ]
 
 
+SELFBENCH_LIMITATIONS = [
+    "Self-benchmark evidence comes from a CLEAN-ISH reference built from your own data (complete rows, no "
+    "duplicates, high-confidence label problems removed), not true ground truth. Undetected problems left in the "
+    "reference, and selection bias from dropping incomplete rows, can make damage look smaller or repairs look "
+    "easier than they are.",
+    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and macro-F1: 'no harm "
+    "observed' means none in those runs, not a guarantee. Your own model may react differently.",
+    "Issues the self-benchmark did not measure (feature anomalies, consistency) still use the UCI Adult "
+    "evidence, and each decision names its evidence source.",
+    "The self-benchmark injects RANDOM errors. Real errors are often structured (systematic mislabeling, a "
+    "faulty sensor), so measured repair precision can be optimistic. That is why label and feature-anomaly "
+    "repairs are never applied automatically, whatever the evidence.",
+]
+
+
+def _limitations(state: AuditState) -> list[str]:
+    adult_specific = (1, 2, 3)      # benchmark-transfer / Adult-floor / Adult label-detector statements
+    sb = state.selfbench
+    if sb is not None and getattr(sb, "ok", False):
+        return SELFBENCH_LIMITATIONS + [t for i, t in enumerate(LIMITATIONS) if i not in adult_specific]
+    out = list(LIMITATIONS)
+    if sb is not None:
+        out.insert(0, f"Self-benchmark did not run on this dataset ({sb.reason}); all evidence comes from the "
+                      "UCI Adult benchmark.")
+    else:
+        out.append("Calibrating on your own data (self-benchmark) was not requested; enabling it replaces the "
+                   "Adult evidence with measurements from this dataset.")
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Output files
 # ---------------------------------------------------------------------------
@@ -930,7 +1077,11 @@ def _sanitize(o):
 def outputs_as_bytes(result: TaskCleanResult) -> dict[str, bytes]:
     csv = lambda df: df.to_csv(index=False).encode("utf-8")
     dims = pd.DataFrame(result.readiness["dimensions"])
-    return {
+    extra = {}
+    sb = result.selfbench
+    if sb is not None and getattr(sb, "ok", False):
+        extra = {"selfbenchmark_evidence.csv": csv(sb.evidence), "selfbenchmark_runs.csv": csv(sb.runs)}
+    return {**extra,
         "dataset_cleaned.csv": csv(result.cleaned),
         "repair_log.csv": csv(result.repair_log),
         "dataset_cleaned_aggressive.csv": csv(result.cleaned_aggressive),
@@ -979,6 +1130,10 @@ def main():
                          f"(choices: {', '.join(ISSUES)}); default = what the policy approves")
     ap.add_argument("--max-model-rows", type=int, default=MAX_MODEL_ROWS,
                     help="above this many rows the slow detectors run on a stratified sample")
+    ap.add_argument("--calibrate", action="store_true",
+                    help="self-benchmark on this dataset: measure damage, repair effectiveness and harm risk on a "
+                         "clean-ish reference built from your own data, and base the policy on that (needs a target)")
+    ap.add_argument("--calibrate-seeds", type=int, default=3, help="seeds per measurement (3 = quick, 5 = thorough)")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -990,13 +1145,24 @@ def main():
                           input_info=info)
     for note in state.meta["notes"]:
         print("  note:", note)
+    if args.calibrate:
+        from selfbench import run_self_benchmark       # local import: selfbench imports this module
+        print("\nCalibrating on this dataset (self-benchmark)...")
+        sb = run_self_benchmark(state, n_seeds=args.calibrate_seeds,
+                                progress=lambda f, m: print(f"  [{f:4.0%}] {m}") if m.endswith("(seed 42)") else None)
+        attach_self_benchmark(state, sb)
+        if sb.ok:
+            print(f"  done in {sb.seconds:.0f}s; noise floor {sb.noise_floor:.4f} {sb.metric}; "
+                  f"reference {sb.reference['rows_used']:,} rows")
+        else:
+            print(f"  skipped: {sb.reason}\n  (the policy keeps using the UCI Adult evidence)")
     apply_issues = None if args.apply is None else {s.strip() for s in args.apply.split(",") if s.strip()}
     result = apply_repairs(state, apply_issues)
     paths = write_outputs(result, args.out)
 
     print("\nREPAIR POLICY")
-    print(state.policy[["issue", "detected_rate", "n_repair_candidates", "n_flag_only", "default_action"]]
-          .round(4).to_string(index=False))
+    print(state.policy[["issue", "detected_rate", "n_repair_candidates", "n_flag_only", "default_action",
+                        "evidence_source"]].round(4).to_string(index=False))
     print("\nEVIDENCE-BASED FILE:", json.dumps(_sanitize(result.summary)))
     print("AGGRESSIVE FILE:    ", json.dumps(_sanitize(result.summary_aggressive)))
     print("\nWrote:")
