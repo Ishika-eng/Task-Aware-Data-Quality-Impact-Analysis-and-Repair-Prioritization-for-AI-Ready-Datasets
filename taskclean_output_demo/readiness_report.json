@@ -1,14 +1,24 @@
 {
   "taskclean_version": "1.0",
-  "generated_at_utc": "2026-10-02T17:24:17+00:00",
+  "generated_at_utc": "2026-10-02T17:47:26+00:00",
   "dataset_overview": {
     "rows_uploaded": 6300,
     "rows_analysed": 6300,
-    "rows_missing_target_excluded_from_analysis": 0,
+    "rows_without_target_excluded_from_label_checks": 0,
     "columns": 15,
     "target": "class",
     "task": "classification",
     "n_classes": 2,
+    "input_format": {
+      "encoding": "utf-8-sig",
+      "delimiter": ",",
+      "decimal": ".",
+      "rows": 6300,
+      "columns": 15
+    },
+    "notes": [],
+    "model_based_detectors_ran_on_rows": 6300,
+    "model_based_detectors_sampled": false,
     "columns_not_analysed": {},
     "columns_skipped_by_model_based_detectors": {},
     "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=300), UCI Adult"
@@ -192,15 +202,26 @@
     "n_rows_missing_target": 0,
     "n_columns": 15,
     "include_feature_anomalies": true,
+    "no_target_mode": false,
+    "model_detector_rows": 6300,
+    "model_detectors_sampled": false,
+    "input_format": {
+      "encoding": "utf-8-sig",
+      "delimiter": ",",
+      "decimal": ".",
+      "rows": 6300,
+      "columns": 15
+    },
+    "notes": [],
     "detector_seconds": {
       "missing_values": 0.0,
       "duplicates": 0.0,
       "outliers": 0.0,
       "inconsistency": 0.01,
       "label_noise": 2.41,
-      "feature_corruption": 26.18
+      "feature_corruption": 28.05
     },
-    "audit_seconds": 28.91,
+    "audit_seconds": 30.81,
     "python": "3.14.6",
     "pandas": "3.0.6",
     "scikit_learn": "1.9.1"
@@ -214,6 +235,51 @@
     "No single AI-readiness score is reported: the tested aggregate of detected rates was not supported by the evidence (pooled r = -0.24). This does not prove no composite could ever work.",
     "No before/after model metrics are reported: an uploaded dataset has no clean held-out test set, and evaluating on a held-out slice of the same dirty data would be misleading.",
     "Automatic repair is applied only for issue types whose benchmark repair showed zero observed harm and high precision. 'Repair not recommended' means the evaluated repair strategy was harmful in testing -- not that the underlying error is inherently unrepairable.",
-    "Classification targets only. Duplicates are full-record duplicates (features + target)."
-  ]
+    "Classification targets only (or no target: label checks are skipped). Duplicates are full-record duplicates (features + target).",
+    "Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; the original cell is left as-is unless a missing-value repair is applied. A token that is a genuine category in your data will be over-counted as missing.",
+    "Files above the model-detector row limit are audited on a stratified sample for the label/feature detectors; their findings and proposals then cover only the sampled rows.",
+    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above."
+  ],
+  "aggressive_variant": {
+    "description": "Every proposed repair except feature-anomaly repairs (harmful in the benchmark). Intended as a model-ready file; each applied repair outside the evidence-based policy is a human-override-style risk and is marked as such in repair_log_aggressive.csv.",
+    "issues_applied": [
+      "duplicates",
+      "label_errors",
+      "missing_values",
+      "outliers"
+    ],
+    "changes_summary": {
+      "rows_uploaded": 6300,
+      "rows_after_cleaning": 6000,
+      "rows_dropped": 300,
+      "cells_modified": 5148,
+      "repairs_applied_by_issue": {
+        "Duplicate row": 300,
+        "Missing value": 4200,
+        "Potential label error": 15,
+        "Potential outlier": 933
+      },
+      "flagged_for_review": 1425,
+      "flagged_only": 3217,
+      "skipped_conflicts": 0,
+      "skipped_row_dropped": 411,
+      "issues_applied": [
+        "duplicates",
+        "label_errors",
+        "missing_values",
+        "outliers"
+      ],
+      "human_overrides": [
+        "label_errors",
+        "missing_values",
+        "outliers"
+      ]
+    },
+    "rates_after_cleaning": {
+      "missing_values": 0.0,
+      "duplicates": 0.0,
+      "outliers": 0.21166666666666667,
+      "inconsistency": 0.0
+    }
+  }
 }
