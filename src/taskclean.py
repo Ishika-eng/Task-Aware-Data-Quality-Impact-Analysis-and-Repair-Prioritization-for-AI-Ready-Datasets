@@ -29,7 +29,9 @@ Design rules inherited from the research (see README):
 
 from __future__ import annotations
 
+import csv
 import io
+import re
 import json
 import os
 import platform
@@ -79,6 +81,12 @@ SAFE_REPAIR_MIN_PRECISION = 0.95
 MAX_CAT_LEVELS = 50
 MAX_CLASSES = 20            # classification only; more distinct targets looks like regression/IDs
 KNN_MAX_ROWS = 40_000       # above this, numeric imputation falls back to the median (KNN is O(n^2))
+# Above this many rows the slow, cross-validated detectors (labels, feature anomalies) run on a stratified
+# random sample instead of every row, and repairs/flags are produced only for the sampled rows.
+MAX_MODEL_ROWS = 30_000
+# Cell contents treated as "missing" when analysing text columns, in addition to real NaN. The original value
+# is never rewritten unless a missing-value repair is applied, and it is shown as-is in the repair log.
+PLACEHOLDER_TOKENS = {"", "?", "-", "--", "n/a", "na", "n.a.", "#n/a", "null", "nan"}
 
 Progress = Callable[[float, str], None]
 
@@ -89,9 +97,9 @@ Progress = Callable[[float, str], None]
 @dataclass
 class AuditState:
     df: pd.DataFrame                         # the uploaded frame (0-based RangeIndex = row_id)
-    target: str
+    target: str | None                       # None = no-target mode (label checks are skipped)
     X: pd.DataFrame                          # analysis features (category / float64), rows with a target
-    y: pd.Series                             # target as strings
+    y: pd.Series | None                      # target as strings (None in no-target mode)
     integer_like: dict[str, bool]
     excluded_columns: dict[str, str]         # not analysed at all
     unmodeled_columns: dict[str, str]        # skipped by model-based detectors only
@@ -100,17 +108,23 @@ class AuditState:
     proposals: pd.DataFrame                  # every candidate repair / flag
     policy: pd.DataFrame                     # one row per issue type
     meta: dict = field(default_factory=dict)
+    decimal_comma_columns: set = field(default_factory=set)
 
 
 @dataclass
 class TaskCleanResult:
-    cleaned: pd.DataFrame
+    cleaned: pd.DataFrame                    # evidence-based (or user-selected) repairs only
     repair_log: pd.DataFrame
     quality_report: pd.DataFrame
     impact_report: pd.DataFrame
     policy: pd.DataFrame
     readiness: dict
     summary: dict
+    # The "aggressive" variant: every proposed repair EXCEPT feature-anomaly repairs (demonstrably harmful in the
+    # benchmark). It is a model-ready file for people who want everything applied -- with the risks that implies.
+    cleaned_aggressive: pd.DataFrame | None = None
+    repair_log_aggressive: pd.DataFrame | None = None
+    summary_aggressive: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -123,11 +137,44 @@ def _to_category(s: pd.Series) -> pd.Series:
     return out.astype("category")
 
 
-def _prepare(df: pd.DataFrame, target: str):
-    if target not in df.columns:
+def _mask_placeholders(s: pd.Series) -> tuple[pd.Series, int]:
+    """Text cells whose stripped, lower-cased content is a placeholder token ('?', 'N/A', '', ...) become NaN
+    *in the analysis copy only*. Returns the masked series and how many cells were masked (not counting
+    cells that were already NaN)."""
+    obj = s.astype(object)
+    is_ph = obj.map(lambda v: isinstance(v, str) and v.strip().lower() in PLACEHOLDER_TOKENS)
+    return obj.where(~is_ph, np.nan), int((is_ph & s.notna()).sum())
+
+
+_COMMA_DECIMAL = re.compile(r"^\s*-?\d+(,\d+)?\s*$")
+
+
+def _looks_numeric(masked: pd.Series):
+    """Parse a text column as numbers only if EVERY non-missing value parses (and none looks like an
+    identifier with leading zeros, e.g. a ZIP code). Handles decimal commas ('3,5'). Returns
+    (numbers, uses_decimal_comma), or (None, False) to keep the column categorical."""
+    nn = masked.dropna()
+    if nn.empty:
+        return None, False
+    if nn.map(lambda v: isinstance(v, str) and len(v.strip()) > 1 and v.strip()[0] == "0"
+              and not v.strip().startswith("0.") and not v.strip().startswith("0,")).any():
+        return None, False
+    num = pd.to_numeric(masked, errors="coerce")
+    if num.notna().sum() == masked.notna().sum():
+        return num, False
+    if nn.map(lambda v: isinstance(v, str) and bool(_COMMA_DECIMAL.match(v))).all() and nn.str.contains(",").any():
+        num = pd.to_numeric(masked.map(lambda v: v.replace(",", ".") if isinstance(v, str) else v), errors="coerce")
+        if num.notna().sum() == masked.notna().sum():
+            return num, True
+    return None, False
+
+
+def _prepare(df: pd.DataFrame, target: str | None):
+    if target is not None and target not in df.columns:
         raise ValueError(f"target column '{target}' not found in the dataset")
 
-    excluded, feats, integer_like = {}, {}, {}
+    excluded, feats, integer_like, notes = {}, {}, {}, []
+    placeholder_counts, numeric_text, comma_cols = {}, [], set()
     for col in df.columns:
         if col == target:
             continue
@@ -144,14 +191,41 @@ def _prepare(df: pd.DataFrame, target: str):
             nn = num.dropna()
             integer_like[col] = bool(len(nn) and (nn % 1 == 0).all())
         else:
-            feats[col] = _to_category(s)
+            masked, n_ph = _mask_placeholders(s)
+            if masked.isna().all():
+                excluded[col] = "entirely missing (placeholders only)"
+                continue
+            if n_ph:
+                placeholder_counts[col] = n_ph
+            num, uses_comma = _looks_numeric(masked)
+            if num is not None:
+                feats[col] = num.astype(float)
+                nn = feats[col].dropna()
+                integer_like[col] = bool(len(nn) and (nn % 1 == 0).all())
+                numeric_text.append(col)
+                if uses_comma:
+                    comma_cols.add(col)
+            else:
+                feats[col] = _to_category(masked)
 
     if not feats:
         raise ValueError("no usable feature columns after excluding the target")
+    if placeholder_counts:
+        top = sorted(placeholder_counts.items(), key=lambda kv: -kv[1])
+        shown = ", ".join(f"{c} ({n:,})" for c, n in top[:6]) + (f", and {len(top) - 6} more" if len(top) > 6 else "")
+        notes.append(f"{sum(placeholder_counts.values()):,} placeholder cell(s) such as '?', 'N/A' or empty text are "
+                     f"treated as missing: {shown}")
+    if numeric_text:
+        notes.append(f"{len(numeric_text)} column(s) are stored as text but every value is a number, so they are "
+                     f"analysed as numeric: {', '.join(numeric_text[:6])}" + (", ..." if len(numeric_text) > 6 else "")
+                     + (f" (decimal comma in {len(comma_cols)})" if comma_cols else ""))
 
-    y_raw = df[target]
-    has_target = y_raw.notna()
-    y = y_raw[has_target].astype(str)
+    if target is None:
+        return pd.DataFrame(feats, index=df.index), None, integer_like, excluded, notes, comma_cols
+
+    # y covers every row (NaN where the target is missing) so the cheap checks can still clean unlabeled rows;
+    # only the label / model-based detectors restrict themselves to labeled rows.
+    y = df[target].astype(object).map(lambda v: np.nan if pd.isna(v) else str(v))
     n_classes = y.nunique()
     if n_classes < 2:
         raise ValueError(f"target '{target}' has fewer than 2 distinct values -- nothing to classify")
@@ -160,16 +234,65 @@ def _prepare(df: pd.DataFrame, target: str):
             f"target '{target}' has {n_classes} distinct values; TaskClean supports classification only "
             f"(<= {MAX_CLASSES} classes). This looks like a regression target or an ID column.")
 
-    X = pd.DataFrame(feats, index=df.index).loc[y.index]
-    return X, y, integer_like, excluded
+    return pd.DataFrame(feats, index=df.index), y, integer_like, excluded, notes, comma_cols
 
 
-def _full_record(X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+def _full_record(X: pd.DataFrame, y: pd.Series | None) -> pd.DataFrame:
     """Duplicates are judged on the WHOLE record (features + target). Two
     rows with identical features but different labels are not duplicates --
     dropping one would delete information. (In the benchmark, injected
-    duplicates were full-row copies, so this matches what was validated.)"""
-    return pd.concat([X, y.rename("__target__")], axis=1)
+    duplicates were full-row copies, so this matches what was validated.)
+    With no target, the record is just the features."""
+    return X.copy() if y is None else pd.concat([X, y.rename("__target__")], axis=1)
+
+
+def load_csv(source) -> tuple[pd.DataFrame, dict]:
+    """Read a CSV from a path, bytes or file-like object, detecting the text encoding, the delimiter
+    (, ; tab |) and -- for ';'-delimited files -- whether decimals use a comma. Returns (frame, info)."""
+    if isinstance(source, (str, os.PathLike)):
+        with open(source, "rb") as f:
+            raw = f.read()
+    elif isinstance(source, (bytes, bytearray)):
+        raw = bytes(source)
+    else:
+        raw = source.read()
+        raw = raw.encode("utf-8") if isinstance(raw, str) else raw
+    if not raw.strip():
+        raise ValueError("the file is empty")
+
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):    # latin-1 accepts any byte sequence
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+
+    head = text[:65536]
+    try:
+        delimiter = csv.Sniffer().sniff(head, delimiters=",;\t|").delimiter
+    except csv.Error:
+        first = head.splitlines()[0] if head.strip() else ""
+        delimiter = max(",;\t|", key=first.count)
+
+    def read(sep, decimal="."):
+        return pd.read_csv(io.StringIO(text), sep=sep, decimal=decimal, low_memory=False)
+
+    df = read(delimiter)
+    if df.shape[1] == 1:                                   # sniffer guessed wrong: take the delimiter that splits most
+        candidates = {d: read(d) for d in ",;\t|" if d != delimiter and d in head}
+        if candidates:
+            best = max(candidates, key=lambda d: candidates[d].shape[1])
+            if candidates[best].shape[1] > 1:
+                delimiter, df = best, candidates[best]
+    decimal = "."
+    if delimiter == ";":                                   # European convention: 3,5 means 3.5
+        alt = read(delimiter, ",")
+        n_numeric = lambda d: sum(pd.api.types.is_numeric_dtype(d[c]) for c in d.columns)
+        if n_numeric(alt) > n_numeric(df):
+            df, decimal = alt, ","
+    df.columns = [str(c).strip() for c in df.columns]
+    return df, {"encoding": encoding, "delimiter": {"\t": "tab"}.get(delimiter, delimiter), "decimal": decimal,
+                "rows": len(df), "columns": df.shape[1]}
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +310,7 @@ def _records(issue, rows, column, original, proposed, method, tier, score) -> pd
     })
 
 
-def _propose_missing(X, integer_like, cell_mask) -> list[pd.DataFrame]:
+def _propose_missing(X, integer_like, cell_mask, original: pd.DataFrame) -> list[pd.DataFrame]:
     frames = []
     num_cols = [c for c in X.columns if pd.api.types.is_numeric_dtype(X[c])]
     miss_num = [c for c in num_cols if cell_mask[c].any()]
@@ -209,13 +332,14 @@ def _propose_missing(X, integer_like, cell_mask) -> list[pd.DataFrame]:
             vals = imputed.loc[rows, c]
             if integer_like.get(c):
                 vals = vals.round()
-            frames.append(_records("missing_values", rows, c, np.nan, vals.values, method, "exact", np.nan))
+            frames.append(_records("missing_values", rows, c, original.loc[rows, c].values, vals.values,
+                                   method, "exact", np.nan))
     for c in [c for c in X.columns if c not in num_cols and cell_mask[c].any()]:
         mode = X[c].mode(dropna=True)
         if len(mode) == 0:
             continue
         rows = X.index[cell_mask[c]]
-        frames.append(_records("missing_values", rows, c, np.nan, str(mode.iloc[0]),
+        frames.append(_records("missing_values", rows, c, original.loc[rows, c].values, str(mode.iloc[0]),
                                "most-frequent value", "exact", np.nan))
     return frames
 
@@ -359,17 +483,52 @@ def _build_policy(detections, proposals, skipped) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Stage 1: audit
 # ---------------------------------------------------------------------------
-def audit_dataset(df: pd.DataFrame, target: str, include_feature_anomalies: bool = False, seed: int = 42,
-                  progress: Progress | None = None) -> AuditState:
-    """Detect problems and propose repairs. Expensive (model-based detectors)."""
+def _stratified_sample_index(y: pd.Series | None, index: pd.Index, n: int, seed: int) -> pd.Index:
+    """Random sample of `n` rows; stratified by class when there is a target (every class keeps >= 5 rows
+    where it has them) so the cross-validated label detector still sees all classes."""
+    if y is None:
+        return index[np.sort(np.random.default_rng(seed).choice(len(index), size=n, replace=False))]
+    frac = n / len(y)
+    parts = [g.sample(n=min(len(g), max(5, int(round(len(g) * frac)))), random_state=seed)
+             for _, g in y.groupby(y)]
+    return pd.concat(parts).index.sort_values()
+
+
+def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalies: bool = False, seed: int = 42,
+                  progress: Progress | None = None, max_model_rows: int = MAX_MODEL_ROWS,
+                  input_info: dict | None = None) -> AuditState:
+    """Detect problems and propose repairs. Expensive (model-based detectors).
+
+    target=None runs in no-target mode: missing values, duplicates, outliers and inconsistent values are
+    checked; the label detector cannot run. Datasets with more than `max_model_rows` rows run the slow
+    cross-validated detectors on a stratified sample (cheap checks always use every row)."""
     say = progress or (lambda f, m: None)
     t0 = time.monotonic()
     df = df.reset_index(drop=True).copy()
-    X, y, integer_like, excluded = _prepare(df, target)
+    if df.empty:
+        raise ValueError("the dataset has no rows")
+    X, y, integer_like, excluded, notes, comma_cols = _prepare(df, target)
 
     unmodeled = {c: f"{X[c].nunique()} distinct values (> {MAX_CAT_LEVELS}); skipped by model-based detectors"
                  for c in X.columns if not pd.api.types.is_numeric_dtype(X[c]) and X[c].nunique() > MAX_CAT_LEVELS}
-    X_model = X.drop(columns=list(unmodeled))
+    labeled = y.notna() if y is not None else pd.Series(True, index=X.index)
+    X_model = X.loc[labeled].drop(columns=list(unmodeled))
+    y_lab = y.loc[labeled] if y is not None else None
+    n_unlabeled = int((~labeled).sum()) if y is not None else 0
+    if n_unlabeled:
+        notes.append(f"{n_unlabeled:,} row(s) have no target value: they are still checked for missing values, "
+                     "duplicates and outliers, but are excluded from the label and model-based detectors")
+
+    sampled = len(X_model) > max_model_rows
+    if sampled:
+        sample_idx = _stratified_sample_index(y_lab, X_model.index, max_model_rows, seed)
+        X_model = X_model.loc[sample_idx]
+        y_model = None if y_lab is None else y_lab.loc[sample_idx]
+        notes.append(f"{len(labeled):,} rows exceed the {max_model_rows:,}-row limit for the model-based detectors: they ran "
+                     f"on a stratified random sample of {len(sample_idx):,} rows, so label/feature findings and "
+                     "proposals cover only those rows (the cheap checks use every row)")
+    else:
+        y_model = y_lab
 
     detections, skipped, timings = {}, {}, {}
 
@@ -388,11 +547,12 @@ def audit_dataset(df: pd.DataFrame, target: str, include_feature_anomalies: bool
     detections["outliers"] = timed("outliers", lambda: detect_outliers_iqr(X))
     detections["inconsistency"] = timed("inconsistency", lambda: detect_inconsistency(X))
 
-    counts = y.value_counts()
-    if X_model.shape[1] >= 1 and counts.min() >= 2:
+    if y_model is None:
+        skipped["label_noise"] = "no target column selected"
+    elif X_model.shape[1] >= 1 and y_model.value_counts().min() >= 2:
         say(0.25, "Estimating label reliability (cross-validated model)")
         detections["label_noise"] = timed("label_noise", lambda: detect_label_noise(
-            X_model, y, confidence_threshold=0.9, seed=seed))
+            X_model, y_model, confidence_threshold=0.9, seed=seed))
     else:
         skipped["label_noise"] = ("no modellable feature columns" if X_model.shape[1] == 0
                                   else "a target class has fewer than 2 rows")
@@ -408,27 +568,30 @@ def audit_dataset(df: pd.DataFrame, target: str, include_feature_anomalies: bool
 
     say(0.90, "Building repair proposals")
     frames: list[pd.DataFrame] = []
-    frames += _propose_missing(X, integer_like, detections["missing_values"].extra["cell_mask"])
+    frames += _propose_missing(X, integer_like, detections["missing_values"].extra["cell_mask"], df)
     frames += _propose_duplicates(full, detections["duplicates"].row_mask)
     frames += _propose_outliers(X, integer_like, detections["outliers"])
     if "label_noise" in detections:
         frames += _propose_labels(y, detections["label_noise"])
     if "feature_corruption" in detections:
-        frames += _propose_features(X, integer_like, detections["feature_corruption"])
+        frames += _propose_features(X_model, integer_like, detections["feature_corruption"])
     proposals = (pd.concat(frames, ignore_index=True) if frames else
                  pd.DataFrame(columns=["issue_key", "row_id", "column", "problem", "original_value",
                                        "proposed_value", "method", "tier", "detector_score"]))
     policy = _build_policy(detections, proposals, skipped)
 
     meta = {
-        "seed": seed, "n_rows_uploaded": len(df), "n_rows_analysed": len(X), "n_rows_missing_target": int(len(df) - len(X)),
+        "seed": seed, "n_rows_uploaded": len(df), "n_rows_analysed": len(X), "n_rows_missing_target": n_unlabeled,
         "n_columns": df.shape[1], "include_feature_anomalies": include_feature_anomalies,
+        "no_target_mode": target is None,
+        "model_detector_rows": len(X_model), "model_detectors_sampled": sampled,
+        "input_format": input_info or {}, "notes": notes,
         "detector_seconds": timings, "audit_seconds": round(time.monotonic() - t0, 2),
     }
     say(1.0, "Audit complete")
     return AuditState(df=df, target=target, X=X, y=y, integer_like=integer_like, excluded_columns=excluded,
                       unmodeled_columns=unmodeled, detections=detections, skipped=skipped,
-                      proposals=proposals, policy=policy, meta=meta)
+                      proposals=proposals, policy=policy, meta=meta, decimal_comma_columns=comma_cols)
 
 
 # ---------------------------------------------------------------------------
@@ -440,7 +603,7 @@ def default_apply_issues(state: AuditState) -> set[str]:
     return set(p.loc[(p.default_action == "auto-repair"), "issue_key"])
 
 
-def _assign(cleaned: pd.DataFrame, col: str, ids, values, label_map=None):
+def _assign(cleaned: pd.DataFrame, col: str, ids, values, label_map=None, decimal_comma=False):
     """Write `values` into cleaned[col] at row labels `ids`, respecting dtype."""
     ids = list(ids)
     s = cleaned[col]
@@ -453,30 +616,27 @@ def _assign(cleaned: pd.DataFrame, col: str, ids, values, label_map=None):
         elif pd.api.types.is_integer_dtype(s):
             values = values.astype(s.dtype)
         cleaned.loc[ids, col] = values
-    elif isinstance(s.dtype, pd.CategoricalDtype):
-        new_cats = [v for v in set(values) if v not in s.cat.categories]
-        if new_cats:
-            cleaned[col] = s.cat.add_categories(new_cats)
-        cleaned.loc[ids, col] = values
     else:
+        # text / category column: a numeric proposal (e.g. an imputed value for a numeric-looking text column)
+        # is written as text so the column keeps a consistent type
+        values = [v if isinstance(v, str) else (f"{float(v):.10g}".replace(".", ",") if decimal_comma
+                                                 else f"{float(v):.10g}") for v in values]
+        if isinstance(s.dtype, pd.CategoricalDtype):
+            new_cats = [v for v in set(values) if v not in s.cat.categories]
+            if new_cats:
+                cleaned[col] = s.cat.add_categories(new_cats)
         cleaned.loc[ids, col] = values
 
 
-def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> TaskCleanResult:
-    """Apply the chosen repair types. `apply_issues=None` means "exactly what the
-    evidence-based policy approves". Passing extra issue types is an explicit
-    human override and is recorded as such in the log and report."""
-    policy_default = default_apply_issues(state)
-    apply_issues = set(policy_default if apply_issues is None else apply_issues)
-    overrides = sorted(apply_issues - policy_default)
-
+def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
+    """Apply `apply_issues` to a copy of the uploaded frame. Returns (cleaned, repair_log)."""
     cleaned = state.df.copy()
     prop = state.proposals.copy()
     prop["action"] = np.where(prop.tier == "loose", "flagged_only", "flagged_for_review")
     prop["applied_value"] = pd.Series([np.nan] * len(prop), dtype=object)
     modified: set[tuple] = set()
     drop_ids: list[int] = []
-    label_map = {str(v): v for v in state.df[state.target].dropna().unique()}
+    label_map = ({str(v): v for v in state.df[state.target].dropna().unique()} if state.target is not None else {})
     # Rows that will be removed as duplicates: repairing cells on a row we are
     # about to delete would make the log claim a change that does not exist in
     # the output file, so those repairs are skipped (and logged as such).
@@ -507,10 +667,12 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
             g = g[~in_drop & ~conflict]
             if g.empty:
                 continue
-            _assign(cleaned, col, g.row_id.values, g.proposed_value.values, label_map if is_label else None)
+            _assign(cleaned, col, g.row_id.values, g.proposed_value.values, label_map if is_label else None,
+                    decimal_comma=col in state.decimal_comma_columns)
             modified |= {(r, col) for r in g.row_id}
             prop.loc[g.index, "action"] = "applied"
-            prop.loc[g.index, "applied_value"] = g.proposed_value.values
+            # record what was actually written to the file (e.g. '38,2' in a decimal-comma column)
+            prop.loc[g.index, "applied_value"] = [cleaned.at[r, col] for r in g.row_id]
 
     if drop_ids:
         cleaned = cleaned.drop(index=drop_ids)
@@ -523,24 +685,54 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
                        "applied_value", "action", "method", "tier", "detector_score",
                        "repair_evidence_status", "human_override"]].copy()
     repair_log["column"] = repair_log["column"].replace("", np.nan)
-    repair_log.loc[(repair_log.problem == PROBLEM_TEXT["label_errors"]), "column"] = state.target
+    if state.target is not None:
+        repair_log.loc[(repair_log.problem == PROBLEM_TEXT["label_errors"]), "column"] = state.target
+    return cleaned, repair_log
+
+
+def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> TaskCleanResult:
+    """Apply the chosen repair types. `apply_issues=None` means "exactly what the
+    evidence-based policy approves". Passing extra issue types is an explicit
+    human override and is recorded as such in the log and report.
+
+    Always also builds the "aggressive" variant (every proposal except feature-anomaly
+    repairs) so a model-ready file exists even when the policy approves almost nothing."""
+    policy_default = default_apply_issues(state)
+    apply_issues = set(policy_default if apply_issues is None else apply_issues)
+    overrides = sorted(apply_issues - policy_default)
+    cleaned, repair_log = _apply(state, apply_issues, overrides)
+
+    aggressive_issues = {i for i in ISSUES if i != "feature_corruption"}
+    aggressive_overrides = sorted(aggressive_issues - policy_default)
+    cleaned_agg, log_agg = _apply(state, aggressive_issues, aggressive_overrides)
+    summary_agg = _summary(state, log_agg, cleaned_agg, aggressive_issues, aggressive_overrides)
 
     after = _after_cleaning_rates(cleaned, state.target)
+    after_agg = _after_cleaning_rates(cleaned_agg, state.target)
     quality = _quality_report(state)
     impact = _impact_report(state, apply_issues)
     summary = _summary(state, repair_log, cleaned, apply_issues, overrides)
     readiness = _readiness(state, quality, impact, apply_issues, overrides, after, summary)
+    readiness["aggressive_variant"] = {
+        "description": ("Every proposed repair except feature-anomaly repairs (harmful in the benchmark). Intended "
+                        "as a model-ready file; each applied repair outside the evidence-based policy is a human-"
+                        "override-style risk and is marked as such in repair_log_aggressive.csv."),
+        "issues_applied": sorted(aggressive_issues), "changes_summary": summary_agg,
+        "rates_after_cleaning": after_agg,
+    }
     return TaskCleanResult(cleaned=cleaned, repair_log=repair_log, quality_report=quality,
-                           impact_report=impact, policy=state.policy, readiness=readiness, summary=summary)
+                           impact_report=impact, policy=state.policy, readiness=readiness, summary=summary,
+                           cleaned_aggressive=cleaned_agg, repair_log_aggressive=log_agg,
+                           summary_aggressive=summary_agg)
 
 
 # ---------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------
-def _after_cleaning_rates(cleaned: pd.DataFrame, target: str) -> dict:
+def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None) -> dict:
     """Cheap, deterministic detectors only -- the model-based ones are not re-run."""
     try:
-        X, y, _, _ = _prepare(cleaned.reset_index(drop=True), target)
+        X, y, _, _, _, _ = _prepare(cleaned.reset_index(drop=True), target)
     except ValueError:
         return {}
     return {"missing_values": detect_missing(X).rate,
@@ -651,9 +843,14 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
         "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dataset_overview": {
             "rows_uploaded": meta["n_rows_uploaded"], "rows_analysed": meta["n_rows_analysed"],
-            "rows_missing_target_excluded_from_analysis": meta["n_rows_missing_target"],
-            "columns": meta["n_columns"], "target": state.target, "task": "classification",
-            "n_classes": int(state.y.nunique()),
+            "rows_without_target_excluded_from_label_checks": meta["n_rows_missing_target"],
+            "columns": meta["n_columns"], "target": state.target,
+            "task": "classification" if state.target is not None else "none (no-target mode: label checks skipped)",
+            "n_classes": int(state.y.nunique()) if state.y is not None else None,
+            "input_format": meta.get("input_format", {}),
+            "notes": meta.get("notes", []),
+            "model_based_detectors_ran_on_rows": meta["model_detector_rows"],
+            "model_based_detectors_sampled": meta["model_detectors_sampled"],
             "columns_not_analysed": state.excluded_columns,
             "columns_skipped_by_model_based_detectors": state.unmodeled_columns,
             "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=300), UCI Adult",
@@ -699,7 +896,15 @@ LIMITATIONS = [
     "Automatic repair is applied only for issue types whose benchmark repair showed zero observed harm and high "
     "precision. 'Repair not recommended' means the evaluated repair strategy was harmful in testing -- not that "
     "the underlying error is inherently unrepairable.",
-    "Classification targets only. Duplicates are full-record duplicates (features + target).",
+    "Classification targets only (or no target: label checks are skipped). Duplicates are full-record duplicates "
+    "(features + target).",
+    "Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; the original cell is "
+    "left as-is unless a missing-value repair is applied. A token that is a genuine category in your data will "
+    "be over-counted as missing.",
+    "Files above the model-detector row limit are audited on a stratified sample for the label/feature "
+    "detectors; their findings and proposals then cover only the sampled rows.",
+    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only "
+    "duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above.",
 ]
 
 
@@ -728,6 +933,8 @@ def outputs_as_bytes(result: TaskCleanResult) -> dict[str, bytes]:
     return {
         "dataset_cleaned.csv": csv(result.cleaned),
         "repair_log.csv": csv(result.repair_log),
+        "dataset_cleaned_aggressive.csv": csv(result.cleaned_aggressive),
+        "repair_log_aggressive.csv": csv(result.repair_log_aggressive),
         "quality_report.csv": csv(result.quality_report),
         "impact_report.csv": csv(result.impact_report),
         "readiness_report.json": json.dumps(_sanitize(result.readiness), indent=2).encode("utf-8"),
@@ -761,19 +968,28 @@ def main():
 
     ap = argparse.ArgumentParser(description="TaskClean: task-aware data quality audit and safe repair")
     ap.add_argument("csv")
-    ap.add_argument("--target", required=True)
+    ap.add_argument("--target", default=None,
+                    help="target column (classification). Omit for no-target mode: missing values, duplicates, "
+                         "outliers and inconsistencies only")
     ap.add_argument("--out", default="taskclean_output")
     ap.add_argument("--feature-anomalies", action="store_true",
                     help="also run the slow feature-anomaly detector (its auto-repair is never recommended)")
     ap.add_argument("--apply", default=None,
                     help="comma-separated issue keys to apply, overriding the evidence-based policy "
                          f"(choices: {', '.join(ISSUES)}); default = what the policy approves")
+    ap.add_argument("--max-model-rows", type=int, default=MAX_MODEL_ROWS,
+                    help="above this many rows the slow detectors run on a stratified sample")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    df = pd.read_csv(args.csv)
+    df, info = load_csv(args.csv)
+    print(f"Read {info['rows']:,} rows x {info['columns']} columns "
+          f"(encoding {info['encoding']}, delimiter '{info['delimiter']}', decimal '{info['decimal']}')")
     state = audit_dataset(df, args.target, include_feature_anomalies=args.feature_anomalies, seed=args.seed,
-                          progress=lambda f, m: print(f"  [{f:4.0%}] {m}"))
+                          progress=lambda f, m: print(f"  [{f:4.0%}] {m}"), max_model_rows=args.max_model_rows,
+                          input_info=info)
+    for note in state.meta["notes"]:
+        print("  note:", note)
     apply_issues = None if args.apply is None else {s.strip() for s in args.apply.split(",") if s.strip()}
     result = apply_repairs(state, apply_issues)
     paths = write_outputs(result, args.out)
@@ -781,7 +997,8 @@ def main():
     print("\nREPAIR POLICY")
     print(state.policy[["issue", "detected_rate", "n_repair_candidates", "n_flag_only", "default_action"]]
           .round(4).to_string(index=False))
-    print("\nCHANGES:", json.dumps(_sanitize(result.summary)))
+    print("\nEVIDENCE-BASED FILE:", json.dumps(_sanitize(result.summary)))
+    print("AGGRESSIVE FILE:    ", json.dumps(_sanitize(result.summary_aggressive)))
     print("\nWrote:")
     for name, path in paths.items():
         print(f"  {path}")
