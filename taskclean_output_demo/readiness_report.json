@@ -1,6 +1,6 @@
 {
   "taskclean_version": "1.0",
-  "generated_at_utc": "2026-10-02T17:47:26+00:00",
+  "generated_at_utc": "2026-10-03T02:34:34+00:00",
   "dataset_overview": {
     "rows_uploaded": 6300,
     "rows_analysed": 6300,
@@ -21,7 +21,7 @@
     "model_based_detectors_sampled": false,
     "columns_not_analysed": {},
     "columns_skipped_by_model_based_detectors": {},
-    "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=300), UCI Adult"
+    "model_used_for_benchmark_validation": "RandomForestClassifier (n_estimators=100) on this dataset's clean-ish reference; macro-F1"
   },
   "dimensions": [
     {
@@ -30,9 +30,9 @@
       "observed_rate": 0.05006802721088435,
       "baseline_false_positive_floor": 0.0,
       "baseline_source": "0 by construction (exact check)",
-      "evidence_status": "weak",
-      "evidence_note": "Weak/inconclusive relationship with measured impact across tested rates (r=0.61, n=3 -- not statistically significant at this sample size).",
-      "status": "Attention",
+      "evidence_status": "not_estimable",
+      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+      "status": "Evidence-limited",
       "rate_after_cleaning": 0.05
     },
     {
@@ -41,20 +41,20 @@
       "observed_rate": 0.047619047619047616,
       "baseline_false_positive_floor": 0.0,
       "baseline_source": "0 by construction (exact check)",
-      "evidence_status": "weak",
-      "evidence_note": "Direction consistent with impact rising at higher rates, but not statistically significant at n=3 (r=0.78).",
-      "status": "Attention",
+      "evidence_status": "not_estimable",
+      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+      "status": "Evidence-limited",
       "rate_after_cleaning": 0.0
     },
     {
       "dimension": "Anomaly burden",
       "issue_key": "outliers",
       "observed_rate": 0.32666666666666666,
-      "baseline_false_positive_floor": 0.2982151318906966,
-      "baseline_source": "Adult benchmark floor -- NOT recalibrated for this dataset",
-      "evidence_status": "weak",
-      "evidence_note": "Strongest observed trend among all dimensions (r=0.99, n=3) but still not statistically significant at this sample size; detector also has a known high false-positive baseline even on clean data (Phase 5/6).",
-      "status": "Good",
+      "baseline_false_positive_floor": 0.3275034293552812,
+      "baseline_source": "this dataset's clean-ish reference (self-benchmark)",
+      "evidence_status": "not_estimable",
+      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+      "status": "Evidence-limited",
       "rate_after_cleaning": 0.30816666666666664
     },
     {
@@ -72,10 +72,10 @@
       "dimension": "Label reliability",
       "issue_key": "label_errors",
       "observed_rate": 0.011904761904761904,
-      "baseline_false_positive_floor": 0.01990206918338335,
-      "baseline_source": "Adult benchmark floor -- NOT recalibrated for this dataset",
+      "baseline_false_positive_floor": 0.009945130315500686,
+      "baseline_source": "this dataset's clean-ish reference (self-benchmark)",
       "evidence_status": "inverted",
-      "evidence_note": "INVERTED relationship: detected rate DECREASES as true corruption (and real measured damage) increases, most likely because the cross-validated detector's own model is degraded by the label noise it's trying to audit. Do not use the detected rate as a proxy for label-error severity.",
+      "evidence_note": "INVERTED on this dataset: the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal.",
       "status": "High uncertainty",
       "rate_after_cleaning": null
     },
@@ -95,8 +95,10 @@
     {
       "issue": "Missing value",
       "detected_rate": 0.05006802721088435,
-      "benchmark_impact_estimate": 0.004199065345279828,
+      "benchmark_impact_estimate": -0.0048536431222384975,
       "is_boundary_estimate": false,
+      "impact_source": "this dataset (self-benchmark)",
+      "impact_unit": "macro-F1",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -104,8 +106,10 @@
     {
       "issue": "Duplicate row",
       "detected_rate": 0.047619047619047616,
-      "benchmark_impact_estimate": 0.00047954768615790467,
+      "benchmark_impact_estimate": -0.00443593445568742,
       "is_boundary_estimate": false,
+      "impact_source": "this dataset (self-benchmark)",
+      "impact_unit": "macro-F1",
       "repairability_status": "weak",
       "policy_decision": "applied",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -113,8 +117,10 @@
     {
       "issue": "Potential outlier",
       "detected_rate": 0.32666666666666666,
-      "benchmark_impact_estimate": 0.0090595010698906,
+      "benchmark_impact_estimate": 0.007733533656622289,
       "is_boundary_estimate": true,
+      "impact_source": "this dataset (self-benchmark)",
+      "impact_unit": "macro-F1",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -122,8 +128,10 @@
     {
       "issue": "Potential label error",
       "detected_rate": 0.011904761904761904,
-      "benchmark_impact_estimate": 0.0023389948658212377,
+      "benchmark_impact_estimate": 9.212977951265887e-05,
       "is_boundary_estimate": false,
+      "impact_source": "this dataset (self-benchmark)",
+      "impact_unit": "macro-F1",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -133,14 +141,16 @@
       "detected_rate": 0.47873015873015873,
       "benchmark_impact_estimate": 0.0144064695489737,
       "is_boundary_estimate": true,
+      "impact_source": "UCI Adult benchmark",
+      "impact_unit": "F1 (positive class)",
       "repairability_status": "negative",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Automatic repair NOT recommended under the evaluated repair strategy -- controlled testing demonstrated it is net-harmful. This does not mean the underlying error is inherently unrepairable, only that the strategy we evaluated was harmful here. Flag for manual review instead of auto-repairing."
     }
   ],
-  "impact_estimate_note": "Benchmark-based task-impact estimate: the detected rate is mapped onto the controlled Phase 7 damage curve (UCI Adult / Random Forest, rates 5-20%). It is not a measured or validated prediction of F1 loss for this dataset. Where the observed rate exceeds the validated 0-20% range the value is a boundary estimate (the 20% benchmark), not an extrapolation.",
+  "impact_estimate_note": "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 on held-out reference rows). It is an estimate of relative harm for this data and a Random Forest, not a validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve.",
   "repair_policy": {
-    "safe_auto_requires": "benchmark risk == 0, repair precision >= 0.95, status != negative",
+    "safe_auto_requires": "observed harm risk == 0, repair precision >= 0.95, status != negative -- evaluated on this dataset's self-benchmark where measured, else the UCI Adult benchmark",
     "issues_applied": [
       "duplicates"
     ],
@@ -150,33 +160,469 @@
         "issue": "Missing value",
         "default_action": "flag for human review",
         "repairability_status": "weak",
-        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 1.00, observed harm risk 0.0021, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+        "evidence_source": "this dataset (self-benchmark)",
+        "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 1.00, harm beyond the noise floor risk 0.0053, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
       },
       {
         "issue": "Duplicate row",
         "default_action": "auto-repair",
         "repairability_status": "weak",
-        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 0.98, observed harm risk 0.0000, status 'weak' -- meets the bar for safe automatic repair"
+        "evidence_source": "this dataset (self-benchmark)",
+        "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 1.00, harm beyond the noise floor risk 0.0000, status 'weak' -- meets the bar for safe automatic repair"
       },
       {
         "issue": "Potential outlier",
         "default_action": "flag for human review",
         "repairability_status": "weak",
-        "reason": "benchmark evidence at nearest evaluated rate (20%): repair precision 0.48, observed harm risk 0.0008, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+        "evidence_source": "this dataset (self-benchmark)",
+        "reason": "this dataset (self-benchmark), nearest evaluated rate (20%): repair precision 0.46, harm beyond the noise floor risk 0.0000, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
       },
       {
         "issue": "Potential label error",
         "default_action": "flag for human review",
         "repairability_status": "weak",
-        "reason": "benchmark evidence at nearest evaluated rate (5%): repair precision 0.78, observed harm risk 0.0016, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+        "evidence_source": "this dataset (self-benchmark)",
+        "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 0.90, harm beyond the noise floor risk 0.0000, status 'weak' -- always human review: this repair type is never applied automatically (it rewrites the target or was harmful in testing)"
       },
       {
         "issue": "Potential feature anomaly",
         "default_action": "flag for human review",
         "repairability_status": "negative",
-        "reason": "benchmark evidence at nearest evaluated rate (20%): repair precision 0.42, observed harm risk 0.0075, status 'negative' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative')"
+        "evidence_source": "UCI Adult benchmark (not measured on this dataset)",
+        "reason": "UCI Adult benchmark (not measured on this dataset), nearest evaluated rate (20%): repair precision 0.42, observed harm risk 0.0075, status 'negative' -- always human review: this repair type is never applied automatically (it rewrites the target or was harmful in testing)"
       }
     ]
+  },
+  "self_benchmark": {
+    "ran": true,
+    "metric": "macro-F1",
+    "model": "RandomForestClassifier (n_estimators=100)",
+    "seeds": 3,
+    "rates": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "reference": {
+      "rows_labeled": 6300,
+      "rows_complete": 3068,
+      "rows_after_dedup": 2925,
+      "rows_removed_label_problems": 9,
+      "rare_classes_dropped": [],
+      "columns_left_out": {},
+      "columns_used": [
+        "age",
+        "workclass",
+        "fnlwgt",
+        "education",
+        "education-num",
+        "marital-status",
+        "occupation",
+        "relationship",
+        "race",
+        "sex",
+        "capital-gain",
+        "capital-loss",
+        "hours-per-week",
+        "native-country"
+      ],
+      "rows_used": 2916,
+      "rows_train": 2041,
+      "rows_test": 875
+    },
+    "noise_floor": 0.008976963904438843,
+    "null_experiment_rms_f1_change": 0.008976963904438843,
+    "baseline_f1": {
+      "42": 0.7337606837606838,
+      "43": 0.7261788494869186,
+      "44": 0.7352059203829542
+    },
+    "majority_class_f1": 0.4201457919151756,
+    "chance_level_f1": 0.46568661314320653,
+    "evidence": [
+      {
+        "error_type": "duplicates",
+        "rate": 0.05,
+        "mean_damage": -0.004657731178471791,
+        "damage_std": 0.0117669958028759,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": -0.004657731178471791,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 1,
+        "n_neg_seeds": 2,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.6666666666666666,
+        "harm_magnitude": 0.009978049759160723,
+        "risk": 0.006652033172773815,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": true
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.05,
+        "mean_damage": 0.0003869450739531673,
+        "damage_std": 0.00832600304490614,
+        "repair_precision": 0.9008547008547009,
+        "repair_recall": 0.12091503267973856,
+        "mean_recovery": 0.008508701221843254,
+        "sign_agreement": 1.0,
+        "n_pos_seeds": 3,
+        "n_neg_seeds": 0,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.0,
+        "harm_magnitude": 0.0,
+        "risk": 0.0,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.05,
+        "mean_damage": -0.004852515567344414,
+        "damage_std": 0.006149528920230147,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": -0.003409271475912153,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 1,
+        "n_neg_seeds": 2,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.6666666666666666,
+        "harm_magnitude": 0.008830889834251787,
+        "risk": 0.005887259889501191,
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.005251682775626339,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.05,
+        "mean_damage": 0.0018974985794742993,
+        "damage_std": 0.012207639575078357,
+        "repair_precision": 0.17432049155540078,
+        "repair_recall": 0.6699346405228758,
+        "mean_recovery": 0.0029968822096713512,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 2,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.000322413411521949,
+        "risk": 0.000107471137173983,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "duplicates",
+        "rate": 0.1,
+        "mean_damage": -0.0028584517506162013,
+        "damage_std": 0.007460855371592998,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": -0.0028584517506162013,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 1,
+        "n_neg_seeds": 2,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.6666666666666666,
+        "harm_magnitude": 0.00642253547428695,
+        "risk": 0.0042816903161913,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": true
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.1,
+        "mean_damage": 0.008108771935903683,
+        "damage_std": 0.004440809406051646,
+        "repair_precision": 0.9583333333333334,
+        "repair_recall": 0.03594771241830066,
+        "mean_recovery": 0.0007462399157193896,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 2,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.010410906024243438,
+        "risk": 0.0034703020080811458,
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.0034703020080811458,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.1,
+        "mean_damage": -0.005681268414496306,
+        "damage_std": 0.009190905887884907,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": -0.008469564204538593,
+        "sign_agreement": 1.0,
+        "n_pos_seeds": 0,
+        "n_neg_seeds": 3,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 1.0,
+        "harm_magnitude": 0.008469564204538593,
+        "risk": 0.008469564204538593,
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.004233606710856486,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.1,
+        "mean_damage": -0.0005880359079902439,
+        "damage_std": 0.004991650887694058,
+        "repair_precision": 0.2948458417331871,
+        "repair_recall": 0.6601307189542484,
+        "mean_recovery": -0.003669518142289182,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 2,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.012883877340241323,
+        "risk": 0.004294625780080441,
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.004294625780080441,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "duplicates",
+        "rate": 0.2,
+        "mean_damage": 0.00646541014290299,
+        "damage_std": 0.010712109336522127,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": 0.00646541014290299,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 2,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.005696065988413879,
+        "risk": 0.0018986886628046262,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": true
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.2,
+        "mean_damage": 0.021912513483932267,
+        "damage_std": 0.01423548569697974,
+        "repair_precision": 1.0,
+        "repair_recall": 0.0024509803921568627,
+        "mean_recovery": 0.001088200795300957,
+        "sign_agreement": 0.3333333333333333,
+        "n_pos_seeds": 1,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.0057715393849848695,
+        "risk": 0.001923846461661623,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.2,
+        "mean_damage": 0.00021837824536855935,
+        "damage_std": 0.014453955349087338,
+        "repair_precision": 1.0,
+        "repair_recall": 1.0,
+        "mean_recovery": 0.0025293647906919534,
+        "sign_agreement": 0.6666666666666666,
+        "n_pos_seeds": 2,
+        "n_neg_seeds": 1,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.3333333333333333,
+        "harm_magnitude": 0.010698968726749913,
+        "risk": 0.0035663229089166375,
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.0035663229089166375,
+        "restored_exactly": false
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.2,
+        "mean_damage": 0.007733533656622289,
+        "damage_std": 0.005131170060613857,
+        "repair_precision": 0.4635753039898118,
+        "repair_recall": 0.6658496732026143,
+        "mean_recovery": 0.005709992150200256,
+        "sign_agreement": 1.0,
+        "n_pos_seeds": 3,
+        "n_neg_seeds": 0,
+        "repairability_status": "weak",
+        "evidence_status": "partial",
+        "p_harm": 0.0,
+        "harm_magnitude": 0.0,
+        "risk": 0.0,
+        "p_material_harm": 0.0,
+        "material_risk": 0.0,
+        "restored_exactly": false
+      }
+    ],
+    "impact_curve": [
+      {
+        "error_type": "duplicates",
+        "rate": 0.05,
+        "mean_damage": -0.004657731178471791,
+        "damage_std": 0.0117669958028759
+      },
+      {
+        "error_type": "duplicates",
+        "rate": 0.1,
+        "mean_damage": -0.0028584517506162013,
+        "damage_std": 0.007460855371592998
+      },
+      {
+        "error_type": "duplicates",
+        "rate": 0.2,
+        "mean_damage": 0.00646541014290299,
+        "damage_std": 0.010712109336522127
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.05,
+        "mean_damage": 0.0003869450739531673,
+        "damage_std": 0.00832600304490614
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.1,
+        "mean_damage": 0.008108771935903683,
+        "damage_std": 0.004440809406051646
+      },
+      {
+        "error_type": "label_errors",
+        "rate": 0.2,
+        "mean_damage": 0.021912513483932267,
+        "damage_std": 0.01423548569697974
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.05,
+        "mean_damage": -0.004852515567344414,
+        "damage_std": 0.006149528920230147
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.1,
+        "mean_damage": -0.005681268414496306,
+        "damage_std": 0.009190905887884907
+      },
+      {
+        "error_type": "missing_values",
+        "rate": 0.2,
+        "mean_damage": 0.00021837824536855935,
+        "damage_std": 0.01445395534908734
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.05,
+        "mean_damage": 0.0018974985794742993,
+        "damage_std": 0.012207639575078357
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.1,
+        "mean_damage": -0.0005880359079902439,
+        "damage_std": 0.004991650887694058
+      },
+      {
+        "error_type": "outliers",
+        "rate": 0.2,
+        "mean_damage": 0.007733533656622289,
+        "damage_std": 0.005131170060613857
+      }
+    ],
+    "detector_reliability": [
+      {
+        "error_type": "duplicates",
+        "unit": "rows",
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "error_type": "label_errors",
+        "unit": "rows",
+        "precision": 0.7897121100457141,
+        "recall": 0.17510893246187365
+      },
+      {
+        "error_type": "missing_values",
+        "unit": "cells",
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "error_type": "outliers",
+        "unit": "cells",
+        "precision": 0.19166677102597757,
+        "recall": 0.7467320261437909
+      }
+    ],
+    "detector_tracking": [
+      {
+        "error_type": "duplicates",
+        "pearson_r": null,
+        "spearman_r": null,
+        "n_points": 3,
+        "evidence_status": "not_estimable",
+        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+      },
+      {
+        "error_type": "label_errors",
+        "pearson_r": -0.9678992026246643,
+        "spearman_r": -1.0,
+        "n_points": 3,
+        "evidence_status": "inverted",
+        "note": "INVERTED on this dataset: the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal."
+      },
+      {
+        "error_type": "missing_values",
+        "pearson_r": null,
+        "spearman_r": null,
+        "n_points": 3,
+        "evidence_status": "not_estimable",
+        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+      },
+      {
+        "error_type": "outliers",
+        "pearson_r": null,
+        "spearman_r": null,
+        "n_points": 3,
+        "evidence_status": "not_estimable",
+        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+      }
+    ],
+    "detector_false_positive_floors_on_reference": {
+      "missing_values": 0.0,
+      "duplicates": 0.0,
+      "outliers": 0.3275034293552812,
+      "label_errors": 0.009945130315500686
+    },
+    "issues_not_measured": {},
+    "seconds": 16.9
   },
   "changes_summary": {
     "rows_uploaded": 6300,
@@ -218,19 +664,20 @@
       "duplicates": 0.0,
       "outliers": 0.0,
       "inconsistency": 0.01,
-      "label_noise": 2.41,
-      "feature_corruption": 28.05
+      "label_noise": 2.58,
+      "feature_corruption": 29.08
     },
-    "audit_seconds": 30.81,
+    "audit_seconds": 32.01,
     "python": "3.14.6",
     "pandas": "3.0.6",
     "scikit_learn": "1.9.1"
   },
   "limitations": [
+    "Self-benchmark evidence comes from a CLEAN-ISH reference built from your own data (complete rows, no duplicates, high-confidence label problems removed), not true ground truth. Undetected problems left in the reference, and selection bias from dropping incomplete rows, can make damage look smaller or repairs look easier than they are.",
+    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and macro-F1: 'no harm observed' means none in those runs, not a guarantee. Your own model may react differently.",
+    "Issues the self-benchmark did not measure (feature anomalies, consistency) still use the UCI Adult evidence, and each decision names its evidence source.",
+    "The self-benchmark injects RANDOM errors. Real errors are often structured (systematic mislabeling, a faulty sensor), so measured repair precision can be optimistic. That is why label and feature-anomaly repairs are never applied automatically, whatever the evidence.",
     "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector with known precision/recall limits (Phase 5). A flagged rate is not a confirmed error rate.",
-    "Benchmark-based impact estimates come from UCI Adult + Random Forest and do not transfer automatically to another dataset or model.",
-    "The false-positive floors used for 'Attention/Good' status on statistical detectors (outliers, feature anomalies, labels) were measured on clean Adult data and are NOT recalibrated for this dataset.",
-    "The label-error detector's flagged rate showed an INVERTED relationship with real damage in validation; a low flagged label-error rate must not be read as reassurance.",
     "Validation evidence per error type rests on 3 corruption rates (n=3): directional, not statistically significant.",
     "No single AI-readiness score is reported: the tested aggregate of detected rates was not supported by the evidence (pooled r = -0.24). This does not prove no composite could ever work.",
     "No before/after model metrics are reported: an uploaded dataset has no clean held-out test set, and evaluating on a held-out slice of the same dirty data would be misleading.",
