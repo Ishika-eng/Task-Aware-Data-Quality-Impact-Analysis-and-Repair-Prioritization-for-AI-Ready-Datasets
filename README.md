@@ -37,6 +37,9 @@ It is both a **research project** (controlled experiments on UCI Adult, 11 phase
 3. **Honest uncertainty.** Every dimension carries an *evidence status* (validated / weak / inverted /
    not estimable) separate from its observed rate. No single readiness score is reported, because the evidence
    did not justify one.
+4. **Calibration on your own data.** The Adult results do not automatically transfer. Optionally, TaskClean
+   re-runs a small version of the experiments on a clean-ish reference built from *your* data and bases its
+   decisions on those measurements instead (see [Calibrating on your data](#calibrating-on-your-data)).
 
 ## How it works
 
@@ -105,6 +108,8 @@ python3 taskclean.py ../data/demo_dirty_adult.csv --target class --out ../taskcl
 | `--target class` | target column (classification). **Omit it for no-target mode**: missing values, duplicates, outliers and inconsistencies only |
 | `--feature-anomalies` | also run the slow feature-anomaly detector (its auto-repair is never recommended) |
 | `--apply missing_values,label_errors` | explicit human override of the evidence-based policy |
+| `--calibrate` | self-benchmark on your own data and base the policy on it (needs a target; about 20 s to a few minutes) |
+| `--calibrate-seeds 3` | seeds per measurement (3 = quick, 5 = steadier) |
 | `--max-model-rows 30000` | above this many rows the slow detectors run on a stratified sample |
 | `--seed 42` | random seed for the model-based detectors |
 
@@ -116,6 +121,9 @@ from taskclean import load_csv, audit_dataset, apply_repairs, write_outputs
 
 df, info = load_csv("my_data.csv")              # detects encoding, delimiter and decimal mark
 state = audit_dataset(df, target="churned")     # expensive: detect + propose (target=None for no-target mode)
+# optional: replace the Adult evidence with measurements from your own data
+# from selfbench import run_self_benchmark; from taskclean import attach_self_benchmark
+# attach_self_benchmark(state, run_self_benchmark(state, n_seeds=3))
 result = apply_repairs(state)                   # cheap: applies what the evidence approves
 write_outputs(result, "out/")
 ```
@@ -134,6 +142,7 @@ model-based audit again.
 | `quality_report.csv` | flagged counts and rates per dimension, with each detector's benchmark precision/recall |
 | `impact_report.csv` | benchmark-based task-impact estimate, repair evidence, and the decision per issue |
 | `readiness_report.json` / `.csv` | the multidimensional readiness report with evidence status, after-cleaning rates, and limitations |
+| `selfbenchmark_evidence.csv` / `selfbenchmark_runs.csv` | (only when calibrated) the evidence table and every individual calibration run |
 
 `row_id` in the log is the 0-based row position in the **uploaded** file. A sample set is in
 [`taskclean_output_demo/`](taskclean_output_demo/).
@@ -143,6 +152,40 @@ The repair log is the product's proof of what it did. [`src/test_taskclean.py`](
 log never claims a repair on a row absent from the output, and that the logged value is what the file contains.
 It also checks detection against the injected ground truth on the demo, and runs awkward generic CSVs through the
 pipeline (IDs, high-cardinality text, booleans, numbers stored as text, placeholders, unlabeled rows).
+
+## Calibrating on your data
+
+The Adult experiments say what hurts and what is safe to repair *on Adult*. With **Calibrate on this dataset**
+(`--calibrate`), TaskClean measures it on your data instead:
+
+![Calibration](docs/screenshots/calibration.jpg)
+
+1. **Reference.** Build a clean-ish subset of your data: complete rows, no duplicates, high-confidence label
+   problems removed (columns that are mostly missing or high-cardinality text are left out). It is the best clean
+   data that can be derived, not ground truth.
+2. **Experiments.** Split it 70/30. For each error type (missing values, duplicates, outliers, label errors) at
+   5/10/20% and several seeds, inject *only* that error into the training rows, train a Random Forest, and measure
+   the macro-F1 **damage** against a clean-trained model. Then run the **real TaskClean repair path** on the corrupted
+   training data and measure **recovery**, repair precision/recall, and harm. The test rows are never corrupted.
+3. **Noise floor.** A null experiment (retrain on a random 90% of the training rows, which should change nothing)
+   measures how much F1 moves by chance on *your* data. Effects below it are noise, and a repair only counts as
+   harmful if it loses more than that. Small datasets get a larger floor than Adult's 0.003.
+4. **Decisions.** The same safe-auto rule runs on your evidence (repair precision of at least 0.95 and no material
+   harm). You also get your own damage curves, detector precision/recall, detector false-positive floors, and a
+   check of whether each detector's flagged rate tracks real damage on your data.
+
+What it deliberately refuses to do:
+- If fewer than 600 clean-ish rows remain, or the target is barely predictable (clean-trained macro-F1 not at least
+  0.05 above the same model trained on shuffled labels), it **declines** and the Adult evidence stays in force,
+  with the reason reported. "No harm observed" would otherwise be vacuous.
+- **Exact restoration is never harm.** When a repair reproduces the clean reference exactly (verified by comparing
+  the data, as for duplicate removal), a negative recovery means the corruption happened to help by chance, so it
+  cannot count against the repair.
+- **Label and feature-anomaly repairs are never applied automatically**, whatever the evidence: label repair
+  rewrites the target, and the calibration injects *random* errors while real ones are often structured.
+
+On the Adult demo, calibrating on its own 2,916-row reference (about 20 s) reaches the same decisions as the
+five-seed, 32,000-row research: duplicate removal is safe; missing-value imputation, outliers and labels go to review.
 
 ## Handling real-world CSVs
 
@@ -277,6 +320,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 11 | `python3 phase11_readiness.py` | validation, several minutes |
 | 11 | `python3 phase11c_report_demo.py` | renders the readiness report |
 | product | `python3 test_taskclean.py` | end-to-end invariants |
+| calibration | `python3 test_selfbench.py` | about a minute |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -288,7 +332,9 @@ The `*_full.csv` files in `results/` are the authoritative 5-seed results; `*_si
 app.py                         Streamlit front end
 src/
   taskclean.py                 product layer: audit -> policy -> repair -> reports (also a CLI)
+  selfbench.py                 calibration: measures impact, repair effectiveness and harm on the uploaded data
   test_taskclean.py            end-to-end invariants and generic-CSV robustness
+  test_selfbench.py            calibration tests (rules match the Adult Phase 10 table; declines when it should)
   data.py  baseline.py         Phase 1-2: data, split, clean baselines
   corruption/                  Phase 3-4: error injection with ground-truth logs
   detect.py                    Phase 5: detectors
@@ -312,10 +358,13 @@ docs/screenshots/              app screenshots
 
 - **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
   with the precision/recall limits above. A flagged rate is not a confirmed error rate.
-- **Benchmark transfer.** Impact estimates and repair evidence come from Adult + Random Forest. They do not
-  transfer automatically to another dataset or model.
-- **False-positive floors** for the statistical detectors were measured on clean Adult data and are not
-  recalibrated per dataset, so "Attention / Good" for outliers, labels and feature anomalies is indicative only.
+- **Benchmark transfer.** Without calibration, impact estimates and repair evidence come from Adult + Random Forest
+  and do not transfer automatically to another dataset or model. Calibration measures them on your data, but with a
+  Random Forest, macro-F1, a few seeds, and a clean-ish reference rather than true ground truth: undetected problems
+  left in the reference and selection bias from dropping incomplete rows can make damage look smaller or repairs
+  easier. It injects random errors, so measured repair precision can be optimistic for structured real-world errors.
+- **False-positive floors** for the statistical detectors come from clean Adult data unless you calibrate (then they
+  come from your reference), so "Attention / Good" is indicative only without calibration.
 - **Small validation sample.** Detector-vs-damage correlations use 3 corruption rates per error type.
 - **No before/after model metrics for uploads.** An uploaded dataset has no clean held-out test set, and evaluating
   on a slice of the same dirty data would mislead.
@@ -331,7 +380,8 @@ docs/screenshots/              app screenshots
 
 - Logistic Regression validation of the Random Forest findings.
 - A second dataset (e.g. Heart Disease) to test whether the prioritization transfers.
-- Calibrating detector false-positive floors per dataset.
+- Calibration of feature-anomaly repair (it stays on the Adult evidence and is never applied automatically).
+- Validating calibration against more datasets than Adult and synthetic data.
 
 ## Data
 
