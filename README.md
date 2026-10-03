@@ -102,19 +102,20 @@ python3 taskclean.py ../data/demo_dirty_adult.csv --target class --out ../taskcl
 
 | Flag | Meaning |
 |---|---|
+| `--target class` | target column (classification). **Omit it for no-target mode**: missing values, duplicates, outliers and inconsistencies only |
 | `--feature-anomalies` | also run the slow feature-anomaly detector (its auto-repair is never recommended) |
 | `--apply missing_values,label_errors` | explicit human override of the evidence-based policy |
+| `--max-model-rows 30000` | above this many rows the slow detectors run on a stratified sample |
 | `--seed 42` | random seed for the model-based detectors |
 
 **Python**
 
 ```python
 import sys; sys.path.insert(0, "src")
-import pandas as pd
-from taskclean import audit_dataset, apply_repairs, write_outputs
+from taskclean import load_csv, audit_dataset, apply_repairs, write_outputs
 
-df = pd.read_csv("my_data.csv")
-state = audit_dataset(df, target="churned")     # expensive: detect + propose
+df, info = load_csv("my_data.csv")              # detects encoding, delimiter and decimal mark
+state = audit_dataset(df, target="churned")     # expensive: detect + propose (target=None for no-target mode)
 result = apply_repairs(state)                   # cheap: applies what the evidence approves
 write_outputs(result, "out/")
 ```
@@ -126,8 +127,10 @@ model-based audit again.
 
 | File | Contents |
 |---|---|
-| `dataset_cleaned.csv` | the dataset after the repairs that were applied |
-| `repair_log.csv` | every proposed, applied, skipped, and flag-only change: row, column, original, proposed and applied value, method, confidence tier, detector score, evidence status, human-override flag |
+| `dataset_cleaned.csv` | **evidence-based file**: only the repairs the benchmark supports (plus any you override) |
+| `repair_log.csv` | every proposed, applied, skipped, and flag-only change for that file: row, column, original, proposed and applied value, method, confidence tier, detector score, evidence status, human-override flag |
+| `dataset_cleaned_aggressive.csv` | **aggressive file**: every proposed repair except feature-anomaly repairs (missing values imputed, outliers clipped, high-confidence label flips applied). Model-ready, but most of these repairs did not clear the safety bar |
+| `repair_log_aggressive.csv` | the same log for the aggressive file |
 | `quality_report.csv` | flagged counts and rates per dimension, with each detector's benchmark precision/recall |
 | `impact_report.csv` | benchmark-based task-impact estimate, repair evidence, and the decision per issue |
 | `readiness_report.json` / `.csv` | the multidimensional readiness report with evidence status, after-cleaning rates, and limitations |
@@ -135,9 +138,24 @@ model-based audit again.
 `row_id` in the log is the 0-based row position in the **uploaded** file. A sample set is in
 [`taskclean_output_demo/`](taskclean_output_demo/).
 
-The repair log is the product's proof of what it did. [`src/test_taskclean.py`](src/test_taskclean.py) checks that
-every cell that differs between the uploaded and cleaned file is a logged, applied repair, that the log never
-claims a repair on a row absent from the output, and that detection matches the injected ground truth on the demo.
+The repair log is the product's proof of what it did. [`src/test_taskclean.py`](src/test_taskclean.py) checks, for
+**both** cleaned files, that every cell that differs from the uploaded file is a logged, applied repair, that the
+log never claims a repair on a row absent from the output, and that the logged value is what the file contains.
+It also checks detection against the injected ground truth on the demo, and runs awkward generic CSVs through the
+pipeline (IDs, high-cardinality text, booleans, numbers stored as text, placeholders, unlabeled rows).
+
+## Handling real-world CSVs
+
+| Situation | What TaskClean does |
+|---|---|
+| Unknown encoding / delimiter / decimal mark | detects UTF-8, cp1252 or Latin-1; `,` `;` tab `|`; decimal comma for `;` files |
+| Missing values written as `?`, `N/A`, `-`, `null`, empty text | counted as missing in the analysis; the original cell is shown as-is in the log and left unchanged unless a missing-value repair is applied |
+| Numbers stored as text (including `3,5`) | analysed as numeric; imputed values are written back in the same format. Values with leading zeros (ZIP codes) stay text |
+| ID columns / high-cardinality text | still checked for missing values and duplicates, skipped by the model-based detectors |
+| Rows with no target value | still checked for missing values, duplicates and outliers; excluded from the label and model-based detectors |
+| No target column | no-target mode (label check skipped) |
+| Very large files | the slow label/feature detectors run on a stratified sample (default limit 30,000 rows); the cheap checks always use every row |
+| Continuous or ID-like target | rejected with a clear message (classification only) |
 
 ## How the repair policy decides
 
@@ -148,8 +166,10 @@ corruption rate, all of these hold:
 - repair precision was at least **0.95** (it rarely overwrote legitimate data),
 - the repairability status was not *negative*.
 
-On the benchmark evidence this is satisfied by **exact duplicate removal only**. Everything else is logged as a
-proposal and flagged for human review; nothing is changed. You can override per issue type in the app, and
+On the benchmark evidence this is satisfied by **exact duplicate removal only**, so `dataset_cleaned.csv` changes
+little by design. Everything else is logged as a proposal and flagged for human review. If you need a model-ready
+file, `dataset_cleaned_aggressive.csv` applies those proposals too (never feature-anomaly repairs) and its log shows
+exactly what changed, so you can judge the risk yourself. You can override per issue type in the app, and
 overrides are recorded in the log. The 0.95 threshold is a documented policy parameter in
 [`src/taskclean.py`](src/taskclean.py) (`SAFE_REPAIR_MIN_PRECISION`).
 
@@ -299,7 +319,9 @@ docs/screenshots/              app screenshots
 - **Small validation sample.** Detector-vs-damage correlations use 3 corruption rates per error type.
 - **No before/after model metrics for uploads.** An uploaded dataset has no clean held-out test set, and evaluating
   on a slice of the same dirty data would mislead.
-- **Scope.** Classification targets only (up to 20 classes). Duplicates are full-record duplicates (features +
+- **Placeholders.** A token such as `-` or `N/A` that is a genuine category in your data is over-counted as missing.
+- **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
+- **Scope.** Classification targets only (up to 20 classes), or no target at all. Duplicates are full-record duplicates (features +
   target). Inconsistent-value detection is report-only because no repair evidence exists for it. The
   feature-anomaly detector is off by default (slow, low precision, harmful repair).
 - **No composite score.** The tested aggregate of detected rates was not supported by the evidence; this does not
