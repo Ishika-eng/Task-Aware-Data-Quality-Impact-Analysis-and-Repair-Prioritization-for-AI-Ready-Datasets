@@ -1022,6 +1022,14 @@ LIMITATIONS = [
     "detectors; their findings and proposals then cover only the sampled rows.",
     "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only "
     "duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above.",
+    "Impact is measured with F1-type metrics, which depend on the decision threshold. On a heavily imbalanced target "
+    "(bank-marketing, 11.7% positive) label noise RAISED F1 while ROC-AUC fell by up to 0.05, so F1-based impact "
+    "estimates can hide or invert the harm of label noise. Check the class balance before trusting them.",
+    "Repair harm is dataset- and metric-dependent: feature-anomaly repair was harmful on Adult but looked helpful by F1 "
+    "(harmful by AUC) on bank-marketing. Its never-auto guard rests on low precision (repair precision about 0.25-0.42), "
+    "not on universal harm.",
+    "A calibration with a large noise floor (small reference sets) is weak evidence of safety: in validation, a dirty "
+    "upload whose noise floor was twice the ground truth's approved a repair the ground truth showed to be harmful.",
 ]
 
 
