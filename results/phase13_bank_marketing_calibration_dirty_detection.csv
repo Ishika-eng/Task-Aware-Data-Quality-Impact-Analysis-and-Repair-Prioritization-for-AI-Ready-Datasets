@@ -1,0 +1,5 @@
+error_type,unit,precision,recall
+duplicates,rows,1.0,1.0
+label_errors,rows,0.9271246398027324,0.251807204964005
+missing_values,cells,1.0,1.0
+outliers,cells,0.22458304816253374,0.769857718071884
