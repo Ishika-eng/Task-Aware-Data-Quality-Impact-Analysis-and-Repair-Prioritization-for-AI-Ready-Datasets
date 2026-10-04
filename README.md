@@ -303,6 +303,26 @@ The product therefore reports a multidimensional readiness table (observed rate,
 status, status, after-cleaning rate) instead of one number. Impact figures are labelled **benchmark-based
 task-impact estimates**; for observed rates beyond the validated 0-20% range they are **boundary estimates**.
 
+## Validation on a second dataset
+
+The Adult results were checked on **bank-marketing** (45,211 rows, 11.7% positive class) with an independent
+ground truth, and the product was run on Heart Disease and German credit. Full write-up:
+[`docs/VALIDATION_SECOND_DATASET.md`](docs/VALIDATION_SECOND_DATASET.md).
+
+- **The product is robust.** It ran on all three datasets with honest repair logs; calibration correctly *declined*
+  on Heart Disease (303 rows) and adapted its noise floor on German credit.
+- **Detector reliability transfers and calibrates well.** Calibration reproduced each detector's precision/recall within
+  about 0.1 (e.g. label errors 0.93 / 0.29 vs ground truth 0.96 / 0.30).
+- **The Adult prioritization transfers, but only under a threshold-free metric.** With ROC-AUC, label errors rank first
+  in 100% of weight combinations and feature corruption last, exactly as on Adult. With F1 it does not: on this imbalanced
+  target label noise *raised* F1 (4 of 5 seeds) while ROC-AUC fell in every seed. **F1-based damage is unreliable on
+  imbalanced targets.** (The AUC analysis was added after seeing the F1 anomaly, so it is exploratory.)
+- **Calibration did not demonstrably improve the safe-to-repair decisions** (7/9 agreement with ground truth, same as
+  the transferred Adult evidence); on a dirty upload it made one false approval, because its noise floor was twice the
+  ground truth's. Duplicate removal is the only repair that was safe on both datasets under every metric.
+- Recommended fixes, not yet implemented: add ROC-AUC to the self-benchmark and warn when F1 and AUC disagree; refuse
+  to certify "safe" when the noise floor is large.
+
 ## Reproducing the experiments
 
 Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`).
@@ -321,6 +341,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 11 | `python3 phase11c_report_demo.py` | renders the readiness report |
 | product | `python3 test_taskclean.py` | end-to-end invariants |
 | calibration | `python3 test_selfbench.py` | about a minute |
+| 13 | `python3 phase13_transfer.py data` then `groundtruth` (about 8 min), `calibration`, `regimes`, `report` | second-dataset validation |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -344,6 +365,7 @@ src/
   phase9_repair_engine.py      Phase 9
   phase10_prioritization.py    Phase 10
   phase11_readiness.py         Phase 11 (+ phase11c_report_demo.py)
+  phase13_transfer.py          Phase 13: second-dataset validation (ground truth, calibration check, regime checks)
   training_log.py              provenance log of every model fit
   make_demo_dataset.py         builds data/demo_dirty_adult.csv
   errors.py train.py impact.py repair.py readiness.py pipeline.py
@@ -379,7 +401,8 @@ docs/screenshots/              app screenshots
 ## Not done yet
 
 - Logistic Regression validation of the Random Forest findings.
-- A second dataset (e.g. Heart Disease) to test whether the prioritization transfers.
+- Applying the two validation-driven fixes (AUC alongside F1; a power guard on the noise floor).
+- More than one extra dataset; Logistic Regression is likewise untested.
 - Calibration of feature-anomaly repair (it stays on the Adult evidence and is never applied automatically).
 - Validating calibration against more datasets than Adult and synthetic data.
 
