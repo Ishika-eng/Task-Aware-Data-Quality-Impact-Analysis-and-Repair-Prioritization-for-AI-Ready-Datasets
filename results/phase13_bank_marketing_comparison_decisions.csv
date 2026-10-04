@@ -1,0 +1,10 @@
+error_type,rate,ground truth (macro-F1),ground truth (posF1),Adult evidence (transferred),"calibration, raw upload","calibration, dirty upload"
+missing_values,0.05,True,True,False,False,True
+missing_values,0.1,True,True,False,False,False
+missing_values,0.2,False,False,False,False,True
+duplicates,0.05,True,True,True,True,True
+duplicates,0.1,True,True,True,True,True
+duplicates,0.2,True,True,True,True,True
+outliers,0.05,False,False,False,False,False
+outliers,0.1,False,False,False,False,False
+outliers,0.2,False,False,False,False,False
