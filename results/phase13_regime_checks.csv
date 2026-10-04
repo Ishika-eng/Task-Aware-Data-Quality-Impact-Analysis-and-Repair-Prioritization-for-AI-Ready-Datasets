@@ -1,0 +1,3 @@
+dataset,rows,columns,calibration,reason_or_noise_floor,auto_repaired,evidence_source_duplicates,rows_dropped_evidence_based,cells_changed_aggressive,logs_honest
+heart-c,303,14,declined,"only 296 clean-ish rows remain after removing incomplete rows, duplicates and high-confidence label problems (need at least 600 and 2 classes)",duplicates,UCI Adult benchmark,1,7,True
+credit-g,1000,21,ran,0.0207,none,this dataset (self-benchmark),0,26,True
