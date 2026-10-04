@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "noise_floor": 0.009179936653154646,
+  "reference_rows": 6000,
+  "baseline_macro_f1": 0.6653253962558517,
+  "chance_f1": 0.4693396226415094,
+  "seconds": 32.81985087506473
+}
