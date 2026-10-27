@@ -374,6 +374,7 @@ data/                          Adult (original + clean) and the demo dataset wit
 results/                       raw and summary CSVs for every experiment
 taskclean_output_demo/         sample outputs of the product on the demo dataset
 docs/screenshots/              app screenshots
+notebooks/                     syllabus companion notebooks, one per unit (see notebooks/README.md); read-only on src/
 ```
 
 ## Limitations
