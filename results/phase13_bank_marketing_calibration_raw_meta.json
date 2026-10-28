@@ -1,8 +1,22 @@
 {
   "ok": true,
   "noise_floor": 0.009179936653154646,
+  "noise_floor_auc": 0.003,
   "reference_rows": 6000,
+  "metric_disagreement": [
+    {
+      "error_type": "label_errors",
+      "disagree": true,
+      "note": "macro-F1 shows no damage (it even improves) but ROC-AUC shows real damage: the model ranks cases worse while F1 moves with the decision threshold -- expected on an imbalanced target (minority class 12%)."
+    },
+    {
+      "error_type": "missing_values",
+      "disagree": true,
+      "note": "macro-F1 shows no damage (it even improves) but ROC-AUC shows real damage: the model ranks cases worse while F1 moves with the decision threshold -- expected on an imbalanced target (minority class 12%)."
+    }
+  ],
+  "underpowered_repairs": 0,
   "baseline_macro_f1": 0.6653253962558517,
   "chance_f1": 0.4693396226415094,
-  "seconds": 32.81985087506473
+  "seconds": 29.72220641700551
 }

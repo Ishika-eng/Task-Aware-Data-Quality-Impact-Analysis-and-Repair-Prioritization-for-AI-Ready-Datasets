@@ -1,7 +1,7 @@
 source,against,agree,false_approvals,missed_safe_repairs
-Adult evidence (transferred),macro-F1 ground truth,7/9,0,2
-Adult evidence (transferred),posF1 ground truth,7/9,0,2
-"calibration, raw upload",macro-F1 ground truth,7/9,0,2
-"calibration, raw upload",posF1 ground truth,7/9,0,2
-"calibration, dirty upload",macro-F1 ground truth,7/9,1,1
-"calibration, dirty upload",posF1 ground truth,7/9,1,1
+Adult evidence (transferred),ground truth (F1 and AUC),9/9,0,0
+Adult evidence (transferred),ground truth (macro-F1 only),7/9,0,2
+"calibration, raw upload",ground truth (F1 and AUC),9/9,0,0
+"calibration, raw upload",ground truth (macro-F1 only),7/9,0,2
+"calibration, dirty upload",ground truth (F1 and AUC),9/9,0,0
+"calibration, dirty upload",ground truth (macro-F1 only),7/9,0,2
