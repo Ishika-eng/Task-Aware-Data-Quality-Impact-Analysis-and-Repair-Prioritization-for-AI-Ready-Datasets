@@ -218,12 +218,13 @@ elif view == "Calibration":
                                                        if k in ("rows_labeled", "rows_complete", "rows_after_dedup")))
     else:
         ref = sb.reference
-        m = st.columns(4)
+        m = st.columns(5 if sb.has_auc else 4)
         m[0].metric("Reference rows", f"{ref['rows_used']:,}")
-        m[1].metric("Clean-trained macro-F1", f"{np.mean(list(sb.baseline_f1.values())):.3f}")
+        m[1].metric("Clean macro-F1", f"{np.mean(list(sb.baseline_f1.values())):.3f}")
         m[2].metric("Chance level", f"{sb.chance_f1:.3f}")
-        m[3].metric("Noise floor (F1 / AUC)", f"{sb.noise_floor:.4f} / {sb.noise_floor_auc:.4f}" if sb.has_auc
-                    else f"{sb.noise_floor:.4f}")
+        m[3].metric("Noise floor (F1)", f"{sb.noise_floor:.4f}")
+        if sb.has_auc:
+            m[4].metric("Noise floor (AUC)", f"{sb.noise_floor_auc:.4f}")
         st.caption(
             f"Built from your data: {ref['rows_labeled']:,} labeled rows -> {ref['rows_complete']:,} complete -> "
             f"{ref['rows_after_dedup']:,} without duplicates -> {ref['rows_used']:,} used "
