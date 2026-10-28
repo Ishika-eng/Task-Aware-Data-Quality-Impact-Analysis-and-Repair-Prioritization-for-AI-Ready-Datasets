@@ -34,13 +34,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 from baseline import build_preprocessor
 from corruption import CORRUPTORS
-from taskclean import AuditState, _apply, _full_record, _stratified_sample_index, audit_dataset
+from taskclean import MAX_CERTIFIABLE_NOISE_FLOOR, AuditState, _apply, _full_record, _stratified_sample_index, audit_dataset
 
 RATES = (0.05, 0.10, 0.20)
 BENCH_ISSUES = ("missing_values", "duplicates", "outliers", "label_errors")
@@ -58,6 +58,7 @@ NULL_DROP_FRACTION = 0.10        # null experiment: retrain on a random 90% of t
                                  # that matters): a perturbation the size of the corruptions being studied
 NULL_DRAWS = 4                   # null draws per seed
 SIGN_AGREEMENT = 0.8             # share of seeds that must agree on the sign of recovery (Phase 10)
+IMBALANCE_WARNING_SHARE = 0.20   # minority class below this share: F1-type metrics are threshold-sensitive
 TEST_FRACTION = 0.30
 SEED0 = 42
 
@@ -75,6 +76,11 @@ class SelfBench:
     reference: dict = field(default_factory=dict)
     noise_floor: float = NOISE_FLOOR_MIN
     null_noise: float = float("nan")
+    noise_floor_auc: float = float("nan")
+    null_noise_auc: float = float("nan")
+    has_auc: bool = False
+    baseline_auc: dict = field(default_factory=dict)
+    metric_disagreement: pd.DataFrame | None = None
     baseline_f1: dict = field(default_factory=dict)
     majority_f1: float = float("nan")
     chance_f1: float = float("nan")
@@ -95,6 +101,12 @@ class SelfBench:
             "ran": True, "metric": self.metric, "model": f"RandomForestClassifier (n_estimators={self.n_estimators})",
             "seeds": self.n_seeds, "rates": list(self.rates), "reference": self.reference,
             "noise_floor": self.noise_floor, "null_experiment_rms_f1_change": self.null_noise,
+            "noise_floor_auc": self.noise_floor_auc, "null_experiment_rms_auc_change": self.null_noise_auc,
+            "max_certifiable_noise_floor": MAX_CERTIFIABLE_NOISE_FLOOR,
+            "underpowered_repairs": sorted({f"{r.error_type}@{r.rate:.0%}" for r in self.evidence.itertuples()
+                                            if r.underpowered}),
+            "metric_disagreement": rec(self.metric_disagreement) if self.metric_disagreement is not None else [],
+            "baseline_auc": {str(k): v for k, v in self.baseline_auc.items()},
             "baseline_f1": {str(k): v for k, v in self.baseline_f1.items()},
             "majority_class_f1": self.majority_f1, "chance_level_f1": self.chance_f1,
             "evidence": rec(self.evidence), "impact_curve": rec(self.impact_curve),
@@ -200,11 +212,28 @@ def _build_reference(state: AuditState, max_rows: int, seed: int):
 # ---------------------------------------------------------------------------------------------------------------
 # Modelling and grading helpers
 # ---------------------------------------------------------------------------------------------------------------
-def _fit_eval(X_tr, y_tr, X_te, y_te, seed: int, n_estimators: int) -> float:
+def _auc(pipe: Pipeline, X_te, y_te) -> float:
+    """ROC-AUC, threshold-free (one-vs-rest macro average for more than two classes); NaN if it cannot be computed."""
+    try:
+        proba, classes = pipe.predict_proba(X_te), pipe.classes_
+        if len(classes) == 2:
+            return float(roc_auc_score((y_te == classes[1]).astype(int), proba[:, 1]))
+        return float(roc_auc_score(y_te, proba, multi_class="ovr", average="macro", labels=classes))
+    except ValueError:
+        return float("nan")
+
+
+def _fit_scores(X_tr, y_tr, X_te, y_te, seed: int, n_estimators: int) -> dict:
+    """One model fit, two metrics: macro-F1 (threshold-dependent) and ROC-AUC (threshold-free)."""
     pipe = Pipeline([("prep", build_preprocessor(X_tr)),
                      ("clf", RandomForestClassifier(n_estimators=n_estimators, random_state=seed, n_jobs=-1))])
     pipe.fit(X_tr, y_tr)
-    return float(f1_score(y_te, pipe.predict(X_te), average="macro", zero_division=0))
+    return {"macro_f1": float(f1_score(y_te, pipe.predict(X_te), average="macro", zero_division=0)),
+            "auc": _auc(pipe, X_te, y_te)}
+
+
+def _fit_eval(X_tr, y_tr, X_te, y_te, seed: int, n_estimators: int) -> float:
+    return _fit_scores(X_tr, y_tr, X_te, y_te, seed, n_estimators)["macro_f1"]
 
 
 def _same_data(Xa: pd.DataFrame, ya: pd.Series, Xb: pd.DataFrame, yb: pd.Series) -> bool:
@@ -290,18 +319,16 @@ def _evidence_table(runs: pd.DataFrame, noise_floor: float) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["rate", "error_type"]).reset_index(drop=True)
 
 
-def _tracking_table(runs: pd.DataFrame, noise_floor: float) -> pd.DataFrame:
-    """Does each detector's flagged rate track real damage on THIS dataset? (Phase 11B on the user's data.)
-    Three rates only, so this is directional evidence, never 'validated'."""
-    rows = []
+def _tracking_one(runs: pd.DataFrame, dmg_col: str, noise_floor: float, metric: str) -> dict:
+    out = {}
     for issue, g in runs.groupby("issue"):
-        pts = g.groupby("rate").agg(det=("detected_rate", "mean"), dmg=("damage", "mean")).reset_index()
+        pts = g.groupby("rate").agg(det=("detected_rate", "mean"), dmg=(dmg_col, "mean")).reset_index()
         r = rho = float("nan")
         if len(pts) < 3 or pts["det"].std() < 1e-9 or pts["dmg"].abs().max() < noise_floor \
                 or pts["dmg"].std() < 1e-12:
             status = "not_estimable"
-            note = ("On this dataset the damage from this error stays below the noise floor (or too few rates were "
-                    "measured), so the detected rate cannot be checked against real damage.")
+            note = (f"On this dataset the {metric} damage from this error stays below the noise floor (or too few "
+                    "rates were measured), so the detected rate cannot be checked against real damage.")
         else:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -309,19 +336,101 @@ def _tracking_table(runs: pd.DataFrame, noise_floor: float) -> pd.DataFrame:
                 rho = float(spearmanr(pts["det"], pts["dmg"])[0])
             if r <= -0.8:
                 status = "inverted"
-                note = (f"INVERTED on this dataset: the detected rate fell as true corruption and measured damage "
-                        f"rose (r = {r:.2f} over {len(pts)} rates). Do not read it as a severity signal.")
+                note = (f"INVERTED on this dataset ({metric}): the detected rate fell as true corruption and measured "
+                        f"damage rose (r = {r:.2f} over {len(pts)} rates). Do not read it as a severity signal.")
             elif r >= 0.8 and rho >= 0.5:
                 status = "weak"
-                note = (f"The detected rate rose with measured damage on this dataset (r = {r:.2f}, "
+                note = (f"The detected rate rose with measured {metric} damage on this dataset (r = {r:.2f}, "
                         f"{len(pts)} rates: directional only, not statistically significant).")
             else:
                 status = "weak"
-                note = (f"No clear relationship between detected rate and measured damage on this dataset "
+                note = (f"No clear relationship between detected rate and measured {metric} damage on this dataset "
                         f"(r = {r:.2f}, {len(pts)} rates).")
-        rows.append({"error_type": issue, "pearson_r": r, "spearman_r": rho, "n_points": len(pts),
-                     "evidence_status": status, "note": note})
+        out[issue] = {"pearson_r": r, "spearman_r": rho, "n_points": len(pts), "evidence_status": status,
+                      "note": note, "metric": metric}
+    return out
+
+
+def _tracking_table(runs: pd.DataFrame, noise_floor: float, noise_floor_auc: float | None = None) -> pd.DataFrame:
+    """Does each detector's flagged rate track real damage on THIS dataset? (Phase 11B on the user's data.)
+    Judged on macro-F1 and, when available, ROC-AUC; the most worrying verdict wins (inverted > weak >
+    not_estimable), because F1 can invert on imbalanced targets while AUC does not, and vice versa.
+    Three rates only, so this is directional evidence, never 'validated'."""
+    per_metric = {"macro-F1": _tracking_one(runs, "damage", noise_floor, "macro-F1")}
+    if noise_floor_auc is not None and "damage_auc" in runs and runs["damage_auc"].notna().all():
+        per_metric["ROC-AUC"] = _tracking_one(runs, "damage_auc", noise_floor_auc, "ROC-AUC")
+    rank = {"inverted": 3, "weak": 2, "not_estimable": 1}
+    rows = []
+    for issue in per_metric["macro-F1"]:
+        options = [m[issue] for m in per_metric.values()]
+        best = max(options, key=lambda o: rank[o["evidence_status"]])
+        rows.append({"error_type": issue, **best,
+                     "pearson_r_macrof1": per_metric["macro-F1"][issue]["pearson_r"],
+                     "pearson_r_auc": per_metric.get("ROC-AUC", {}).get(issue, {}).get("pearson_r", float("nan"))})
     return pd.DataFrame(rows)
+
+
+def _combine_evidence(ev_f1: pd.DataFrame, ev_auc: pd.DataFrame | None, floor_f1: float,
+                      floor_auc: float | None) -> pd.DataFrame:
+    """One evidence table the policy can use. A repair counts as safe only if NEITHER metric shows material harm
+    (status 'negative' on either metric, or material risk on either), because each metric can hide harm the other
+    shows. The power guard marks non-exact repairs 'underpowered' when the noise floor on either metric is above
+    MAX_CERTIFIABLE_NOISE_FLOOR."""
+    out = ev_f1.copy()
+    out["status_macrof1"] = out["repairability_status"]
+    out["material_risk_f1"] = out["material_risk"]
+    if ev_auc is None:
+        for c in ("mean_damage_auc", "mean_recovery_auc", "material_risk_auc"):
+            out[c] = float("nan")
+        out["status_auc"] = out["status_macrof1"]
+        out["noise_floor_auc"] = float("nan")
+        worst_floor = floor_f1
+    else:
+        a = ev_auc.set_index(["error_type", "rate"])
+        keys = list(zip(out.error_type, out.rate))
+        out["status_auc"] = [a.loc[k, "repairability_status"] for k in keys]
+        out["mean_damage_auc"] = [a.loc[k, "mean_damage"] for k in keys]
+        out["mean_recovery_auc"] = [a.loc[k, "mean_recovery"] for k in keys]
+        out["material_risk_auc"] = [a.loc[k, "material_risk"] for k in keys]
+        out["p_material_harm"] = np.maximum(out["p_material_harm"].values, [a.loc[k, "p_material_harm"] for k in keys])
+        out["material_risk"] = np.maximum(out["material_risk_f1"].values, out["material_risk_auc"].values)
+        out["noise_floor_auc"] = floor_auc
+        worst_floor = max(floor_f1, floor_auc)
+
+        def combine(s1: str, s2: str) -> str:
+            if "negative" in (s1, s2):
+                return "negative"
+            return "positive" if s1 == s2 == "positive" else "weak"
+
+        out["repairability_status"] = [combine(x, y) for x, y in zip(out.status_macrof1, out.status_auc)]
+        out["evidence_status"] = out["repairability_status"].map(
+            {"positive": "complete", "negative": "complete", "weak": "partial"})
+    out["noise_floor"] = floor_f1
+    out["underpowered"] = (worst_floor > MAX_CERTIFIABLE_NOISE_FLOOR) & ~out["restored_exactly"].astype(bool)
+    return out
+
+
+def _metric_disagreement(curve: pd.DataFrame, floor_f1: float, floor_auc: float, minority_share: float) -> pd.DataFrame:
+    """Where do macro-F1 and ROC-AUC tell different stories about the same error? 'Disagree' at a rate means one
+    metric shows damage beyond its noise floor while the other shows none (<= 0). Flagged when this happens at a
+    majority of the measured rates. Typical cause: F1 is threshold-dependent, and on an imbalanced target label
+    noise shifts the threshold (raising minority-class F1) while ranking quality (AUC) gets worse."""
+    rows = []
+    for issue, g in curve.groupby("error_type"):
+        d1, d2 = g["mean_damage"].values, g["mean_damage_auc"].values
+        f1_hides = (d1 <= 0) & (d2 >= floor_auc)            # F1 shows no harm, AUC does
+        auc_hides = (d2 <= 0) & (d1 >= floor_f1)            # AUC shows no harm, F1 does
+        if (f1_hides.sum() * 2 > len(g)) or (auc_hides.sum() * 2 > len(g)):
+            if f1_hides.sum() >= auc_hides.sum():
+                note = (f"macro-F1 shows no damage (it even improves) but ROC-AUC shows real damage: the model ranks "
+                        f"cases worse while F1 moves with the decision threshold"
+                        + (f" -- expected on an imbalanced target (minority class {minority_share:.0%})."
+                           if minority_share < IMBALANCE_WARNING_SHARE else "."))
+            else:
+                note = ("macro-F1 shows damage but ROC-AUC does not: the harm is in where the decision threshold "
+                        "falls, not in how well the model ranks cases.")
+            rows.append({"error_type": issue, "disagree": True, "note": note})
+    return pd.DataFrame(rows, columns=["error_type", "disagree", "note"])
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -343,11 +452,14 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
         return SelfBench(ok=False, reason=info.pop("reason"), reference=info, n_estimators=n_estimators)
 
     X_tr, X_te, y_tr, y_te = train_test_split(Xr, yr, test_size=TEST_FRACTION, stratify=yr, random_state=SEED0)
-    info.update(rows_train=len(X_tr), rows_test=len(X_te))
+    minority_share = float(yr.value_counts(normalize=True).min())
+    info.update(rows_train=len(X_tr), rows_test=len(X_te), minority_class_share=minority_share)
     seeds = [SEED0 + i for i in range(n_seeds)]
 
     say(0.02, "Training clean reference models")
-    baseline = {s: _fit_eval(X_tr, y_tr, X_te, y_te, s, n_estimators) for s in seeds}
+    baseline_scores = {s: _fit_scores(X_tr, y_tr, X_te, y_te, s, n_estimators) for s in seeds}
+    baseline = {s: v["macro_f1"] for s, v in baseline_scores.items()}
+    baseline_auc = {s: v["auc"] for s, v in baseline_scores.items()}
     majority = y_tr.mode()[0]
     majority_f1 = float(f1_score(y_te, [majority] * len(y_te), average="macro", zero_division=0))
     # Chance level = the same model trained on SHUFFLED labels. (Always guessing the majority class is a poor
@@ -368,13 +480,18 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
     # should not matter (drop a random 10% of rows)? Effects smaller than that are indistinguishable from noise.
     say(0.04, "Measuring the noise floor (null experiment)")
     rng = np.random.default_rng(SEED0)
-    null_diffs = []
+    null_f1, null_auc = [], []
     for seed in seeds:
         for _ in range(NULL_DRAWS):
             keep = rng.random(len(X_tr)) >= NULL_DROP_FRACTION
-            null_diffs.append(_fit_eval(X_tr[keep], y_tr[keep], X_te, y_te, seed, n_estimators) - baseline[seed])
-    null_noise = float(np.sqrt(np.mean(np.square(null_diffs))))
+            sc = _fit_scores(X_tr[keep], y_tr[keep], X_te, y_te, seed, n_estimators)
+            null_f1.append(sc["macro_f1"] - baseline[seed])
+            null_auc.append(sc["auc"] - baseline_auc[seed])
+    null_noise = float(np.sqrt(np.mean(np.square(null_f1))))
     noise_floor = max(NOISE_FLOOR_MIN, null_noise)
+    auc_available = bool(np.all(np.isfinite(list(baseline_auc.values()))) and np.all(np.isfinite(null_auc)))
+    null_noise_auc = float(np.sqrt(np.mean(np.square(null_auc)))) if auc_available else float("nan")
+    noise_floor_auc = max(NOISE_FLOOR_MIN, null_noise_auc) if auc_available else float("nan")
 
     target = state.target
     has_numeric = any(pd.api.types.is_numeric_dtype(X_tr[c]) for c in X_tr.columns)
@@ -394,7 +511,7 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
                 for seed in seeds:
                     say(0.05 + 0.9 * done / total, f"{issue} at {rate:.0%} (seed {seed})")
                     X_d, y_d, log = CORRUPTORS[issue](X_tr, y_tr, rate=rate, seed=seed)
-                    dirty_f1 = _fit_eval(X_d, y_d, X_te, y_te, seed, n_estimators)
+                    dirty = _fit_scores(X_d, y_d, X_te, y_te, seed, n_estimators)
 
                     # the REAL product path on the corrupted training data
                     d = X_d.copy()
@@ -402,7 +519,7 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
                     st = audit_dataset(d, target, detectors={DETECTOR_OF.get(issue, issue)}, seed=seed)
                     cleaned, rlog = _apply(st, {issue}, [])
                     X_rep, y_rep = cleaned.drop(columns=[target]), cleaned[target].astype(str)
-                    repaired_f1 = _fit_eval(X_rep, y_rep, X_te, y_te, seed, n_estimators)
+                    repaired = _fit_scores(X_rep, y_rep, X_te, y_te, seed, n_estimators)
                     restored_exactly = _same_data(X_rep, y_rep, X_tr, y_tr)
 
                     orig_index = X_d.index
@@ -412,8 +529,10 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
                     det = st.detections[DETECTOR_OF.get(issue, issue)]
                     rows.append({
                         "issue": issue, "rate": rate, "seed": seed, "baseline_f1": baseline[seed],
-                        "dirty_f1": dirty_f1, "repaired_f1": repaired_f1,
-                        "damage": baseline[seed] - dirty_f1, "recovery": repaired_f1 - dirty_f1,
+                        "dirty_f1": dirty["macro_f1"], "repaired_f1": repaired["macro_f1"],
+                        "damage": baseline[seed] - dirty["macro_f1"], "recovery": repaired["macro_f1"] - dirty["macro_f1"],
+                        "baseline_auc": baseline_auc[seed], "dirty_auc": dirty["auc"], "repaired_auc": repaired["auc"],
+                        "damage_auc": baseline_auc[seed] - dirty["auc"], "recovery_auc": repaired["auc"] - dirty["auc"],
                         "detected_rate": det.rate, "detector_precision": det_p, "detector_recall": det_r,
                         "repair_precision": rep_p, "repair_recall": rep_r,
                         "restored_exactly": restored_exactly,
@@ -436,17 +555,27 @@ def run_self_benchmark(state: AuditState, n_seeds: int = 3, rates=RATES, max_row
                                  seed=SEED0)
     floors = {("label_errors" if k == "label_noise" else k): float(v.rate) for k, v in floors_state.detections.items()}
 
-    evidence = _evidence_table(runs, noise_floor)
-    impact_curve = (runs.groupby(["issue", "rate"])["damage"].agg(["mean", "std"]).reset_index()
-                    .rename(columns={"issue": "error_type", "mean": "mean_damage", "std": "damage_std"}))
+    ev_f1 = _evidence_table(runs, noise_floor)
+    use_auc = auc_available and bool(runs["damage_auc"].notna().all())
+    ev_auc = (_evidence_table(runs.assign(damage=runs["damage_auc"], recovery=runs["recovery_auc"]), noise_floor_auc)
+              if use_auc else None)
+    evidence = _combine_evidence(ev_f1, ev_auc, noise_floor, noise_floor_auc if use_auc else None)
+    agg = {"mean_damage": ("damage", "mean"), "damage_std": ("damage", "std")}
+    if use_auc:
+        agg.update(mean_damage_auc=("damage_auc", "mean"), damage_std_auc=("damage_auc", "std"))
+    impact_curve = runs.groupby(["issue", "rate"]).agg(**agg).reset_index().rename(columns={"issue": "error_type"})
     reliability = (runs.groupby("issue")[["detector_precision", "detector_recall"]].mean().reset_index()
                    .rename(columns={"issue": "error_type", "detector_precision": "precision",
                                     "detector_recall": "recall"}))
     reliability.insert(1, "unit", reliability["error_type"].map(UNIT_OF))
+    disagreement = (_metric_disagreement(impact_curve, noise_floor, noise_floor_auc, minority_share) if use_auc
+                    else pd.DataFrame(columns=["error_type", "disagree", "note"]))
     say(1.0, "Self-benchmark complete")
     return SelfBench(ok=True, n_estimators=n_estimators, n_seeds=n_seeds, rates=rates, reference=info,
-                     noise_floor=noise_floor, null_noise=null_noise, baseline_f1=baseline, majority_f1=majority_f1,
+                     noise_floor=noise_floor, null_noise=null_noise, noise_floor_auc=noise_floor_auc,
+                     null_noise_auc=null_noise_auc, has_auc=use_auc, baseline_auc=baseline_auc,
+                     metric_disagreement=disagreement, baseline_f1=baseline, majority_f1=majority_f1,
                      chance_f1=chance_f1, runs=runs,
                      evidence=evidence, impact_curve=impact_curve, detector_reliability=reliability,
-                     detector_tracking=_tracking_table(runs, noise_floor), baseline_floors=floors,
-                     skipped_issues=skipped, seconds=time.monotonic() - t0)
+                     detector_tracking=_tracking_table(runs, noise_floor, noise_floor_auc if use_auc else None),
+                     baseline_floors=floors, skipped_issues=skipped, seconds=time.monotonic() - t0)

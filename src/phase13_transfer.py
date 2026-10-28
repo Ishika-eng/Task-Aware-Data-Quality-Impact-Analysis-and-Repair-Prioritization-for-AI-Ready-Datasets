@@ -230,7 +230,10 @@ def run_calibration(slug: str = PRIMARY, n_seeds: int = 3):
             sb.evidence.to_csv(f"{tag}_evidence.csv", index=False)
             sb.runs.to_csv(f"{tag}_runs.csv", index=False)
             sb.detector_reliability.to_csv(f"{tag}_detection.csv", index=False)
-            json.dump({"ok": True, "noise_floor": sb.noise_floor, "reference_rows": sb.reference["rows_used"],
+            json.dump({"ok": True, "noise_floor": sb.noise_floor, "noise_floor_auc": sb.noise_floor_auc,
+                       "reference_rows": sb.reference["rows_used"],
+                       "metric_disagreement": sb.metric_disagreement.to_dict("records"),
+                       "underpowered_repairs": int(sb.evidence["underpowered"].sum()),
                        "baseline_macro_f1": float(np.mean(list(sb.baseline_f1.values()))),
                        "chance_f1": sb.chance_f1, "seconds": time.monotonic() - t0},
                       open(f"{tag}_meta.json", "w"), indent=2)
@@ -278,6 +281,8 @@ def safe_decisions(evidence: pd.DataFrame) -> pd.Series:
     risk = evidence["material_risk"] if "material_risk" in evidence else evidence["risk"]
     safe = ((risk <= 1e-9) & (evidence["repair_precision"] >= SAFE_REPAIR_MIN_PRECISION)
             & (evidence["repairability_status"] != "negative") & ~evidence["error_type"].isin(NEVER_AUTO_APPLY))
+    if "underpowered" in evidence:                                    # the power guard (calibrated evidence only)
+        safe &= ~evidence["underpowered"].astype(bool)
     return pd.Series(safe.values, index=pd.MultiIndex.from_frame(evidence[["error_type", "rate"]]))
 
 
@@ -339,7 +344,8 @@ def run_report(slug: str = PRIMARY):
         pth = f"{tag}_calibration_{kind}_evidence.csv"
         if os.path.exists(pth):
             sources[f"calibration, {kind} upload"] = pd.read_csv(pth)
-    truth = safe_decisions(gt["macrof1"])
+    truth_macro = safe_decisions(gt["macrof1"])
+    truth = truth_macro & safe_decisions(gt["auc"])          # the product's rule: safe under BOTH macro-F1 and ROC-AUC
     truth_pos = safe_decisions(gt["posf1"])
     decidable = [(i, r) for i in ("missing_values", "duplicates", "outliers") for r in RATES]
 
@@ -347,14 +353,14 @@ def run_report(slug: str = PRIMARY):
     print("Q3/Q4 CALIBRATION vs GROUND TRUTH -- safe-auto decision per (repair type, corruption rate)")
     print("(label and feature-anomaly repairs are never auto-applied by design, so only the 9 decidable cells count)")
     print("=" * 100)
-    table = pd.DataFrame({"ground truth (macro-F1)": truth.reindex(decidable),
-                          "ground truth (posF1)": truth_pos.reindex(decidable)})
+    table = pd.DataFrame({"ground truth (F1 and AUC)": truth.reindex(decidable),
+                          "ground truth (macro-F1 only)": truth_macro.reindex(decidable)})
     for k, ev in sources.items():
         table[k] = safe_decisions(ev).reindex(decidable)
     print(table.map(lambda v: "SAFE" if v else "review").to_string())
     rows = []
     for k in sources:
-        for ref, ref_name in ((truth, "macro-F1 ground truth"), (truth_pos, "posF1 ground truth")):
+        for ref, ref_name in ((truth, "ground truth (F1 and AUC)"), (truth_macro, "ground truth (macro-F1 only)")):
             d = table[k].astype(bool)
             t = ref.reindex(decidable).astype(bool)
             rows.append({"source": k, "against": ref_name, "agree": f"{int((d == t).sum())}/{len(d)}",

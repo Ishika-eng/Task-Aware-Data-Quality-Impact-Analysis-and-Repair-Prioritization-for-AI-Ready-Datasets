@@ -11,8 +11,10 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from selfbench import (classify_repairability, harm_risk, material_harm_risk, run_self_benchmark)
-from taskclean import apply_repairs, attach_self_benchmark, audit_dataset, outputs_as_bytes
+from selfbench import (SelfBench, _combine_evidence, _metric_disagreement, classify_repairability, harm_risk,
+                       material_harm_risk, run_self_benchmark)
+from taskclean import (MAX_CERTIFIABLE_NOISE_FLOOR, apply_repairs, attach_self_benchmark, audit_dataset,
+                       outputs_as_bytes)
 from test_taskclean import assert_log_honest
 
 warnings.filterwarnings("ignore")
@@ -78,6 +80,64 @@ def test_exact_restoration_is_never_harm():
     print("OK exact restoration never counts as harm; inexact repairs keep the strict rule")
 
 
+def _ev_row(issue, rate=0.05, status="weak", material=0.0, exact=False, precision=1.0, damage=0.01, recovery=0.0):
+    return {"error_type": issue, "rate": rate, "mean_damage": damage, "damage_std": 0.0, "repair_precision": precision,
+            "repair_recall": 1.0, "mean_recovery": recovery, "sign_agreement": 1.0, "n_pos_seeds": 0, "n_neg_seeds": 0,
+            "repairability_status": status, "evidence_status": "partial", "p_harm": 0.0, "harm_magnitude": 0.0,
+            "risk": 0.0, "p_material_harm": float(material > 0), "material_risk": material, "restored_exactly": exact}
+
+
+def test_two_metric_evidence_and_power_guard():
+    """Fix 1: a repair is safe only if it is safe under BOTH macro-F1 and ROC-AUC. Fix 2: with a large noise floor a
+    non-exact repair cannot be certified safe, while exact restoration (duplicate removal) still can."""
+    f1 = pd.DataFrame([_ev_row("outliers", status="weak"), _ev_row("missing_values", status="weak")])
+    auc = pd.DataFrame([_ev_row("outliers", status="negative", material=0.02, recovery=-0.03),
+                        _ev_row("missing_values", status="weak")])
+    both = _combine_evidence(f1, auc, floor_f1=0.004, floor_auc=0.003).set_index("error_type")
+    assert both.loc["outliers", "repairability_status"] == "negative", "harm on EITHER metric makes it negative"
+    assert both.loc["outliers", "material_risk"] == 0.02, "material risk is the worse of the two metrics"
+    assert both.loc["missing_values", "repairability_status"] == "weak"
+    assert not both.underpowered.any(), "small noise floors must not trigger the guard"
+
+    noisy = _combine_evidence(pd.DataFrame([_ev_row("missing_values"), _ev_row("duplicates", exact=True)]),
+                              pd.DataFrame([_ev_row("missing_values"), _ev_row("duplicates", exact=True)]),
+                              floor_f1=0.016, floor_auc=0.003).set_index("error_type")
+    assert bool(noisy.loc["missing_values", "underpowered"]) and not bool(noisy.loc["duplicates", "underpowered"]), \
+        "the guard blocks inexact repairs but exempts exact restoration"
+    just_under = _combine_evidence(pd.DataFrame([_ev_row("missing_values")]), None,
+                                   floor_f1=MAX_CERTIFIABLE_NOISE_FLOOR - 1e-6, floor_auc=None)
+    assert not just_under.underpowered.any(), "at or below the cap is certifiable"
+
+    # through the policy: same evidence, noisy vs quiet
+    state = audit_dataset(synthetic(), "y")
+    for floor, expect_auto in ((0.016, False), (0.004, True)):
+        rows = [_ev_row(i, r) for i in ("missing_values", "outliers", "label_errors") for r in (0.05, 0.10, 0.20)]
+        rows += [_ev_row("duplicates", r, exact=True) for r in (0.05, 0.10, 0.20)]
+        ev = _combine_evidence(pd.DataFrame(rows), pd.DataFrame(rows), floor_f1=floor, floor_auc=floor)
+        attach_self_benchmark(state, SelfBench(ok=True, evidence=ev))
+        pol = state.policy.set_index("issue_key")
+        assert pol.loc["duplicates", "default_action"] == "auto-repair", "exact dedup is certifiable at any noise"
+        assert (pol.loc["missing_values", "default_action"] == "auto-repair") is expect_auto
+        if not expect_auto:
+            assert "cannot be certified safe" in pol.loc["missing_values", "reason"]
+    print("OK two-metric evidence (worst of F1/AUC) and the power guard (blocks noisy approvals, exempts exact repairs)")
+
+
+def test_metric_disagreement_flag():
+    imbalanced = pd.DataFrame({"error_type": ["label_errors"] * 3 + ["duplicates"] * 3 + ["outliers"] * 3,
+                               "rate": [0.05, 0.10, 0.20] * 3,
+                               "mean_damage": [-0.005, -0.011, -0.008, 0.001, 0.0, 0.001, 0.007, 0.012, 0.015],
+                               "mean_damage_auc": [0.013, 0.026, 0.050, 0.0, 0.0, 0.0, 0.0, -0.001, 0.001]})
+    flagged = _metric_disagreement(imbalanced, floor_f1=0.007, floor_auc=0.003, minority_share=0.117).set_index("error_type")
+    assert "label_errors" in flagged.index and "ROC-AUC shows real damage" in flagged.loc["label_errors", "note"]
+    assert "imbalanced" in flagged.loc["label_errors", "note"], "the imbalance cause is named when the minority class is rare"
+    assert "outliers" in flagged.index and "does not" in flagged.loc["outliers", "note"], "the opposite pattern is flagged too"
+    assert "duplicates" not in flagged.index, "agreement (no damage on either) is not flagged"
+    balanced = _metric_disagreement(imbalanced, 0.007, 0.003, minority_share=0.45).set_index("error_type")
+    assert "imbalanced" not in balanced.loc["label_errors", "note"]
+    print("OK F1/AUC disagreement is flagged in both directions, with the imbalance cause only when it applies")
+
+
 def test_calibrates_and_drives_policy():
     df = synthetic()
     state = audit_dataset(df, "y")
@@ -88,6 +148,11 @@ def test_calibrates_and_drives_policy():
     needed = {"error_type", "rate", "mean_damage", "repair_precision", "repair_recall", "mean_recovery",
               "repairability_status", "risk", "material_risk", "p_harm"}
     assert needed <= set(ev.columns), "evidence must follow the Phase 10 schema (plus material risk)"
+    assert sb.has_auc and sb.noise_floor_auc >= 0.003, "ROC-AUC must be measured alongside macro-F1"
+    assert {"status_macrof1", "status_auc", "mean_damage_auc", "material_risk_auc", "underpowered",
+            "noise_floor", "noise_floor_auc"} <= set(ev.columns)
+    assert np.isfinite(ev.mean_damage_auc).all() and "mean_damage_auc" in sb.impact_curve
+    assert sb.metric_disagreement is not None and "minority_class_share" in sb.reference
     assert set(ev.error_type) == {"missing_values", "duplicates", "outliers", "label_errors"}
     assert set(ev.repairability_status) <= {"positive", "weak", "negative"}
     dmg = sb.impact_curve.set_index(["error_type", "rate"])["mean_damage"]
@@ -122,6 +187,8 @@ def test_calibrates_and_drives_policy():
     assert "selfbenchmark_evidence.csv" in files and "selfbenchmark_runs.csv" in files
     report = json.loads(files["readiness_report.json"])
     assert report["self_benchmark"]["ran"] is True and report["self_benchmark"]["evidence"]
+    assert "noise_floor_auc" in report["self_benchmark"] and "metric_disagreement" in report["self_benchmark"]
+    assert "impact_estimate_auc" in report["benchmark_task_impact"][0]
     assert any("CLEAN-ISH" in t for t in report["limitations"])
     assert_log_honest(df, res.cleaned, res.repair_log, "calibrated/evidence-based")
     assert_log_honest(df, res.cleaned_aggressive, res.repair_log_aggressive, "calibrated/aggressive")
@@ -167,6 +234,8 @@ def test_multiclass():
 if __name__ == "__main__":
     test_rules_match_adult_phase10()
     test_exact_restoration_is_never_harm()
+    test_two_metric_evidence_and_power_guard()
+    test_metric_disagreement_flag()
     test_calibrates_and_drives_policy()
     test_declines_when_evidence_would_be_meaningless()
     test_multiclass()

@@ -74,6 +74,12 @@ PROBLEM_TEXT = {
 # rarely overwrote legitimate data), and (c) its repairability status was not
 # "negative". Everything else is flagged for human review.
 SAFE_REPAIR_MIN_PRECISION = 0.95
+# Power guard (see selfbench.py): if the measurement noise on either metric of a self-benchmark exceeds this,
+# "no material harm observed" is too weak to certify a NON-exact repair as safe. Exact restoration is exempt (it is
+# safe by construction, verified by comparing the data). Chosen conservatively after a validation run in which a noise
+# floor twice the ground truth's let a harmful repair through. More seeds help only modestly (per-run noise does
+# not shrink with seeds); a larger clean-ish reference is what lowers the floor.
+MAX_CERTIFIABLE_NOISE_FLOOR = 0.01
 # Categorical columns with more distinct values than this are excluded from
 # the model-based detectors only (one-hot encoding an ID-like column would
 # blow up memory and carries no signal). They are still checked for missing
@@ -454,22 +460,28 @@ def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | No
             # dataset-specific evidence also carries a noise-aware "material" harm risk; use it when present
             material = row.get("material_risk")
             use_material = material is not None and not pd.isna(material)
+            up = row.get("underpowered")
+            floor = row.get("noise_floor")
+            floor_auc = row.get("noise_floor_auc")
             return {"rate": float(row["rate"]), "status": row["repairability_status"],
                     "risk": float(material if use_material else row["risk"]),
                     "risk_kind": "harm beyond the noise floor" if use_material else "observed harm",
                     "precision": float(row["repair_precision"]), "recall": float(row["repair_recall"]),
+                    "underpowered": bool(up) if up is not None and not pd.isna(up) else False,
+                    "noise_floor": max([float(f) for f in (floor, floor_auc) if f is not None and not pd.isna(f)]
+                                       or [float("nan")]),
                     "source": source}
     return None
 
 
-def _impact_curve_estimate(curve: pd.DataFrame, issue: str, rate: float):
+def _impact_curve_estimate(curve: pd.DataFrame, issue: str, rate: float, col: str = "mean_damage"):
     """Same interpolation as the Adult version (a (0,0) anchor; beyond the highest measured rate the value is a
     boundary estimate), over this dataset's own measured damage curve. Returns None if the issue wasn't measured."""
     c = curve[curve.error_type == issue].sort_values("rate")
-    if c.empty:
+    if c.empty or col not in c or c[col].isna().any():
         return None
     rates = np.concatenate([[0.0], c["rate"].values])
-    damages = np.concatenate([[0.0], c["mean_damage"].values])
+    damages = np.concatenate([[0.0], c[col].values])
     return float(np.interp(rate, rates, damages)), bool(rate > rates.max())
 
 
@@ -498,14 +510,19 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
             status, risk, prec = ev["status"], ev["risk"], ev["precision"]
             safe = risk <= 1e-9 and prec >= SAFE_REPAIR_MIN_PRECISION and status != "negative"
             guarded = issue in NEVER_AUTO_APPLY
+            underpowered = ev["underpowered"]
             reason = (f"{source}, nearest evaluated rate ({ev['rate']:.0%}): repair precision "
                       f"{prec:.2f}, {ev['risk_kind']} risk {risk:.4f}, status '{status}' -- "
                       + ("always human review: this repair type is never applied automatically "
                          "(it rewrites the target or was harmful in testing)" if guarded else
+                         f"cannot be certified safe: this dataset's measurement noise (floor "
+                         f"{ev['noise_floor']:.4f}) is above {MAX_CERTIFIABLE_NOISE_FLOOR}, so harm smaller than that "
+                         "would be invisible. A larger clean-ish reference lowers the noise; more seeds help only "
+                         "modestly" if underpowered and safe else
                          "meets the bar for safe automatic repair" if safe else
                          f"does not meet the safe-auto bar (risk must be 0 and precision >= "
                          f"{SAFE_REPAIR_MIN_PRECISION:.2f}, status not 'negative')"))
-            safe = safe and not guarded
+            safe = safe and not guarded and not underpowered
         if n_auto == 0 and n_flag == 0:
             action = "nothing to repair"
         elif safe and n_auto > 0:
@@ -873,13 +890,21 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
         if not p.detector_ran:
             rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": np.nan,
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
-                         "impact_source": "-", "impact_unit": "-",
+                         "impact_source": "-", "impact_unit": "-", "impact_estimate_auc": np.nan,
+                         "metrics_disagree": False, "metric_note": "",
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "policy_decision": "not assessed", "recommendation": p.reason})
             continue
         own = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate) if sb is not None else None
+        est_auc, disagree, metric_note = np.nan, False, ""
         if own is not None:
             (est, boundary), source, unit = own, "this dataset (self-benchmark)", sb.metric
+            own_auc = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate, "mean_damage_auc")
+            if own_auc is not None:
+                est_auc = own_auc[0]
+            md = sb.metric_disagreement
+            if md is not None and not md.empty and issue in set(md.error_type):
+                disagree, metric_note = True, md.set_index("error_type").loc[issue, "note"]
         else:
             est, boundary = _estimate_impact(issue, p.detected_rate)
             source, unit = "UCI Adult benchmark", "F1 (positive class)"
@@ -891,7 +916,8 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             decision = "flagged for human review (not applied)"
         rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
                      "benchmark_impact_estimate": est, "is_boundary_estimate": boundary,
-                     "impact_source": source, "impact_unit": unit,
+                     "impact_source": source, "impact_unit": unit, "impact_estimate_auc": est_auc,
+                     "metrics_disagree": disagree, "metric_note": metric_note,
                      "repairability_status": p.repairability_status, "benchmark_risk": p.benchmark_risk,
                      "policy_decision": decision,
                      "recommendation": RECOMMENDATION_TEXT.get(p.repairability_status, RECOMMENDATION_TEXT["unknown"])})
@@ -964,14 +990,17 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "issue": r.issue, "detected_rate": None if pd.isna(r.detected_rate) else float(r.detected_rate),
             "benchmark_impact_estimate": None if pd.isna(r.benchmark_impact_estimate) else float(r.benchmark_impact_estimate),
             "is_boundary_estimate": bool(r.is_boundary_estimate), "impact_source": r.impact_source,
-            "impact_unit": r.impact_unit, "repairability_status": r.repairability_status,
+            "impact_unit": r.impact_unit, "impact_estimate_auc": None if pd.isna(r.impact_estimate_auc) else float(r.impact_estimate_auc),
+            "metrics_disagree": bool(r.metrics_disagree), "metric_note": r.metric_note,
+            "repairability_status": r.repairability_status,
             "policy_decision": r.policy_decision, "recommendation": r.recommendation,
         } for r in impact.itertuples()],
         "impact_estimate_note": (
             "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a "
-            "clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 on held-out "
-            "reference rows). It is an estimate of relative harm for this data and a Random Forest, not a "
-            "validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary "
+            "clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 and ROC-AUC on "
+            "held-out reference rows; a repair counts as safe only if neither metric shows material harm, and "
+            "disagreements between the two are flagged). It is an estimate of relative harm for this data and a "
+            "Random Forest, not a validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary "
             "estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve."
             if sb is not None else
             "Benchmark-based task-impact estimate: the detected rate is mapped onto the controlled Phase 7 "
@@ -1024,12 +1053,15 @@ LIMITATIONS = [
     "duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above.",
     "Impact is measured with F1-type metrics, which depend on the decision threshold. On a heavily imbalanced target "
     "(bank-marketing, 11.7% positive) label noise RAISED F1 while ROC-AUC fell by up to 0.05, so F1-based impact "
-    "estimates can hide or invert the harm of label noise. Check the class balance before trusting them.",
+    "estimates can hide or invert the harm of label noise. Check the class balance before trusting them. (A "
+    "calibrated run also measures ROC-AUC and flags where the two metrics disagree.)",
     "Repair harm is dataset- and metric-dependent: feature-anomaly repair was harmful on Adult but looked helpful by F1 "
     "(harmful by AUC) on bank-marketing. Its never-auto guard rests on low precision (repair precision about 0.25-0.42), "
     "not on universal harm.",
-    "A calibration with a large noise floor (small reference sets) is weak evidence of safety: in validation, a dirty "
-    "upload whose noise floor was twice the ground truth's approved a repair the ground truth showed to be harmful.",
+    "A calibration with a large noise floor (small reference sets) is weak evidence of safety, so non-exact repairs "
+    "are not certified safe when the noise on either metric exceeds " + str(MAX_CERTIFIABLE_NOISE_FLOOR) + ". That "
+    "cap was set after a validation run in which a noise floor twice the ground truth's approved a harmful repair; "
+    "it was chosen conservatively, not tuned, and has not been tested out of sample.",
 ]
 
 
@@ -1038,8 +1070,10 @@ SELFBENCH_LIMITATIONS = [
     "duplicates, high-confidence label problems removed), not true ground truth. Undetected problems left in the "
     "reference, and selection bias from dropping incomplete rows, can make damage look smaller or repairs look "
     "easier than they are.",
-    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and macro-F1: 'no harm "
-    "observed' means none in those runs, not a guarantee. Your own model may react differently.",
+    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and two metrics (macro-F1 "
+    "and ROC-AUC): 'no harm observed' means none in those runs, not a guarantee. Your own model may react "
+    "differently. When the measurement noise on either metric exceeds "
+    + str(MAX_CERTIFIABLE_NOISE_FLOOR) + ", non-exact repairs cannot be certified safe at all.",
     "Issues the self-benchmark did not measure (feature anomalies, consistency) still use the UCI Adult "
     "evidence, and each decision names its evidence source.",
     "The self-benchmark injects RANDOM errors. Real errors are often structured (systematic mislabeling, a "
@@ -1160,8 +1194,14 @@ def main():
                                 progress=lambda f, m: print(f"  [{f:4.0%}] {m}") if m.endswith("(seed 42)") else None)
         attach_self_benchmark(state, sb)
         if sb.ok:
-            print(f"  done in {sb.seconds:.0f}s; noise floor {sb.noise_floor:.4f} {sb.metric}; "
-                  f"reference {sb.reference['rows_used']:,} rows")
+            print(f"  done in {sb.seconds:.0f}s; noise floor {sb.noise_floor:.4f} {sb.metric}"
+                  + (f" / {sb.noise_floor_auc:.4f} ROC-AUC" if sb.has_auc else "")
+                  + f"; reference {sb.reference['rows_used']:,} rows")
+            if sb.evidence["underpowered"].any():
+                print(f"  note: the noise floor exceeds {MAX_CERTIFIABLE_NOISE_FLOOR}, so non-exact repairs cannot be "
+                      "certified safe from this calibration (a larger clean-ish reference lowers the noise)")
+            for r in sb.metric_disagreement.itertuples():
+                print(f"  WARNING {r.error_type}: {r.note}")
         else:
             print(f"  skipped: {sb.reason}\n  (the policy keeps using the UCI Adult evidence)")
     apply_issues = None if args.apply is None else {s.strip() for s in args.apply.split(",") if s.strip()}

@@ -17,8 +17,9 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from selfbench import NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
-from taskclean import (ISSUES, MAX_MODEL_ROWS, PROBLEM_TEXT, apply_repairs, attach_self_benchmark,  # noqa: E402
+from selfbench import IMBALANCE_WARNING_SHARE, NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
+from taskclean import (ISSUES, MAX_CERTIFIABLE_NOISE_FLOOR, MAX_MODEL_ROWS, PROBLEM_TEXT, apply_repairs,  # noqa: E402
+                       attach_self_benchmark,
                        audit_dataset, default_apply_issues, load_csv, outputs_as_bytes, outputs_zip)
 
 DEMO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "demo_dirty_adult.csv")
@@ -221,7 +222,8 @@ elif view == "Calibration":
         m[0].metric("Reference rows", f"{ref['rows_used']:,}")
         m[1].metric("Clean-trained macro-F1", f"{np.mean(list(sb.baseline_f1.values())):.3f}")
         m[2].metric("Chance level", f"{sb.chance_f1:.3f}")
-        m[3].metric("Noise floor", f"{sb.noise_floor:.4f}")
+        m[3].metric("Noise floor (F1 / AUC)", f"{sb.noise_floor:.4f} / {sb.noise_floor_auc:.4f}" if sb.has_auc
+                    else f"{sb.noise_floor:.4f}")
         st.caption(
             f"Built from your data: {ref['rows_labeled']:,} labeled rows -> {ref['rows_complete']:,} complete -> "
             f"{ref['rows_after_dedup']:,} without duplicates -> {ref['rows_used']:,} used "
@@ -234,18 +236,36 @@ elif view == "Calibration":
         if sb.skipped_issues:
             st.warning("Not measured: " + "; ".join(f"{k} ({v})" for k, v in sb.skipped_issues.items())
                        + ". These keep using the UCI Adult evidence.")
+        if ref.get("minority_class_share", 1.0) < IMBALANCE_WARNING_SHARE:
+            st.info(f"The minority class is only {ref['minority_class_share']:.0%} of your reference. F1-type metrics "
+                    "depend on the decision threshold and can mislead on imbalanced targets, so ROC-AUC (which does "
+                    "not) is measured alongside macro-F1, and a repair counts as safe only if neither metric shows "
+                    "material harm.")
+        for r in sb.metric_disagreement.itertuples():
+            st.warning(f"**{r.error_type}: macro-F1 and ROC-AUC disagree.** {r.note}")
+        if sb.evidence["underpowered"].any():
+            st.warning(f"The measurement noise on your data (floor {max(sb.noise_floor, sb.noise_floor_auc if sb.has_auc else 0):.4f}) "
+                       f"is above {MAX_CERTIFIABLE_NOISE_FLOOR}, so harm smaller than that would be invisible: "
+                       "non-exact repairs (imputation, outlier clipping) cannot be certified safe from this "
+                       "calibration and stay in human review. Exact duplicate removal is unaffected. A larger "
+                       "clean-ish reference lowers the noise; more seeds help only modestly.")
         st.subheader("Damage and repair evidence measured on your data")
         ev = sb.evidence
         st.dataframe(pd.DataFrame({
             "Error": ev.error_type, "Rate": [pct(r, 0) for r in ev.rate],
             "Damage (macro-F1)": [num(x) for x in ev.mean_damage],
+            "Damage (ROC-AUC)": [num(x) for x in ev.mean_damage_auc],
             "Repair precision": [pct(x, 0) for x in ev.repair_precision],
             "Repair recall": [pct(x, 0) for x in ev.repair_recall],
-            "Recovery": [num(x) for x in ev.mean_recovery], "Repair evidence": ev.repairability_status,
-            "Material harm risk": [f"{x:.4f}" for x in ev.material_risk]}), width="stretch", hide_index=True)
-        st.caption(f"Means over {sb.n_seeds} seeds. 'Damage' is how much each error lowers macro-F1 versus a model "
-                   "trained on the clean reference; 'Recovery' is how much of that the real TaskClean repair wins "
-                   "back; 'Material harm risk' counts only harm larger than the noise floor.")
+            "Recovery": [num(x) for x in ev.mean_recovery],
+            "Evidence (F1 / AUC)": ev.status_macrof1 + " / " + ev.status_auc,
+            "Material harm risk": [f"{x:.4f}" for x in ev.material_risk],
+            "Certifiable": ["no (noisy)" if u else "yes" for u in ev.underpowered]}),
+            width="stretch", hide_index=True)
+        st.caption(f"Means over {sb.n_seeds} seeds. 'Damage' is how much each error lowers the metric versus a model "
+                   "trained on the clean reference; 'Recovery' (macro-F1) is how much of that the real TaskClean "
+                   "repair wins back; 'Material harm risk' is the worse of the two metrics and counts only harm "
+                   "larger than that metric's noise floor.")
         st.subheader("Does each detector's flagged rate track real damage on your data?")
         tr = sb.detector_tracking
         st.dataframe(pd.DataFrame({"Error": tr.error_type, "Evidence": tr.evidence_status, "Note": tr.note}),
@@ -280,6 +300,8 @@ elif view == "Task impact":
         "Impact estimate": [
             ("-" if pd.isna(e) else num(e) + ("  [boundary estimate]" if b else ""))
             for e, b in zip(imp.benchmark_impact_estimate, imp.is_boundary_estimate)],
+        "Impact (ROC-AUC)": [("-" if pd.isna(e) else num(e)) for e in imp.impact_estimate_auc],
+        "Metrics disagree": ["yes" if d else "" for d in imp.metrics_disagree],
         "Unit": imp.impact_unit, "Based on": imp.impact_source,
         "Repair evidence": imp.repairability_status, "Decision": imp.policy_decision,
         "Recommendation": imp.recommendation})
