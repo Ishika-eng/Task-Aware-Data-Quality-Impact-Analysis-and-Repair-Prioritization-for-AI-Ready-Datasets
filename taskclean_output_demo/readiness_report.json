@@ -1,6 +1,6 @@
 {
   "taskclean_version": "1.0",
-  "generated_at_utc": "2026-10-03T02:34:34+00:00",
+  "generated_at_utc": "2026-10-04T02:43:48+00:00",
   "dataset_overview": {
     "rows_uploaded": 6300,
     "rows_analysed": 6300,
@@ -31,7 +31,7 @@
       "baseline_false_positive_floor": 0.0,
       "baseline_source": "0 by construction (exact check)",
       "evidence_status": "not_estimable",
-      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+      "evidence_note": "On this dataset the macro-F1 damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
       "status": "Evidence-limited",
       "rate_after_cleaning": 0.05
     },
@@ -42,7 +42,7 @@
       "baseline_false_positive_floor": 0.0,
       "baseline_source": "0 by construction (exact check)",
       "evidence_status": "not_estimable",
-      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+      "evidence_note": "On this dataset the macro-F1 damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
       "status": "Evidence-limited",
       "rate_after_cleaning": 0.0
     },
@@ -52,9 +52,9 @@
       "observed_rate": 0.32666666666666666,
       "baseline_false_positive_floor": 0.3275034293552812,
       "baseline_source": "this dataset's clean-ish reference (self-benchmark)",
-      "evidence_status": "not_estimable",
-      "evidence_note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
-      "status": "Evidence-limited",
+      "evidence_status": "weak",
+      "evidence_note": "The detected rate rose with measured ROC-AUC damage on this dataset (r = 0.99, 3 rates: directional only, not statistically significant).",
+      "status": "Good",
       "rate_after_cleaning": 0.30816666666666664
     },
     {
@@ -75,7 +75,7 @@
       "baseline_false_positive_floor": 0.009945130315500686,
       "baseline_source": "this dataset's clean-ish reference (self-benchmark)",
       "evidence_status": "inverted",
-      "evidence_note": "INVERTED on this dataset: the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal.",
+      "evidence_note": "INVERTED on this dataset (macro-F1): the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal.",
       "status": "High uncertainty",
       "rate_after_cleaning": null
     },
@@ -99,6 +99,9 @@
       "is_boundary_estimate": false,
       "impact_source": "this dataset (self-benchmark)",
       "impact_unit": "macro-F1",
+      "impact_estimate_auc": -0.0005361345379371065,
+      "metrics_disagree": false,
+      "metric_note": "",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -110,6 +113,9 @@
       "is_boundary_estimate": false,
       "impact_source": "this dataset (self-benchmark)",
       "impact_unit": "macro-F1",
+      "impact_estimate_auc": 0.0015728200080989026,
+      "metrics_disagree": false,
+      "metric_note": "",
       "repairability_status": "weak",
       "policy_decision": "applied",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -121,6 +127,9 @@
       "is_boundary_estimate": true,
       "impact_source": "this dataset (self-benchmark)",
       "impact_unit": "macro-F1",
+      "impact_estimate_auc": 0.013870527202202573,
+      "metrics_disagree": false,
+      "metric_note": "",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -132,6 +141,9 @@
       "is_boundary_estimate": false,
       "impact_source": "this dataset (self-benchmark)",
       "impact_unit": "macro-F1",
+      "impact_estimate_auc": 0.0024976568721742105,
+      "metrics_disagree": false,
+      "metric_note": "",
       "repairability_status": "weak",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
@@ -143,12 +155,15 @@
       "is_boundary_estimate": true,
       "impact_source": "UCI Adult benchmark",
       "impact_unit": "F1 (positive class)",
+      "impact_estimate_auc": null,
+      "metrics_disagree": false,
+      "metric_note": "",
       "repairability_status": "negative",
       "policy_decision": "flagged for human review (not applied)",
       "recommendation": "Automatic repair NOT recommended under the evaluated repair strategy -- controlled testing demonstrated it is net-harmful. This does not mean the underlying error is inherently unrepairable, only that the strategy we evaluated was harmful here. Flag for manual review instead of auto-repairing."
     }
   ],
-  "impact_estimate_note": "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 on held-out reference rows). It is an estimate of relative harm for this data and a Random Forest, not a validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve.",
+  "impact_estimate_note": "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 and ROC-AUC on held-out reference rows; a repair counts as safe only if neither metric shows material harm, and disagreements between the two are flagged). It is an estimate of relative harm for this data and a Random Forest, not a validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve.",
   "repair_policy": {
     "safe_auto_requires": "observed harm risk == 0, repair precision >= 0.95, status != negative -- evaluated on this dataset's self-benchmark where measured, else the UCI Adult benchmark",
     "issues_applied": [
@@ -228,10 +243,21 @@
       ],
       "rows_used": 2916,
       "rows_train": 2041,
-      "rows_test": 875
+      "rows_test": 875,
+      "minority_class_share": 0.27537722908093276
     },
     "noise_floor": 0.008976963904438843,
     "null_experiment_rms_f1_change": 0.008976963904438843,
+    "noise_floor_auc": 0.00538350107965691,
+    "null_experiment_rms_auc_change": 0.00538350107965691,
+    "max_certifiable_noise_floor": 0.01,
+    "underpowered_repairs": [],
+    "metric_disagreement": [],
+    "baseline_auc": {
+      "42": 0.8705806510726861,
+      "43": 0.8708097176590704,
+      "44": 0.8665130829744624
+    },
     "baseline_f1": {
       "42": 0.7337606837606838,
       "43": 0.7261788494869186,
@@ -258,7 +284,16 @@
         "risk": 0.006652033172773815,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": true
+        "restored_exactly": true,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.001651461008503848,
+        "mean_recovery_auc": 0.001651461008503848,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "label_errors",
@@ -278,7 +313,16 @@
         "risk": 0.0,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.010490158863131685,
+        "mean_recovery_auc": 0.0037228774253788752,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "missing_values",
@@ -298,7 +342,16 @@
         "risk": 0.005887259889501191,
         "p_material_harm": 0.3333333333333333,
         "material_risk": 0.005251682775626339,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.005251682775626339,
+        "status_auc": "weak",
+        "mean_damage_auc": -0.0005355794948317764,
+        "mean_recovery_auc": 0.0006173889899690662,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "outliers",
@@ -316,9 +369,18 @@
         "p_harm": 0.3333333333333333,
         "harm_magnitude": 0.000322413411521949,
         "risk": 0.000107471137173983,
-        "p_material_harm": 0.0,
-        "material_risk": 0.0,
-        "restored_exactly": false
+        "p_material_harm": 0.3333333333333333,
+        "material_risk": 0.002429196608941882,
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.00562194850583142,
+        "mean_recovery_auc": -0.002083415142828393,
+        "material_risk_auc": 0.002429196608941882,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "duplicates",
@@ -338,7 +400,16 @@
         "risk": 0.0042816903161913,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": true
+        "restored_exactly": true,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.0019808805755898717,
+        "mean_recovery_auc": 0.0019808805755898717,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "label_errors",
@@ -358,7 +429,16 @@
         "risk": 0.0034703020080811458,
         "p_material_harm": 0.3333333333333333,
         "material_risk": 0.0034703020080811458,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0034703020080811458,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.022078746547639454,
+        "mean_recovery_auc": -0.0019688818496362095,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "missing_values",
@@ -378,7 +458,16 @@
         "risk": 0.008469564204538593,
         "p_material_harm": 0.3333333333333333,
         "material_risk": 0.004233606710856486,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.004233606710856486,
+        "status_auc": "weak",
+        "mean_damage_auc": -0.0009435361772494785,
+        "mean_recovery_auc": -0.0038385015118394352,
+        "material_risk_auc": 0.002199039229289064,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "outliers",
@@ -398,7 +487,16 @@
         "risk": 0.004294625780080441,
         "p_material_harm": 0.3333333333333333,
         "material_risk": 0.004294625780080441,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.004294625780080441,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.008535457325985782,
+        "mean_recovery_auc": -0.0003381459132338893,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "duplicates",
@@ -418,7 +516,16 @@
         "risk": 0.0018986886628046262,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": true
+        "restored_exactly": true,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.0021106849745409217,
+        "mean_recovery_auc": 0.0021106849745409217,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "label_errors",
@@ -438,7 +545,16 @@
         "risk": 0.001923846461661623,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.06590463848929495,
+        "mean_recovery_auc": 0.0009860771147208736,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "missing_values",
@@ -458,7 +574,16 @@
         "risk": 0.0035663229089166375,
         "p_material_harm": 0.3333333333333333,
         "material_risk": 0.0035663229089166375,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0035663229089166375,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.004033753506900384,
+        "mean_recovery_auc": -0.001082066922348653,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       },
       {
         "error_type": "outliers",
@@ -478,7 +603,16 @@
         "risk": 0.0,
         "p_material_harm": 0.0,
         "material_risk": 0.0,
-        "restored_exactly": false
+        "restored_exactly": false,
+        "status_macrof1": "weak",
+        "material_risk_f1": 0.0,
+        "status_auc": "weak",
+        "mean_damage_auc": 0.013870527202202573,
+        "mean_recovery_auc": 0.0011518776915323918,
+        "material_risk_auc": 0.0,
+        "noise_floor_auc": 0.00538350107965691,
+        "noise_floor": 0.008976963904438843,
+        "underpowered": false
       }
     ],
     "impact_curve": [
@@ -486,73 +620,97 @@
         "error_type": "duplicates",
         "rate": 0.05,
         "mean_damage": -0.004657731178471791,
-        "damage_std": 0.0117669958028759
+        "damage_std": 0.0117669958028759,
+        "mean_damage_auc": 0.001651461008503848,
+        "damage_std_auc": 0.0028446041813329223
       },
       {
         "error_type": "duplicates",
         "rate": 0.1,
         "mean_damage": -0.0028584517506162013,
-        "damage_std": 0.007460855371592998
+        "damage_std": 0.007460855371592998,
+        "mean_damage_auc": 0.0019808805755898717,
+        "damage_std_auc": 0.0025329875560376925
       },
       {
         "error_type": "duplicates",
         "rate": 0.2,
         "mean_damage": 0.00646541014290299,
-        "damage_std": 0.010712109336522127
+        "damage_std": 0.010712109336522127,
+        "mean_damage_auc": 0.0021106849745409217,
+        "damage_std_auc": 0.0035717302288215936
       },
       {
         "error_type": "label_errors",
         "rate": 0.05,
         "mean_damage": 0.0003869450739531673,
-        "damage_std": 0.00832600304490614
+        "damage_std": 0.00832600304490614,
+        "mean_damage_auc": 0.010490158863131685,
+        "damage_std_auc": 0.00490075595441696
       },
       {
         "error_type": "label_errors",
         "rate": 0.1,
         "mean_damage": 0.008108771935903683,
-        "damage_std": 0.004440809406051646
+        "damage_std": 0.004440809406051646,
+        "mean_damage_auc": 0.022078746547639454,
+        "damage_std_auc": 0.008204158995698882
       },
       {
         "error_type": "label_errors",
         "rate": 0.2,
         "mean_damage": 0.021912513483932267,
-        "damage_std": 0.01423548569697974
+        "damage_std": 0.01423548569697974,
+        "mean_damage_auc": 0.06590463848929495,
+        "damage_std_auc": 0.009768802080875124
       },
       {
         "error_type": "missing_values",
         "rate": 0.05,
         "mean_damage": -0.004852515567344414,
-        "damage_std": 0.006149528920230147
+        "damage_std": 0.006149528920230147,
+        "mean_damage_auc": -0.0005355794948317764,
+        "damage_std_auc": 0.0023854780919737827
       },
       {
         "error_type": "missing_values",
         "rate": 0.1,
         "mean_damage": -0.005681268414496306,
-        "damage_std": 0.009190905887884907
+        "damage_std": 0.009190905887884907,
+        "mean_damage_auc": -0.0009435361772494785,
+        "damage_std_auc": 0.0028299375828440875
       },
       {
         "error_type": "missing_values",
         "rate": 0.2,
         "mean_damage": 0.00021837824536855935,
-        "damage_std": 0.01445395534908734
+        "damage_std": 0.01445395534908734,
+        "mean_damage_auc": 0.004033753506900384,
+        "damage_std_auc": 0.004400689419235683
       },
       {
         "error_type": "outliers",
         "rate": 0.05,
         "mean_damage": 0.0018974985794742993,
-        "damage_std": 0.012207639575078357
+        "damage_std": 0.012207639575078357,
+        "mean_damage_auc": 0.00562194850583142,
+        "damage_std_auc": 0.001855217137777618
       },
       {
         "error_type": "outliers",
         "rate": 0.1,
         "mean_damage": -0.0005880359079902439,
-        "damage_std": 0.004991650887694058
+        "damage_std": 0.004991650887694058,
+        "mean_damage_auc": 0.008535457325985782,
+        "damage_std_auc": 0.003678330064623945
       },
       {
         "error_type": "outliers",
         "rate": 0.2,
         "mean_damage": 0.007733533656622289,
-        "damage_std": 0.005131170060613857
+        "damage_std": 0.005131170060613857,
+        "mean_damage_auc": 0.013870527202202573,
+        "damage_std_auc": 0.003756481548516411
       }
     ],
     "detector_reliability": [
@@ -588,7 +746,10 @@
         "spearman_r": null,
         "n_points": 3,
         "evidence_status": "not_estimable",
-        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+        "note": "On this dataset the macro-F1 damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+        "metric": "macro-F1",
+        "pearson_r_macrof1": null,
+        "pearson_r_auc": null
       },
       {
         "error_type": "label_errors",
@@ -596,7 +757,10 @@
         "spearman_r": -1.0,
         "n_points": 3,
         "evidence_status": "inverted",
-        "note": "INVERTED on this dataset: the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal."
+        "note": "INVERTED on this dataset (macro-F1): the detected rate fell as true corruption and measured damage rose (r = -0.97 over 3 rates). Do not read it as a severity signal.",
+        "metric": "macro-F1",
+        "pearson_r_macrof1": -0.9678992026246643,
+        "pearson_r_auc": -0.995795644052725
       },
       {
         "error_type": "missing_values",
@@ -604,15 +768,21 @@
         "spearman_r": null,
         "n_points": 3,
         "evidence_status": "not_estimable",
-        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+        "note": "On this dataset the macro-F1 damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+        "metric": "macro-F1",
+        "pearson_r_macrof1": null,
+        "pearson_r_auc": null
       },
       {
         "error_type": "outliers",
-        "pearson_r": null,
-        "spearman_r": null,
+        "pearson_r": 0.9942452757907678,
+        "spearman_r": 1.0,
         "n_points": 3,
-        "evidence_status": "not_estimable",
-        "note": "On this dataset the damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage."
+        "evidence_status": "weak",
+        "note": "The detected rate rose with measured ROC-AUC damage on this dataset (r = 0.99, 3 rates: directional only, not statistically significant).",
+        "metric": "ROC-AUC",
+        "pearson_r_macrof1": null,
+        "pearson_r_auc": 0.9942452757907678
       }
     ],
     "detector_false_positive_floors_on_reference": {
@@ -622,7 +792,7 @@
       "label_errors": 0.009945130315500686
     },
     "issues_not_measured": {},
-    "seconds": 16.9
+    "seconds": 17.9
   },
   "changes_summary": {
     "rows_uploaded": 6300,
@@ -664,17 +834,17 @@
       "duplicates": 0.0,
       "outliers": 0.0,
       "inconsistency": 0.01,
-      "label_noise": 2.58,
-      "feature_corruption": 29.08
+      "label_noise": 2.26,
+      "feature_corruption": 25.84
     },
-    "audit_seconds": 32.01,
+    "audit_seconds": 28.44,
     "python": "3.14.6",
     "pandas": "3.0.6",
     "scikit_learn": "1.9.1"
   },
   "limitations": [
     "Self-benchmark evidence comes from a CLEAN-ISH reference built from your own data (complete rows, no duplicates, high-confidence label problems removed), not true ground truth. Undetected problems left in the reference, and selection bias from dropping incomplete rows, can make damage look smaller or repairs look easier than they are.",
-    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and macro-F1: 'no harm observed' means none in those runs, not a guarantee. Your own model may react differently.",
+    "Each measurement uses only a few seeds and 3 corruption rates, a Random Forest, and two metrics (macro-F1 and ROC-AUC): 'no harm observed' means none in those runs, not a guarantee. Your own model may react differently. When the measurement noise on either metric exceeds 0.01, non-exact repairs cannot be certified safe at all.",
     "Issues the self-benchmark did not measure (feature anomalies, consistency) still use the UCI Adult evidence, and each decision names its evidence source.",
     "The self-benchmark injects RANDOM errors. Real errors are often structured (systematic mislabeling, a faulty sensor), so measured repair precision can be optimistic. That is why label and feature-anomaly repairs are never applied automatically, whatever the evidence.",
     "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector with known precision/recall limits (Phase 5). A flagged rate is not a confirmed error rate.",
@@ -685,7 +855,10 @@
     "Classification targets only (or no target: label checks are skipped). Duplicates are full-record duplicates (features + target).",
     "Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; the original cell is left as-is unless a missing-value repair is applied. A token that is a genuine category in your data will be over-counted as missing.",
     "Files above the model-detector row limit are audited on a stratified sample for the label/feature detectors; their findings and proposals then cover only the sampled rows.",
-    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above."
+    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above.",
+    "Impact is measured with F1-type metrics, which depend on the decision threshold. On a heavily imbalanced target (bank-marketing, 11.7% positive) label noise RAISED F1 while ROC-AUC fell by up to 0.05, so F1-based impact estimates can hide or invert the harm of label noise. Check the class balance before trusting them. (A calibrated run also measures ROC-AUC and flags where the two metrics disagree.)",
+    "Repair harm is dataset- and metric-dependent: feature-anomaly repair was harmful on Adult but looked helpful by F1 (harmful by AUC) on bank-marketing. Its never-auto guard rests on low precision (repair precision about 0.25-0.42), not on universal harm.",
+    "A calibration with a large noise floor (small reference sets) is weak evidence of safety, so non-exact repairs are not certified safe when the noise on either metric exceeds 0.01. That cap was set after a validation run in which a noise floor twice the ground truth's approved a harmful repair; it was chosen conservatively, not tuned, and has not been tested out of sample."
   ],
   "aggressive_variant": {
     "description": "Every proposed repair except feature-anomaly repairs (harmful in the benchmark). Intended as a model-ready file; each applied repair outside the evidence-based policy is a human-override-style risk and is marked as such in repair_log_aggressive.csv.",
