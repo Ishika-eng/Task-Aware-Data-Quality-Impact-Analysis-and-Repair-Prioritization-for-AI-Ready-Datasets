@@ -112,16 +112,58 @@ reliability and the dataset's own damage ordering. With 9 cells and 3 seeds this
 ## What this changes
 
 1. **F1-based damage is unreliable on imbalanced targets.** The self-benchmark's impact numbers (macro-F1) would
-   have told a bank-marketing user that label noise is harmless. *Recommended:* also measure ROC-AUC (one-vs-rest for
-   multi-class) in the self-benchmark and warn when F1 and AUC disagree. Not yet implemented.
+   have told a bank-marketing user that label noise is harmless. **Fixed - see the follow-up below:** the
+   self-benchmark now also measures ROC-AUC and warns when the two metrics disagree.
 2. **Approvals from a noisy calibration are weak evidence.** A large noise floor makes "no material harm" easy to
-   satisfy. *Recommended:* refuse to certify a repair as safe when the noise floor is large (for example above 0.01)
-   and offer 5 seeds. Not yet implemented.
+   satisfy. **Fixed - see the follow-up below:** non-exact repairs cannot be certified safe when the noise floor is
+   above 0.01.
 3. **Repair harm is dataset- and metric-dependent.** The "feature-anomaly repair is net-harmful" statement is not
    universal; the never-auto guard is justified by its low precision (repair precision 0.25-0.42, detector precision 0.28), not by universal harm. The product's
    limitations text now says so.
 4. The Adult findings are **not** safe to quote as general without stating the metric: label errors first and feature
    corruption last holds under AUC on both datasets, and not under F1 on the imbalanced one.
+
+## Follow-up: the two fixes, re-validated
+
+Both recommendations were then implemented (`src/selfbench.py`, `src/taskclean.py`) and the calibration was rerun on the
+same two bank-marketing uploads.
+
+**Fix 1 - ROC-AUC alongside macro-F1.** Every calibration run now records both metrics from the same model fit, each
+with its own noise floor. A repair counts as safe only if **neither** metric shows material harm (the validation showed
+each metric can hide harm the other shows), and disagreements are flagged, with the class-imbalance cause named when
+the minority class is under 20%.
+
+- On the raw upload the calibration now reports label-error damage by ROC-AUC of 0.014 / 0.032 / 0.070 at 5 / 10 / 20%,
+  against the ground truth's 0.013 / 0.026 / 0.050, while its macro-F1 still said label noise was harmless (-0.017 at
+  10%). The disagreement warning fired for label errors, exactly the failure found. On the dirty upload the AUC values
+  were 0.013 / 0.031 / 0.064.
+- AUC damage ordering vs the AUC ground truth (Spearman): **+0.76** (raw upload), **+0.47** (dirty upload).
+
+**Fix 2 - power guard.** If the measurement noise on either metric exceeds 0.01, a non-exact repair cannot be certified
+safe. Exact restoration (duplicate removal) is exempt, because it is safe by construction, verified by comparing the
+data, not by a noisy measurement.
+
+- The dirty upload (noise floor 0.0161): 9 of its 12 evidence rows (every missing-value, outlier and label row) were
+  marked not certifiable. **The false approval is gone.** The raw upload (floor 0.0092) is unaffected.
+
+Decision agreement with the ground truth under the product's new rule (safe only if safe under macro-F1 **and** AUC),
+over the 9 decidable cells:
+
+| Source | Agrees | False approvals | Missed safe repairs |
+|---|---|---|---|
+| Adult evidence, transferred | 9 / 9 | 0 | 0 |
+| Calibration, raw upload | 9 / 9 | 0 | 0 |
+| Calibration, dirty upload | 9 / 9 | 0 | 0 |
+
+**How much does this prove? Less than the table suggests.**
+- The ground truth became stricter under the two-metric rule (AUC shows harm from imputation that macro-F1 hid), and the
+  Adult evidence happens to agree with it. All three sources therefore tie. **The fixes remove the identified failures;
+  they do not show that calibration beats the transferred Adult evidence for this decision.**
+- Against the earlier macro-F1-only ground truth the same decisions score 7 / 9 for every source, with 0 false approvals
+  and 2 conservative misses.
+- The 0.01 cap was set **after** seeing the dirty upload's floor (0.0161 against the ground truth's 0.0074). It is
+  deliberately round and conservative, but it is in-sample and untested on other datasets. It also guarantees that small
+  datasets (for example German credit, floor 0.021) can never auto-approve imputation or outlier clipping.
 
 ## Not tested
 

@@ -165,19 +165,24 @@ The Adult experiments say what hurts and what is safe to repair *on Adult*. With
    data that can be derived, not ground truth.
 2. **Experiments.** Split it 70/30. For each error type (missing values, duplicates, outliers, label errors) at
    5/10/20% and several seeds, inject *only* that error into the training rows, train a Random Forest, and measure
-   the macro-F1 **damage** against a clean-trained model. Then run the **real TaskClean repair path** on the corrupted
+   the **damage** (macro-F1 and ROC-AUC) against a clean-trained model. Then run the **real TaskClean repair path** on the corrupted
    training data and measure **recovery**, repair precision/recall, and harm. The test rows are never corrupted.
 3. **Noise floor.** A null experiment (retrain on a random 90% of the training rows, which should change nothing)
-   measures how much F1 moves by chance on *your* data. Effects below it are noise, and a repair only counts as
-   harmful if it loses more than that. Small datasets get a larger floor than Adult's 0.003.
+   measures how much each metric moves by chance on *your* data. Effects below it are noise, and a repair only counts
+   as harmful if it loses more than that. Small datasets get a larger floor than Adult's 0.003.
 4. **Decisions.** The same safe-auto rule runs on your evidence (repair precision of at least 0.95 and no material
-   harm). You also get your own damage curves, detector precision/recall, detector false-positive floors, and a
+   harm on **either** metric). You also get your own damage curves, detector precision/recall, detector false-positive floors, and a
    check of whether each detector's flagged rate tracks real damage on your data.
 
 What it deliberately refuses to do:
 - If fewer than 600 clean-ish rows remain, or the target is barely predictable (clean-trained macro-F1 not at least
   0.05 above the same model trained on shuffled labels), it **declines** and the Adult evidence stays in force,
   with the reason reported. "No harm observed" would otherwise be vacuous.
+- **Power guard.** If the measurement noise on either metric exceeds 0.01, non-exact repairs (imputation, outlier
+  clipping) cannot be certified safe: harm smaller than that would be invisible. A larger clean-ish reference lowers
+  the noise; more seeds help only modestly. Exact duplicate removal is exempt.
+- **F1 and AUC disagreement is flagged.** On an imbalanced target label noise can *raise* F1 while ROC-AUC falls;
+  the report says so instead of reporting "harmless".
 - **Exact restoration is never harm.** When a repair reproduces the clean reference exactly (verified by comparing
   the data, as for duplicate removal), a negative recovery means the corruption happened to help by chance, so it
   cannot count against the repair.
@@ -320,8 +325,10 @@ ground truth, and the product was run on Heart Disease and German credit. Full w
 - **Calibration did not demonstrably improve the safe-to-repair decisions** (7/9 agreement with ground truth, same as
   the transferred Adult evidence); on a dirty upload it made one false approval, because its noise floor was twice the
   ground truth's. Duplicate removal is the only repair that was safe on both datasets under every metric.
-- Recommended fixes, not yet implemented: add ROC-AUC to the self-benchmark and warn when F1 and AUC disagree; refuse
-  to certify "safe" when the noise floor is large.
+- **Both fixes this exposed are now implemented and re-validated:** the self-benchmark measures ROC-AUC alongside
+  macro-F1 (a repair must be safe under both; disagreements are flagged), and non-exact repairs cannot be certified safe
+  when the noise floor exceeds 0.01. The false approval is gone, but all evidence sources now tie on this dataset, so
+  calibration is still not shown to beat the transferred evidence for that decision (see the follow-up in the report).
 
 ## Reproducing the experiments
 
@@ -402,7 +409,6 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 ## Not done yet
 
 - Logistic Regression validation of the Random Forest findings.
-- Applying the two validation-driven fixes (AUC alongside F1; a power guard on the noise floor).
 - More than one extra dataset; Logistic Regression is likewise untested.
 - Calibration of feature-anomaly repair (it stays on the Adult evidence and is never applied automatically).
 - Validating calibration against more datasets than Adult and synthetic data.
