@@ -3,3 +3,6 @@ pandas
 numpy
 scipy
 streamlit
+fastapi
+uvicorn
+python-multipart

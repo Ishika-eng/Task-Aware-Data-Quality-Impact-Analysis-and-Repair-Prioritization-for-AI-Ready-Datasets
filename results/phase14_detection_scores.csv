@@ -1,0 +1,2 @@
+error_type,unit,true_count,detected_count,precision,recall,f1,tp,fp,fn
+inconsistency,cells,443170,336380,1.0,0.7590315228918925,0.8630107113078057,336380,0,106790

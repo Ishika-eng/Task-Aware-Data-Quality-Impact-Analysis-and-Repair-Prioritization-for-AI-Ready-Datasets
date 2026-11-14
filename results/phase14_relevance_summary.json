@@ -1,0 +1,93 @@
+{
+  "n_seeds": 5,
+  "recall_by_injected_kind": {
+    "constant": 1.0,
+    "exact_copy": 1.0,
+    "gaussian": 0.8,
+    "linear_copy": 1.0,
+    "random_cat3": 1.0,
+    "random_cat30": 0.8,
+    "sequential_id": 1.0,
+    "shuffled_id": 1.0,
+    "string_id": 1.0,
+    "uniform_int": 0.8
+  },
+  "verdicts_by_injected_kind": {
+    "constant": {
+      "constant": 5
+    },
+    "exact_copy": {
+      "redundant": 5
+    },
+    "gaussian": {
+      "no_detectable_relevance": 4,
+      "relevant": 1
+    },
+    "linear_copy": {
+      "redundant": 5
+    },
+    "random_cat3": {
+      "no_detectable_relevance": 5
+    },
+    "random_cat30": {
+      "no_detectable_relevance": 4,
+      "relevant": 1
+    },
+    "sequential_id": {
+      "id_like": 5
+    },
+    "shuffled_id": {
+      "id_like": 5
+    },
+    "string_id": {
+      "id_like": 5
+    },
+    "uniform_int": {
+      "no_detectable_relevance": 4,
+      "relevant": 1
+    }
+  },
+  "overall_recall_on_injected": 0.94,
+  "real_columns_flagged_on_clean_adult": {
+    "fraction_of_seeds_flagged": {
+      "education-num": 1.0,
+      "race": 0.4
+    },
+    "verdicts": {
+      "education-num": {
+        "redundant": 5
+      },
+      "race": {
+        "no_detectable_relevance": 2
+      }
+    }
+  },
+  "mean_real_columns_flagged_per_seed": 1.4,
+  "f1": {
+    "f1_original_14_columns": {
+      "mean": 0.6799635664208844,
+      "std": 0.0025310001837479065
+    },
+    "f1_with_irrelevant_added": {
+      "mean": 0.6457529845075224,
+      "std": 0.0030702841995078377
+    },
+    "f1_after_dropping_flagged_from_added": {
+      "mean": 0.6809260614574679,
+      "std": 0.004295108598326452
+    },
+    "f1_after_dropping_flagged_from_original": {
+      "mean": 0.6783811616688203,
+      "std": 0.001434152889394978
+    }
+  },
+  "paired_effect_of_dropping_flagged_real_columns": {
+    "mean_f1_change": -0.0015824047520639705
+  },
+  "paired_effect_of_adding_irrelevant_columns": {
+    "mean_f1_change": -0.034210581913361994
+  },
+  "paired_recovery_from_dropping_flagged_added": {
+    "mean_f1_change": 0.035173076949945495
+  }
+}

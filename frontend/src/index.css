@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Light is the default; the .dark class on <html> swaps every token at once. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --fg: #0f172a;
+  --muted: #5b6678;
+  --line: #e1e6ee;
+  --accent: #2257d6;
+  --accent-fg: #ffffff;
+  --accent-soft: #e6eefc;
+  --good: #166b3a;
+  --good-soft: #e3f3e9;
+  --warn: #92520a;
+  --warn-soft: #fdf0d3;
+  --bad: #b3261e;
+  --bad-soft: #fbe6e4;
+  --grid: #e6eaf1;
+
+  /* one colour per error type, used identically in every chart and badge */
+  --c-label: #d9362b;
+  --c-feature: #7a4bd6;
+  --c-outliers: #d9650b;
+  --c-missing: #2257d6;
+  --c-duplicates: #1c8a4a;
+  --c-inconsistency: #b5267f;
+  --c-joint: #0e8a8a;
+  --c-series-a: #2257d6;
+  --c-series-b: #d9650b;
+  --c-series-c: #7a4bd6;
+}
+
+.dark {
+  --bg: #0a0f16;
+  --surface: #111826;
+  --surface-2: #19223a;
+  --fg: #e6eaf2;
+  --muted: #98a3b8;
+  --line: #243049;
+  --accent: #6aa0ff;
+  --accent-fg: #07101f;
+  --accent-soft: #16284d;
+  --good: #58d68d;
+  --good-soft: #11301f;
+  --warn: #f2be5c;
+  --warn-soft: #382a0b;
+  --bad: #ff8a80;
+  --bad-soft: #3a1816;
+  --grid: #1f2a40;
+
+  --c-label: #ff7a6e;
+  --c-feature: #b69cff;
+  --c-outliers: #ff9f4d;
+  --c-missing: #6aa0ff;
+  --c-duplicates: #5fd68f;
+  --c-inconsistency: #f07ac0;
+  --c-joint: #4fd1c5;
+  --c-series-a: #6aa0ff;
+  --c-series-b: #ff9f4d;
+  --c-series-c: #b69cff;
+}
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+* { border-color: var(--line); }
+::selection { background: var(--accent-soft); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* slim scrollbars for tables */
+.scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+
+.recharts-text { fill: var(--muted); }
+.recharts-cartesian-axis-tick-value { fill: var(--muted); font-size: 11px; }
+
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 37%, var(--surface-2) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.3s infinite linear;
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  * { scroll-behavior: auto !important; transition: none !important; }
+}

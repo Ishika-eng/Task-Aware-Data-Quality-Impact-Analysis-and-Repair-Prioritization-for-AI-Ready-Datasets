@@ -1,0 +1,339 @@
+// Typed client for the TaskClean API (backend/main.py). Every number shown in the UI comes from these responses.
+
+export interface ColumnInfo {
+  name: string;
+  kind: "numeric" | "text" | "boolean" | "datetime";
+  n_unique: number;
+  n_missing: number;
+  target_candidate: boolean;
+  examples: string[];
+}
+
+export interface DatasetInfo {
+  id: string;
+  name: string;
+  rows: number;
+  n_columns: number;
+  input_format: { encoding: string; delimiter: string; decimal: string; rows: number; columns: number };
+  columns: ColumnInfo[];
+  suggested_target: string | null;
+  preview: Record<string, unknown>[];
+  demo: boolean;
+}
+
+export interface Job {
+  id: string;
+  status: "queued" | "running" | "done" | "error";
+  progress: number;
+  message: string;
+  stage: string;
+  error: string | null;
+  audit_id: string | null;
+  elapsed: number;
+  calibrate: boolean;
+}
+
+export interface AuditRequest {
+  dataset_id: string;
+  target: string | null;
+  include_feature_anomalies: boolean;
+  include_joint_outliers: boolean;
+  calibrate: boolean;
+  seeds: number;
+  max_model_rows: number;
+}
+
+export interface Overview {
+  rows_uploaded: number;
+  rows_analysed: number;
+  rows_without_target_excluded_from_label_checks: number;
+  columns: number;
+  target: string | null;
+  task: string;
+  n_classes: number | null;
+  notes: string[];
+  model_based_detectors_ran_on_rows: number;
+  model_based_detectors_sampled: boolean;
+  columns_not_analysed: Record<string, string>;
+  columns_skipped_by_model_based_detectors: Record<string, string>;
+  model_used_for_benchmark_validation: string;
+  audit_seconds: number;
+  detector_seconds: Record<string, number>;
+  generated_at: string;
+}
+
+export interface QualityRow {
+  dimension: string;
+  issue_key: string;
+  detector_type: string;
+  detected_rate: number | null;
+  detected_count: number | null;
+  count_unit: string;
+  benchmark_precision: number | null;
+  benchmark_recall: number | null;
+  reliability_source: string | null;
+  evidence_status: string;
+  note: string;
+}
+
+export interface PolicyRow {
+  issue_key: string;
+  issue: string;
+  detector_ran: boolean;
+  detected_rate: number | null;
+  n_repair_candidates: number;
+  n_flag_only: number;
+  repairability_status: string;
+  benchmark_risk: number | null;
+  benchmark_repair_precision: number | null;
+  safe_auto: boolean;
+  default_action: string;
+  evidence_source: string;
+  reason: string;
+}
+
+export interface ImpactRow {
+  issue: string;
+  issue_key: string;
+  detected_rate: number | null;
+  benchmark_impact_estimate: number | null;
+  is_boundary_estimate: boolean;
+  impact_source: string;
+  impact_unit: string;
+  impact_estimate_auc: number | null;
+  metrics_disagree: boolean;
+  metric_note: string;
+  repairability_status: string;
+  benchmark_risk: number | null;
+  policy_decision: string;
+  recommendation: string;
+}
+
+export interface ReadinessRow {
+  dimension: string;
+  issue_key: string;
+  observed_rate: number | null;
+  baseline_false_positive_floor: number | null;
+  baseline_source: string | null;
+  evidence_status: string;
+  evidence_note: string;
+  status: string;
+  rate_after_cleaning: number | null;
+}
+
+export interface Summary {
+  rows_uploaded: number;
+  rows_after_cleaning: number;
+  rows_dropped: number;
+  cells_modified: number;
+  repairs_applied_by_issue: Record<string, number>;
+  flagged_for_review: number;
+  flagged_only: number;
+  skipped_conflicts: number;
+  skipped_row_dropped: number;
+  issues_applied: string[];
+  human_overrides: string[];
+}
+
+export interface EvidenceRow {
+  error_type: string;
+  rate: number;
+  mean_damage: number;
+  mean_damage_auc: number | null;
+  damage_std: number | null;
+  repair_precision: number | null;
+  repair_recall: number | null;
+  mean_recovery: number;
+  repairability_status: string;
+  status_macrof1: string;
+  status_auc: string;
+  material_risk: number;
+  underpowered: boolean;
+  restored_exactly: boolean;
+}
+
+export interface CurveRow {
+  error_type: string;
+  rate: number;
+  mean_damage: number;
+  damage_std: number | null;
+  mean_damage_auc?: number | null;
+}
+
+export interface Calibration {
+  status: "not_run" | "declined" | "ok";
+  reason?: string;
+  metric?: string;
+  n_seeds?: number;
+  rates?: number[];
+  seconds?: number;
+  reference?: {
+    rows_labeled: number;
+    rows_complete: number;
+    rows_after_dedup: number;
+    rows_used: number;
+    rows_train: number;
+    rows_test: number;
+    rows_removed_label_problems: number;
+    columns_left_out: Record<string, string>;
+    columns_used: string[];
+    minority_class_share?: number;
+  };
+  noise_floor?: number;
+  noise_floor_auc?: number | null;
+  has_auc?: boolean;
+  clean_macro_f1?: number;
+  chance_f1?: number;
+  minority_share?: number | null;
+  imbalance_warning?: boolean;
+  underpowered?: boolean;
+  evidence?: EvidenceRow[];
+  impact_curve?: CurveRow[];
+  detector_reliability?: { error_type: string; unit: string; precision: number; recall: number }[];
+  detector_tracking?: { error_type: string; evidence_status: string; note: string; pearson_r: number | null }[];
+  baseline_floors?: Record<string, number>;
+  skipped_issues?: Record<string, string>;
+  metric_disagreement?: { error_type: string; disagree: boolean; note: string }[];
+}
+
+export interface Audit {
+  id: string;
+  dataset_id: string;
+  dataset_name: string;
+  request: AuditRequest;
+  version: string;
+  overview: Overview;
+  quality: QualityRow[];
+  policy: PolicyRow[];
+  impact: ImpactRow[];
+  impact_note: string;
+  readiness: ReadinessRow[];
+  limitations: string[];
+  calibration: Calibration;
+  selection: { applied: string[]; default: string[]; label: string };
+  summary: { evidence_based: Summary; aggressive: Summary };
+  review: ReviewSummary;
+  features: FeatureRow[] | null;
+  files: { name: string; bytes: number }[];
+  never_auto_apply: string[];
+}
+
+export interface FeatureRow {
+  column: string;
+  kind: "numeric" | "categorical";
+  verdict: "relevant" | "constant" | "id_like" | "redundant" | "no_detectable_relevance" | "not_assessed";
+  reason: string;
+  redundant_with: string | null;
+  perm_importance: number | null;
+  perm_importance_std: number | null;
+  mutual_info: number | null;
+  probe_importance_threshold: number | null;
+  probe_mi_threshold: number | null;
+  recommendation: string;
+}
+
+export interface ReviewSummary {
+  proposed: number;
+  flag_only: number;
+  total: number;
+  by_issue: { issue_key: string; problem: string; proposed: number; flag_only: number }[];
+}
+
+export interface RepairLogRow {
+  repair_id: string;
+  row_id: number;
+  column: string | null;
+  problem: string;
+  original_value: unknown;
+  proposed_value: unknown;
+  applied_value: unknown;
+  action: string;
+  method: string;
+  tier: string;
+  detector_score: number | null;
+  repair_evidence_status: string;
+  human_override: boolean;
+}
+
+export interface RepairLogPage {
+  total: number;
+  page: number;
+  page_size: number;
+  rows: RepairLogRow[];
+  actions: Record<string, number>;
+  problems: Record<string, number>;
+}
+
+export type Rec = Record<string, any>;
+export interface Benchmark {
+  baseline: Rec[];
+  impact: Rec[];
+  detection: Rec[];
+  repair: Rec[];
+  evidence: Rec[];
+  priority: Rec[];
+  sensitivity: Rec[];
+  tracking: Rec[];
+  correlation: Rec[];
+  baseline_rates: Rec;
+  bank: { posf1: Rec[]; macrof1: Rec[]; auc: Rec[]; decisions: Rec[]; damage_corr: Rec[]; regimes: Rec[] };
+}
+
+export interface AppConfig {
+  issues: string[];
+  problem_text: Record<string, string>;
+  never_auto_apply: string[];
+  safe_repair_min_precision: number;
+  max_certifiable_noise_floor: number;
+  max_model_rows: number;
+  max_classes: number;
+  max_cat_levels: number;
+  null_drop_fraction: number;
+  imbalance_warning_share: number;
+}
+
+async function parse<T>(r: Response): Promise<T> {
+  if (!r.ok) {
+    let detail = `${r.status} ${r.statusText}`;
+    try {
+      const body = await r.json();
+      if (body?.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(detail);
+  }
+  return r.json() as Promise<T>;
+}
+
+const json = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+export const api = {
+  health: () => fetch("/api/health").then((r) => parse<{ ok: boolean; version: string; demo_available: boolean }>(r)),
+  config: () => fetch("/api/config").then((r) => parse<AppConfig>(r)),
+  uploadDataset: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch("/api/datasets/upload", { method: "POST", body: fd }).then((r) => parse<DatasetInfo>(r));
+  },
+  demoDataset: () => fetch("/api/datasets/demo", { method: "POST" }).then((r) => parse<DatasetInfo>(r)),
+  startAudit: (req: AuditRequest) => fetch("/api/audits", json(req)).then((r) => parse<{ job_id: string }>(r)),
+  job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => parse<Job>(r)),
+  audit: (id: string) => fetch(`/api/audits/${id}`).then((r) => parse<Audit>(r)),
+  apply: (id: string, issues: string[]) =>
+    fetch(`/api/audits/${id}/apply`, json({ issues })).then((r) => parse<Audit>(r)),
+  repairLog: (id: string, p: { variant: string; action?: string; issue?: string; page: number; page_size: number }) => {
+    const q = new URLSearchParams({ variant: p.variant, page: String(p.page), page_size: String(p.page_size) });
+    if (p.action) q.set("action", p.action);
+    if (p.issue) q.set("issue", p.issue);
+    return fetch(`/api/audits/${id}/repair-log?${q}`).then((r) => parse<RepairLogPage>(r));
+  },
+  benchmark: () => fetch("/api/benchmark").then((r) => parse<Benchmark>(r)),
+  downloadUrl: (id: string, name: string) => `/api/audits/${id}/download/${name}`,
+  reviewCsvUrl: (id: string, variant: string) => `/api/audits/${id}/review.csv?variant=${variant}`,
+  zipUrl: (id: string) => `/api/audits/${id}/download.zip`,
+};

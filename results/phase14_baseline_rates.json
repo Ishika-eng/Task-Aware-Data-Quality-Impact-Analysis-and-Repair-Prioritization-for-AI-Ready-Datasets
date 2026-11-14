@@ -1,0 +1,13 @@
+{
+  "detector_floors": {
+    "inconsistency": 0.0
+  },
+  "detail": {
+    "adult_train_clean": {
+      "rows": 31655,
+      "rate": 0.0,
+      "flagged_cells": 0
+    }
+  },
+  "note": "false-positive floor of the Phase 14 inconsistency detector on clean UCI Adult"
+}

@@ -47,7 +47,10 @@ import sklearn
 from sklearn.impute import KNNImputer
 
 from detect import (DetectionResult, detect_duplicates, detect_feature_corruption_crossfeature,
-                    detect_inconsistency, detect_label_noise, detect_missing, detect_outliers_iqr)
+                    detect_label_noise, detect_missing, detect_outliers_iqr)
+from inconsistency import detect_inconsistency_v2     # Phase 14: replaces detect.detect_inconsistency in the product
+from joint_outliers import detect_joint_outliers      # Phase 15: opt-in, flag-only (docs/PHASE15_SPEC.md)
+from relevance import assess_features                 # Phase 14: irrelevant-feature report (report-only)
 from phase9_repair_engine import (AUTO_REPAIR_FEATURE_CAT_THRESHOLD, AUTO_REPAIR_FEATURE_NUM_Z,
                                    AUTO_REPAIR_LABEL_CONFIDENCE, AUTO_REPAIR_OUTLIER_FALLBACK_Q,
                                    AUTO_REPAIR_OUTLIER_K)
@@ -56,8 +59,10 @@ from phase11_readiness import (EVIDENCE_NOTES, EVIDENCE_STATUS, LABELS, RECOMMEN
 
 TASKCLEAN_VERSION = "1.0"
 
-ISSUES = ["missing_values", "duplicates", "outliers", "label_errors", "feature_corruption"]
-APPLY_ORDER = ["missing_values", "outliers", "feature_corruption", "label_errors", "duplicates"]
+ISSUES = ["missing_values", "duplicates", "outliers", "label_errors", "feature_corruption", "inconsistency",
+          "joint_outliers"]
+# inconsistency first: canonical spellings make the most-frequent-value imputation of later steps correct
+APPLY_ORDER = ["inconsistency", "missing_values", "outliers", "feature_corruption", "label_errors", "duplicates"]
 
 PROBLEM_TEXT = {
     "missing_values": "Missing value",
@@ -65,7 +70,22 @@ PROBLEM_TEXT = {
     "outliers": "Potential outlier",
     "label_errors": "Potential label error",
     "feature_corruption": "Potential feature anomaly",
+    "inconsistency": "Inconsistent value",
+    "joint_outliers": "Unusual combination of values",
 }
+# Issue types whose repair evidence / damage curve / detector scores come from the Phase 14 validation
+# (results/phase14_*), not from the frozen Phase 7-10 files.
+PHASE14_ISSUES = {"inconsistency"}
+# Phase 15: bivariate / multivariate outliers. OFF BY DEFAULT and FLAG-ONLY: no repair exists, nothing is ever written to
+# the cleaned file, and no repair-gate evidence is claimed. Off by default because the pre-registered validation failed
+# (clean-data flag rate 7-30% on Diabetes and Breast Cancer; recall 10-14% on marginally invisible swaps).
+FLAG_ONLY_ISSUES = {"joint_outliers"}
+LABELS = {**LABELS, "joint_outliers": "Joint plausibility"}
+JOINT_OUTLIER_VALIDATION = (
+    "Phase 15 validation (docs/PHASE15_SPEC.md): well calibrated on synthetic Gaussian data (0.07% of clean rows flagged, "
+    "precision 0.95-0.98 at rho 0.8) but it flagged 7% of clean Diabetes rows and 30% of clean Breast Cancer rows, and "
+    "found only 10-14% of random swaps that no single column can reveal. The flagged rate is therefore NOT a severity "
+    "signal and each row is only 'an unusual combination', not an error.")
 
 # --- policy / safety parameters (documented, not hidden) --------------------
 # A repair type is applied AUTOMATICALLY only if, in the Phase 9 controlled
@@ -90,7 +110,7 @@ KNN_MAX_ROWS = 40_000       # above this, numeric imputation falls back to the m
 # Never applied automatically, whatever the measured evidence says: label repair rewrites the target, and the
 # benchmark injects RANDOM noise whereas real label errors are usually structured, so a measured precision
 # would be optimistic; feature-anomaly repair was net-harmful.
-NEVER_AUTO_APPLY = {"label_errors", "feature_corruption"}
+NEVER_AUTO_APPLY = {"label_errors", "feature_corruption", "joint_outliers"}
 # Above this many rows the slow, cross-validated detectors (labels, feature anomalies) run on a stratified
 # random sample instead of every row, and repairs/flags are produced only for the sampled rows.
 MAX_MODEL_ROWS = 30_000
@@ -120,6 +140,7 @@ class AuditState:
     meta: dict = field(default_factory=dict)
     decimal_comma_columns: set = field(default_factory=set)
     selfbench: object | None = None          # dataset-specific evidence (see selfbench.py), if calibrated
+    feature_findings: pd.DataFrame | None = None   # Phase 14 irrelevant-feature report (never changes the data)
 
 
 @dataclass
@@ -137,6 +158,7 @@ class TaskCleanResult:
     repair_log_aggressive: pd.DataFrame | None = None
     summary_aggressive: dict | None = None
     selfbench: object | None = None
+    feature_report: pd.DataFrame | None = None     # per-column relevance verdicts (report-only)
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +456,31 @@ def _propose_features(X, integer_like, res: DetectionResult) -> list[pd.DataFram
     return frames
 
 
+def _propose_inconsistency(det: DetectionResult) -> list[pd.DataFrame]:
+    """strict = a repair candidate (canonical value already present in the column); loose = flag only
+    (possible typo, or an abbreviation that could stand for several values). The detector's own explanation is
+    stored as the method so a reviewer sees exactly why each cell was flagged."""
+    cells = det.extra["cells"]
+    if cells.empty:
+        return []
+    return [_records("inconsistency", sub.row_id.values, sub["column"].values, sub.original_value.values,
+                     sub.proposed_value.values, sub.detail.values, tier, np.nan)
+            for tier, sub in cells.groupby("tier")]
+
+
+def _propose_joint(det: DetectionResult, X: pd.DataFrame) -> list[pd.DataFrame]:
+    """Flag-only (tier 'loose', no proposed value). Only JOINT-ONLY rows (the ones the univariate outlier check does not
+    already flag), one record per (row, column); a row flagged by several scopes keeps its strongest."""
+    rec = det.extra["records"]
+    rec = rec[rec.row_id.isin(det.row_mask[det.row_mask].index)]
+    if rec.empty:
+        return []
+    rec = rec.assign(ratio=rec.distance / rec.cutoff).sort_values("ratio", ascending=False).drop_duplicates(["row_id", "column"])
+    orig = [X.at[r, c] for r, c in zip(rec.row_id, rec["column"])]
+    return [_records("joint_outliers", rec.row_id.values, rec["column"].values, orig, np.nan, rec.detail.values,
+                     "loose", rec.ratio.values)]
+
+
 # ---------------------------------------------------------------------------
 # Policy (Phase 9/10 evidence -> apply or review)
 # ---------------------------------------------------------------------------
@@ -452,8 +499,11 @@ def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | No
         sources.append(("this dataset (self-benchmark)", selfbench.evidence))
     path = os.path.join(RESULTS_DIR, "phase10_evidence_table.csv")
     if os.path.exists(path):
-        sources.append(("UCI Adult benchmark" + (" (not measured on this dataset)" if sources else ""),
-                        pd.read_csv(path)))
+        adult = pd.read_csv(path)
+        p14 = os.path.join(RESULTS_DIR, "phase14_evidence_table.csv")     # inconsistency (Phase 14, also Adult)
+        if os.path.exists(p14):
+            adult = pd.concat([adult, pd.read_csv(p14)], ignore_index=True)
+        sources.append(("UCI Adult benchmark" + (" (not measured on this dataset)" if sources else ""), adult))
     for source, ev in sources:
         row = _nearest_evidence_row(ev, issue, observed_rate)
         if row is not None:
@@ -500,6 +550,16 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
                          "default_action": "not assessed", "evidence_source": "-",
                          "reason": skipped.get(det_key, "detector did not run")})
+            continue
+        if issue in FLAG_ONLY_ISSUES:
+            rows.append({"issue_key": issue, "issue": PROBLEM_TEXT[issue], "detector_ran": True,
+                         "detected_rate": det.rate, "n_repair_candidates": 0, "n_flag_only": n_flag,
+                         "repairability_status": "flag_only", "benchmark_risk": np.nan,
+                         "benchmark_repair_precision": np.nan, "safe_auto": False,
+                         "default_action": "flag for human review" if n_flag else "nothing to repair",
+                         "evidence_source": "Phase 15 validation (detection only)",
+                         "reason": "Flag-only: no repair exists for this issue and nothing is written to the cleaned file. "
+                                   + JOINT_OUTLIER_VALIDATION})
             continue
         ev = _evidence_for(issue, det.rate, selfbench)
         source = ev["source"] if ev else "-"
@@ -553,7 +613,8 @@ def _stratified_sample_index(y: pd.Series | None, index: pd.Index, n: int, seed:
 
 def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalies: bool = False, seed: int = 42,
                   progress: Progress | None = None, max_model_rows: int = MAX_MODEL_ROWS,
-                  input_info: dict | None = None, detectors: set[str] | None = None) -> AuditState:
+                  input_info: dict | None = None, detectors: set[str] | None = None,
+                  include_joint_outliers: bool = False) -> AuditState:
     """Detect problems and propose repairs. Expensive (model-based detectors).
 
     target=None runs in no-target mode: missing values, duplicates, outliers and inconsistent values are
@@ -561,7 +622,8 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     cross-validated detectors on a stratified sample (cheap checks always use every row).
 
     `detectors` restricts which detectors run (names: missing_values, duplicates, outliers, inconsistency,
-    label_noise, feature_corruption); None runs all of them. Used by the self-benchmark, which only needs the
+    label_noise, feature_corruption, joint_outliers, feature_relevance); None runs all of them (joint_outliers still needs
+    include_joint_outliers=True: it is off by default and flag-only). Used by the self-benchmark, which only needs the
     detector matching the error it injected."""
     say = progress or (lambda f, m: None)
     want = lambda name: detectors is None or name in detectors     # noqa: E731
@@ -611,10 +673,25 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         say(0.15, "Checking outliers")
         detections["outliers"] = timed("outliers", lambda: detect_outliers_iqr(X))
     if want("inconsistency"):
-        detections["inconsistency"] = timed("inconsistency", lambda: detect_inconsistency(X))
+        detections["inconsistency"] = timed("inconsistency", lambda: detect_inconsistency_v2(X))
     for name in ("missing_values", "duplicates", "outliers", "inconsistency"):
         if name not in detections:
             skipped[name] = "not requested"
+
+    if not want("joint_outliers"):
+        skipped["joint_outliers"] = "not requested"
+    elif not include_joint_outliers:
+        skipped["joint_outliers"] = ("not run (off by default: its validation failed on real data, and it is flag-only; "
+                                     "enable it explicitly to get unusual-combination flags)")
+    else:
+        say(0.20, "Checking unusual combinations of numeric values (bivariate and multivariate)")
+        jo = timed("joint_outliers", lambda: detect_joint_outliers(X, seed=seed))
+        for scope, why in jo.extra["declined"].items():
+            notes.append(f"joint-outlier check, {scope} scope not run: {why}")
+        if jo.extra["scopes"]:
+            detections["joint_outliers"] = jo
+        else:
+            skipped["joint_outliers"] = "no scope could run: " + "; ".join(f"{k}: {v}" for k, v in jo.extra["declined"].items())
 
     if not want("label_noise"):
         skipped["label_noise"] = "not requested"
@@ -639,8 +716,24 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
                                          "repair was found harmful)" if not include_feature_anomalies
                                          else "needs at least 2 modellable feature columns")
 
+    feature_findings = None
+    if want("feature_relevance"):
+        say(0.80, "Checking feature relevance (random-probe test)")
+        try:
+            feature_findings = timed("feature_relevance", lambda: assess_features(
+                X, y, seed=seed, integer_like=integer_like))
+        except Exception as e:        # a report-only extra must never break the audit, but must never fail silently
+            notes.append(f"the feature-relevance check could not run ({type(e).__name__}: {e})")
+
+    if "inconsistency" in detections and detections["inconsistency"].extra.get("skipped_columns"):
+        sk = detections["inconsistency"].extra["skipped_columns"]
+        notes.append(f"{len(sk)} column(s) were not checked for inconsistent spellings because they look like free "
+                     f"text or identifiers: {', '.join(list(sk)[:6])}" + (", ..." if len(sk) > 6 else ""))
+
     say(0.90, "Building repair proposals")
     frames: list[pd.DataFrame] = []
+    if "inconsistency" in detections:
+        frames += _propose_inconsistency(detections["inconsistency"])
     if "missing_values" in detections:
         frames += _propose_missing(X, integer_like, detections["missing_values"].extra["cell_mask"], df)
     if "duplicates" in detections:
@@ -651,6 +744,8 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         frames += _propose_labels(y, detections["label_noise"])
     if "feature_corruption" in detections:
         frames += _propose_features(X_model, integer_like, detections["feature_corruption"])
+    if "joint_outliers" in detections:
+        frames += _propose_joint(detections["joint_outliers"], X)
     proposals = (pd.concat(frames, ignore_index=True) if frames else
                  pd.DataFrame(columns=["issue_key", "row_id", "column", "problem", "original_value",
                                        "proposed_value", "method", "tier", "detector_score"]))
@@ -659,6 +754,7 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     meta = {
         "seed": seed, "n_rows_uploaded": len(df), "n_rows_analysed": len(X), "n_rows_missing_target": n_unlabeled,
         "n_columns": df.shape[1], "include_feature_anomalies": include_feature_anomalies,
+        "include_joint_outliers": include_joint_outliers,
         "no_target_mode": target is None,
         "model_detector_rows": len(X_model), "model_detectors_sampled": sampled,
         "input_format": input_info or {}, "notes": notes,
@@ -667,7 +763,8 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     say(1.0, "Audit complete")
     return AuditState(df=df, target=target, X=X, y=y, integer_like=integer_like, excluded_columns=excluded,
                       unmodeled_columns=unmodeled, detections=detections, skipped=skipped,
-                      proposals=proposals, policy=policy, meta=meta, decimal_comma_columns=comma_cols)
+                      proposals=proposals, policy=policy, meta=meta, decimal_comma_columns=comma_cols,
+                      feature_findings=feature_findings)
 
 
 # ---------------------------------------------------------------------------
@@ -786,7 +883,7 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     overrides = sorted(apply_issues - policy_default)
     cleaned, repair_log = _apply(state, apply_issues, overrides)
 
-    aggressive_issues = {i for i in ISSUES if i != "feature_corruption"}
+    aggressive_issues = {i for i in ISSUES if i != "feature_corruption" and i not in FLAG_ONLY_ISSUES}
     aggressive_overrides = sorted(aggressive_issues - policy_default)
     cleaned_agg, log_agg = _apply(state, aggressive_issues, aggressive_overrides)
     summary_agg = _summary(state, log_agg, cleaned_agg, aggressive_issues, aggressive_overrides)
@@ -807,7 +904,8 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     return TaskCleanResult(cleaned=cleaned, repair_log=repair_log, quality_report=quality,
                            impact_report=impact, policy=state.policy, readiness=readiness, summary=summary,
                            cleaned_aggressive=cleaned_agg, repair_log_aggressive=log_agg,
-                           summary_aggressive=summary_agg, selfbench=state.selfbench)
+                           summary_aggressive=summary_agg, selfbench=state.selfbench,
+                           feature_report=state.feature_findings)
 
 
 # ---------------------------------------------------------------------------
@@ -822,7 +920,7 @@ def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None) -> dict:
     return {"missing_values": detect_missing(X).rate,
             "duplicates": detect_duplicates(_full_record(X, y)).rate,
             "outliers": detect_outliers_iqr(X).rate,
-            "inconsistency": detect_inconsistency(X).rate}
+            "inconsistency": detect_inconsistency_v2(X).rate}
 
 
 def _ok_selfbench(state: AuditState):
@@ -830,17 +928,46 @@ def _ok_selfbench(state: AuditState):
     return sb if sb is not None and getattr(sb, "ok", False) else None
 
 
+PHASE14_EVIDENCE_NOTES = {
+    "inconsistency": "Repair evidence exists (Phase 14, UCI Adult: injected case, whitespace, punctuation, abbreviation "
+                     "and typo variants), but whether the flagged RATE tracks damage on a new dataset has not been "
+                     "validated, so it is not used as a severity signal.",
+}
+
+
+def _phase14_json(name: str) -> dict:
+    path = os.path.join(RESULTS_DIR, name)
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def _phase14_impact(issue: str, rate: float):
+    """(estimate, boundary) from the Phase 14 damage curve; (nan, False) if that file is absent."""
+    path = os.path.join(RESULTS_DIR, "phase14_impact_summary.csv")
+    if os.path.exists(path):
+        est = _impact_curve_estimate(pd.read_csv(path), issue, rate)
+        if est is not None:
+            return est
+    return float("nan"), False
+
+
 def _evidence_status(issue: str, tracking: pd.DataFrame | None) -> tuple[str, str]:
     """(status, note) for how far a detector's flagged rate can be trusted as a severity signal: measured on this
     dataset when calibrated, else the UCI Adult validation (Phase 11B)."""
     if tracking is not None and issue in tracking.index:
         return tracking.loc[issue, "evidence_status"], tracking.loc[issue, "note"]
+    if issue in PHASE14_EVIDENCE_NOTES:
+        return EVIDENCE_STATUS.get(issue, "not_estimable"), PHASE14_EVIDENCE_NOTES[issue]
     return EVIDENCE_STATUS.get(issue, "not_estimable"), EVIDENCE_NOTES.get(issue, "")
 
 
 def _quality_report(state: AuditState) -> pd.DataFrame:
     p5_path = os.path.join(RESULTS_DIR, "phase5_detection_scores.csv")
     p5 = pd.read_csv(p5_path).set_index("error_type") if os.path.exists(p5_path) else None
+    p14_path = os.path.join(RESULTS_DIR, "phase14_detection_scores.csv")
+    p14d = pd.read_csv(p14_path).set_index("error_type") if os.path.exists(p14_path) else None
     sb = _ok_selfbench(state)
     reliability = sb.detector_reliability.set_index("error_type") if sb is not None else None
     tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
@@ -848,9 +975,10 @@ def _quality_report(state: AuditState) -> pd.DataFrame:
     order = [("missing_values", "missing_values", "exact check", "cells"),
              ("duplicates", "duplicates", "exact check", "rows"),
              ("outliers", "outliers", "statistical estimate", "rows"),
-             ("inconsistency", "inconsistency", "exact check", "rows"),
+             ("inconsistency", "inconsistency", "rule-based check", "rows"),
              ("label_noise", "label_errors", "statistical estimate", "rows"),
-             ("feature_corruption", "feature_corruption", "statistical estimate", "rows")]
+             ("feature_corruption", "feature_corruption", "statistical estimate", "rows"),
+             ("joint_outliers", "joint_outliers", "statistical estimate", "rows")]
     for det_key, issue, dtype, unit in order:
         det = state.detections.get(det_key)
         rec = {"dimension": LABELS.get(issue, issue), "issue_key": issue, "detector_type": dtype}
@@ -870,9 +998,15 @@ def _quality_report(state: AuditState) -> pd.DataFrame:
             elif p5 is not None and issue in p5.index:
                 prec, rec_ = float(p5.loc[issue, "precision"]), float(p5.loc[issue, "recall"])
                 rel_source = "UCI Adult benchmark"
+            elif p14d is not None and issue in p14d.index:
+                prec, rec_ = float(p14d.loc[issue, "precision"]), float(p14d.loc[issue, "recall"])
+                rel_source = "UCI Adult benchmark (Phase 14)"
             ev_status, ev_note = _evidence_status(issue, tracking)
-            note = ("report-only: no repair evidence exists for this issue type, so no repair is proposed"
+            note = ("flagged rate, not a confirmed error rate. Case, spacing and unique-abbreviation variants are "
+                    "repair candidates; possible typos and ambiguous abbreviations are flag-only"
                     if issue == "inconsistency" else
+                    "flagged rate, not an error rate. Flag-only, opt-in. " + JOINT_OUTLIER_VALIDATION
+                    if issue == "joint_outliers" else
                     "flagged rate, not a confirmed error rate" if dtype != "exact check" else "")
             rec.update(detected_rate=det.rate, detected_count=count, count_unit=unit,
                        benchmark_precision=prec, benchmark_recall=rec_, reliability_source=rel_source,
@@ -895,6 +1029,17 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "policy_decision": "not assessed", "recommendation": p.reason})
             continue
+        if issue in FLAG_ONLY_ISSUES:       # no damage curve was measured and no repair exists
+            rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
+                         "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
+                         "impact_source": "none measured (flag-only issue)", "impact_unit": "-",
+                         "impact_estimate_auc": np.nan, "metrics_disagree": False, "metric_note": "",
+                         "repairability_status": p.repairability_status, "benchmark_risk": np.nan,
+                         "policy_decision": ("flagged for human review (not applied)"
+                                             if p.n_flag_only else "nothing to repair"),
+                         "recommendation": "Review the flagged rows yourself. Nothing is repaired and no impact on a "
+                                           "model was measured for this issue type."})
+            continue
         own = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate) if sb is not None else None
         est_auc, disagree, metric_note = np.nan, False, ""
         if own is not None:
@@ -906,7 +1051,10 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             if md is not None and not md.empty and issue in set(md.error_type):
                 disagree, metric_note = True, md.set_index("error_type").loc[issue, "note"]
         else:
-            est, boundary = _estimate_impact(issue, p.detected_rate)
+            if issue in PHASE14_ISSUES:
+                est, boundary = _phase14_impact(issue, p.detected_rate)
+            else:
+                est, boundary = _estimate_impact(issue, p.detected_rate)
             source, unit = "UCI Adult benchmark", "F1 (positive class)"
         if issue in apply_issues and p.n_repair_candidates > 0:
             decision = "applied" + ("" if p.safe_auto else " (human override)")
@@ -940,7 +1088,7 @@ def _summary(state, repair_log, cleaned, apply_issues, overrides) -> dict:
 
 
 def _readiness(state, quality, impact, apply_issues, overrides, after, summary) -> dict:
-    baseline = _load_baseline_rates()
+    baseline = {**_load_baseline_rates(), **_phase14_json("phase14_baseline_rates.json").get("detector_floors", {})}
     sb = _ok_selfbench(state)
     tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
     dims = []
@@ -1123,6 +1271,8 @@ def outputs_as_bytes(result: TaskCleanResult) -> dict[str, bytes]:
     sb = result.selfbench
     if sb is not None and getattr(sb, "ok", False):
         extra = {"selfbenchmark_evidence.csv": csv(sb.evidence), "selfbenchmark_runs.csv": csv(sb.runs)}
+    if result.feature_report is not None:
+        extra["feature_report.csv"] = csv(result.feature_report)
     return {**extra,
         "dataset_cleaned.csv": csv(result.cleaned),
         "repair_log.csv": csv(result.repair_log),
@@ -1167,6 +1317,9 @@ def main():
     ap.add_argument("--out", default="taskclean_output")
     ap.add_argument("--feature-anomalies", action="store_true",
                     help="also run the slow feature-anomaly detector (its auto-repair is never recommended)")
+    ap.add_argument("--joint-outliers", action="store_true",
+                    help="also flag unusual combinations of numeric values (bivariate/multivariate). Flag-only and OFF "
+                         "by default: its validation failed on real data (docs/PHASE15_SPEC.md)")
     ap.add_argument("--apply", default=None,
                     help="comma-separated issue keys to apply, overriding the evidence-based policy "
                          f"(choices: {', '.join(ISSUES)}); default = what the policy approves")
@@ -1183,6 +1336,7 @@ def main():
     print(f"Read {info['rows']:,} rows x {info['columns']} columns "
           f"(encoding {info['encoding']}, delimiter '{info['delimiter']}', decimal '{info['decimal']}')")
     state = audit_dataset(df, args.target, include_feature_anomalies=args.feature_anomalies, seed=args.seed,
+                          include_joint_outliers=args.joint_outliers,
                           progress=lambda f, m: print(f"  [{f:4.0%}] {m}"), max_model_rows=args.max_model_rows,
                           input_info=info)
     for note in state.meta["notes"]:

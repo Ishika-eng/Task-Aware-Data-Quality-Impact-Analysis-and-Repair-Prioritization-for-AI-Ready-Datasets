@@ -96,6 +96,16 @@ Use **"Use demo dataset"** in the app for a one-click run (6,300 Adult rows with
 > If your checkout path contains a space, launch with `.venv/bin/python -m streamlit run app.py`;
 > the `streamlit` console script's shebang breaks on spaces.
 
+**React dashboard** (FastAPI backend + React/Vite frontend; the Streamlit app above is unchanged)
+
+```bash
+pip install -r requirements.txt                                 # includes the dashboard backend (fastapi, uvicorn)
+cd frontend && npm install && npm run build && cd ..            # builds frontend/dist (not committed)
+.venv/bin/python -m uvicorn backend.main:app --port 8000        # then open http://localhost:8000
+```
+
+For frontend development use `npm run dev` inside `frontend/` (proxies to the backend on port 8000).
+
 **Command line**
 
 ```bash
@@ -401,8 +411,16 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 - **Placeholders.** A token such as `-` or `N/A` that is a genuine category in your data is over-counted as missing.
 - **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
 - **Scope.** Classification targets only (up to 20 classes), or no target at all. Duplicates are full-record duplicates (features +
-  target). Inconsistent-value detection is report-only because no repair evidence exists for it. The
-  feature-anomaly detector is off by default (slow, low precision, harmful repair).
+  target). Inconsistent-value repair (Phase 14: case, spacing, punctuation, unique abbreviations) is exact
+  (precision 1.0 in validation) but the measured model recovery was negative, so the evidence rule keeps it in the
+  review queue; typos are flag-only. The irrelevant-feature check (constant, identifier-like, redundant, or no
+  better than 12 random probe columns) is report-only and never edits the cleaned file. The
+  feature-anomaly detector is off by default (slow, low precision, harmful repair). See `docs/PHASE14_SPEC.md`.
+  **Unusual combinations** (Phase 15: bivariate and multivariate outliers on numeric columns) is an opt-in, flag-only check,
+  off by default because its pre-registered validation failed on real data: well calibrated on synthetic data (0.07% of clean
+  rows flagged) but 7% of clean Diabetes rows and 30% of clean Breast Cancer rows flagged, and only 10-14% of hidden swaps
+  found. Enable it with `--joint-outliers` or the Start-page switch; treat flags as a list to look at, not a rate to trust.
+  See `docs/PHASE15_SPEC.md`.
 - **No composite score.** The tested aggregate of detected rates was not supported by the evidence; this does not
   prove no composite could ever work.
 

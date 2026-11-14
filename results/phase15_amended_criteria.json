@@ -1,0 +1,284 @@
+{
+  "F1_clean_false_positive": {
+    "fails_multivariate": [
+      "breast_cancer",
+      "diabetes"
+    ],
+    "fails_bivariate": [
+      "breast_cancer",
+      "diabetes"
+    ],
+    "table": [
+      {
+        "dataset": "adult",
+        "multi": 0.004,
+        "multi_max": 0.00411,
+        "bi": 0.0,
+        "bi_max": 0.0,
+        "any": 0.004,
+        "group": "limited",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "bank_marketing",
+        "multi": 0.00169,
+        "multi_max": 0.00177,
+        "bi": 0.0,
+        "bi_max": 0.0,
+        "any": 0.00169,
+        "group": "limited",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "breast_cancer",
+        "multi": 0.29877,
+        "multi_max": 0.30228,
+        "bi": 0.09877,
+        "bi_max": 0.10018,
+        "any": 0.31775,
+        "group": "evidence",
+        "multi_fail": true,
+        "bi_fail": true
+      },
+      {
+        "dataset": "diabetes",
+        "multi": 0.07195,
+        "multi_max": 0.07466,
+        "bi": 0.01765,
+        "bi_max": 0.0181,
+        "any": 0.07376,
+        "group": "evidence",
+        "multi_fail": true,
+        "bi_fail": true
+      },
+      {
+        "dataset": "german_credit",
+        "multi": 0.0042,
+        "multi_max": 0.005,
+        "bi": 0.0048,
+        "bi_max": 0.006,
+        "any": 0.0048,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "heart",
+        "multi": 0.00066,
+        "multi_max": 0.0033,
+        "bi": 0.0,
+        "bi_max": 0.0,
+        "any": 0.00066,
+        "group": "limited",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.0",
+        "multi": 0.00072,
+        "multi_max": 0.001,
+        "bi": 0.0,
+        "bi_max": 0.0,
+        "any": 0.00072,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.0_skew",
+        "multi": 0.00072,
+        "multi_max": 0.001,
+        "bi": 0.0,
+        "bi_max": 0.0,
+        "any": 0.00072,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.5",
+        "multi": 0.00068,
+        "multi_max": 0.0012,
+        "bi": 0.00024,
+        "bi_max": 0.0012,
+        "any": 0.00092,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.5_skew",
+        "multi": 0.00068,
+        "multi_max": 0.0012,
+        "bi": 0.00024,
+        "bi_max": 0.0012,
+        "any": 0.00092,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.8",
+        "multi": 0.00072,
+        "multi_max": 0.0012,
+        "bi": 0.00048,
+        "bi_max": 0.0008,
+        "any": 0.001,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      },
+      {
+        "dataset": "synthetic_rho0.8_skew",
+        "multi": 0.00072,
+        "multi_max": 0.0012,
+        "bi": 0.00048,
+        "bi_max": 0.0008,
+        "any": 0.001,
+        "group": "evidence",
+        "multi_fail": false,
+        "bi_fail": false
+      }
+    ],
+    "passed": false
+  },
+  "F2_recall_invisible_swaps_rho0.8": {
+    "table": [
+      {
+        "dataset": "synthetic_rho0.8",
+        "rate": 0.02,
+        "recall_invisible_swaps": 0.1364,
+        "recall_invisible_swaps_per_seed_min": 0.0923
+      },
+      {
+        "dataset": "synthetic_rho0.8",
+        "rate": 0.05,
+        "recall_invisible_swaps": 0.1344,
+        "recall_invisible_swaps_per_seed_min": 0.1317
+      },
+      {
+        "dataset": "synthetic_rho0.8_skew",
+        "rate": 0.02,
+        "recall_invisible_swaps": 0.1044,
+        "recall_invisible_swaps_per_seed_min": 0.0517
+      },
+      {
+        "dataset": "synthetic_rho0.8_skew",
+        "rate": 0.05,
+        "recall_invisible_swaps": 0.1066,
+        "recall_invisible_swaps_per_seed_min": 0.0822
+      }
+    ],
+    "passed": false
+  },
+  "F3_precision_synthetic_rho>=0.5": {
+    "table": [
+      {
+        "dataset": "synthetic_rho0.5",
+        "rate": 0.02,
+        "precision": 0.8947,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.5",
+        "rate": 0.05,
+        "precision": 0.9777,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.5_skew",
+        "rate": 0.02,
+        "precision": 0.7398,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.5_skew",
+        "rate": 0.05,
+        "precision": 0.8785,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.8",
+        "rate": 0.02,
+        "precision": 0.9466,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.8",
+        "rate": 0.05,
+        "precision": 0.9839,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.8_skew",
+        "rate": 0.02,
+        "precision": 0.8841,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      },
+      {
+        "dataset": "synthetic_rho0.8_skew",
+        "rate": 0.05,
+        "precision": 0.952,
+        "n_seeds_with_flags": 5,
+        "n_seeds": 5
+      }
+    ],
+    "passed": false,
+    "note": "NaN precision (nothing flagged) is excluded from the mean"
+  },
+  "F4_attribution_synthetic_rho>=0.5": {
+    "multi": {
+      "correct": 221,
+      "flagged_swap_one_rows": 229,
+      "share": 0.9650655021834061
+    },
+    "bi": {
+      "correct": 156,
+      "flagged_swap_one_rows": 306,
+      "share": 0.5098039215686274
+    },
+    "passed": false
+  },
+  "F5_gating": {
+    "adult_bivariate_declined": true,
+    "adult_multivariate_clean_flag_rate_max": 0.004113042324532307,
+    "wine_both_declined": true,
+    "passed": true
+  },
+  "F6_isolation_forest_beats_detector": {
+    "share_of_cells": 0.027777777777777776,
+    "n_cells": 36,
+    "passed": true
+  },
+  "consequence": {
+    "multivariate_datasets_failing_F1_or_F5": [
+      "breast_cancer",
+      "diabetes"
+    ],
+    "multivariate_ships_off_by_default": true,
+    "bivariate_F1_failures": [
+      "breast_cancer",
+      "diabetes"
+    ],
+    "F2_failed_so_detector_cannot_find_marginally_invisible_anomalies": true
+  },
+  "design": "amended",
+  "ties": "random",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "scikit_learn": "1.9.1"
+}
