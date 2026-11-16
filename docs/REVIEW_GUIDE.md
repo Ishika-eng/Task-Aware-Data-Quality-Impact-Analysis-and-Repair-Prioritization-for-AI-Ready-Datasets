@@ -14,15 +14,20 @@ Contents: 0 Pitch · 1 Problem · 2 Data · 3 Concepts you must own · 4 The pip
 ML task, can it be repaired safely, and is it worth it?". We injected five kinds of errors into clean data one at a time,
 measured how much each one hurts a model, built detectors and repair methods that never see the ground truth, and
 measured whether repairing helps or hurts. A repair is applied automatically only if it showed zero harm and at least
-0.95 precision in testing. On the evidence, that is exact duplicate removal only. We also report where our own ideas
-failed: one detector is inverted, and one repair makes things worse.
+0.95 precision in testing, and on Adult evidence it must pass under two model families (Random Forest and gradient
+boosting). Under the Random Forest alone that was exact duplicate removal only; gradient boosting did not confirm it at
+every rate, so on Adult evidence nothing is applied automatically and duplicate removal is a one-click proposal. We also
+report where our own ideas failed: one detector is inverted, one repair makes things worse, and several numbers turned
+out to depend on the model (Section 7b).
 
 **The one-sentence thesis.** *Detected is not the same as harmful, and harmful is not the same as safely repairable.*
 
 **The five findings to be able to recite**
 
-1. Label errors hurt the most (F1 loss 0.065 at 20%), and they are the hardest to repair automatically.
-2. Duplicates barely hurt (loss smaller than its own noise), and removing them is the only repair that is always safe.
+1. Label errors hurt the most (F1 loss 0.065 at 20% with a Random Forest; about 0.03 with gradient boosting, so the
+   ordering is robust and the size is not), and they are the hardest to repair automatically.
+2. Duplicates barely hurt (loss smaller than its own noise), and removing them did no harm with the Random Forest.
+   With gradient boosting it failed the strict safe-auto gate at 5% and 20% (noise, not harm), so it is now a proposal.
 3. Feature-corruption repair makes things worse at every rate (-0.007 F1 at 10%), even though the detector finds it.
 4. The label-error detector is inverted: its flagged rate falls as real corruption rises (r = -0.95). So a low
    label-error rate must not be read as reassurance, and no single "readiness score" is justified.
@@ -89,8 +94,8 @@ data".
 - **Logistic Regression:** a linear model, `P(y=1) = sigmoid(w.x + b)`. It is the simple baseline. F1 = 0.662 versus
   Random Forest 0.680. It needs scaled inputs; trees do not (we share one pipeline anyway, so both see identical inputs).
 - **Why only Random Forest for the experiments?** To isolate the effect of data quality, one model was fixed. It is
-  strong on tabular data and has few settings. The consequence, stated openly: findings are for Random Forest. **Logistic
-  Regression validation is not done.**
+  strong on tabular data and has few settings. The consequence, stated openly: findings are for Random Forest. **Phase 16
+  re-measured the key results with gradient boosting (Section 7b); Logistic Regression validation is still not done.**
 
 ### 3.2 Preprocessing (`baseline.py`)
 
@@ -251,7 +256,8 @@ Mean F1 damage vs the clean baseline (mean +/- std over 5 seeds):
 | Missing values | 0.0042 +/- 0.0051 | 0.0006 +/- 0.0046 | 0.0071 +/- 0.0032 |
 | Duplicates | 0.0005 +/- 0.0040 | 0.0020 +/- 0.0050 | 0.0020 +/- 0.0052 |
 
-Reading: label noise dominates and grows faster than linearly (0.010, 0.025, 0.065). Duplicates' damage is smaller than its
+Reading (Random Forest): label noise dominates and grows faster than linearly (0.010, 0.025, 0.065); with gradient boosting
+the same ordering holds at about 0.45 times the size (0.004, 0.011, 0.030). Duplicates' damage is smaller than its
 own std: indistinguishable from zero. A likely reason (a hypothesis, not tested): copies add no false information, they
 only reweight some rows slightly.
 
@@ -311,7 +317,8 @@ Three separately measured dimensions:
 (so error types are compared at matched severity).
 
 Headline at 10%, equal weights: **label errors 0.66 > duplicates 0.35 > outliers 0.31 > missing 0.16 > feature
-corruption -0.26.** Across 15 weight combinations label errors rank first and feature corruption last in 100%.
+corruption -0.26.** Across 15 weight combinations label errors rank first and feature corruption last in 100% (Random Forest;
+under gradient boosting missing values, not feature corruption, ranks last: a "model-dependent ranking").
 That is **severity-dependent**: at 5% label errors rank first in only 53%; at 20% imputation turns harmful and competes
 with feature corruption for last place. Repairability status can differ across rates for the same error type
 (label errors are "weak" at 5% and 20% but "positive" at 10%). That instability is a finding, not noise.
@@ -348,8 +355,11 @@ upload CSV + target -> audit (6 detectors) -> impact estimate + repair proposals
 ```
 
 **The policy.** A repair type is applied automatically only if, in the benchmark at the nearest rate: no seed ever showed
-net harm (risk = 0), repair precision >= 0.95, and status is not "negative". On the evidence this is **duplicate removal
-only**, so `dataset_cleaned.csv` changes little *by design*. Everything else is logged as a proposal. A second file,
+net harm (risk = 0), repair precision >= 0.95, and status is not "negative". On Adult evidence it must pass under **both**
+a Random Forest and gradient boosting (the "model check" column: agree / model-dependent / not tested; the stricter status
+is used when they differ), and duplicate removal is proposal-only there. So with Adult evidence alone `dataset_cleaned.csv`
+changes nothing *by design*; a calibration on your own data (Random Forest) can still certify duplicate removal.
+Everything else is logged as a proposal. A second file,
 `dataset_cleaned_aggressive.csv`, applies the other proposals (never feature-anomaly) so a user who wants a model-ready file
 can judge the risk from its log. Label and feature-anomaly repairs are never auto-applied whatever the evidence.
 
@@ -431,9 +441,38 @@ AUC alongside F1, and add the power guard. Both fixes were re-validated: the fal
 
 ---
 
+## 7b. Is it the errors or the model? Gradient boosting (Phase 16)
+
+Source: `docs/PHASE16_SPEC.md` (pre-registered, with Results and two visible amendments at the end), `src/phase16_gb.py`,
+`results/phase16_gb_*`. Know this one well: it is the strongest answer to "does it hold for another model?".
+
+- **Design.** One variable: the classifier (scikit-learn `HistGradientBoostingClassifier`, chosen over XGBoost for no
+  compiled dependency and determinism). Same Adult data, split, corruptors, rates, preprocessing, seeds, detectors and
+  repairs. Hyperparameters chosen once on clean validation data and frozen before any dirty run. Ten criteria (G0-G9)
+  and five predictions written down first. G0 proved the harness reproduces the frozen Random Forest numbers exactly.
+- **Result: 5 pass, 5 fail.** Pass: harness (G0), competent model (G1: 0.715 vs 0.680), damage ordering (G2, Spearman
+  0.86, label errors first), repair-status agreement (G4, 11 of 15, the minimum; "everything weak" agrees on 8), dominance
+  across three capacities (G8). Fail: damage size (G3, median 0.35 of the forest's), duplicate auto-approval (G5), no new
+  harm (G6: KNN imputation hurts gradient boosting by about 0.02), priority ranking (G7: the bottom two swap), Bank
+  Marketing macro-F1 replication (G9).
+- **Predictions.** P1 (label damage larger under GB) wrong on Adult; P2 (outliers and feature corruption similar) wrong;
+  P3 half right; P4 and P5 right.
+- **What changed in the product.** Impact estimates carry the model and the GB ratio; Adult-sourced repairs need both
+  models to pass; disagreements are `model-dependent` (stricter status); duplicate removal is proposal-only on Adult
+  evidence; the ranking carries a model-dependent note. Evidence can only make the product more cautious.
+- **Honest caveats.** The Bank Marketing agreement on ROC-AUC (Spearman 0.87, 14 of 15) was found after seeing the macro-F1
+  failure, so it is exploratory and does not rescue G9. On Bank, GB's label-error damage is about twice the forest's
+  (opposite of Adult), so the size of the damage is dataset-and-model specific. G5's failure is partly a property of the
+  strict risk definition on a model with no training noise, not evidence that removal harms. GB's smaller Adult damage may
+  reflect its higher clean accuracy (untested). Two amendments were made after the results (G3 wording, G9 premise) and are
+  recorded as such. Logistic Regression and Phase 14 under GB were not done.
+
+---
+
 ## 8. Honest limits (list these yourself)
 
-1. **Random Forest only.** Logistic Regression validation not done.
+1. **Two model families, not all models.** Random Forest throughout, gradient boosting for the Adult evidence (Phase 16);
+   Logistic Regression validation not done, and the on-your-data calibration is still Random Forest only.
 2. **Random, synthetic errors.** Real errors are structured, so repair precision may be optimistic. Missing values are MCAR.
 3. **Estimates, not truth.** On uploads, every rate is a detector estimate with the precision/recall above.
 4. **Three corruption rates per error type.** Detector-vs-damage correlations are directional.
@@ -545,7 +584,8 @@ judgement, not derived from a theorem. Be honest about that.
 
 **Q25. Why is duplicate removal "safe" if duplicates barely hurt?**
 "Safe" is about *harm*, not benefit. Exact removal restores the data exactly (precision 0.99-1.00, recall 1.00), so it
-cannot hurt. The benefit is small because damage is small.
+cannot hurt. The benefit is small because damage is small. (Phase 16 caveat: under gradient boosting the strict gate counted
+tiny negative recoveries at 5% and 20% as risk, so on Adult-only evidence the product proposes removal instead of applying it.)
 
 **Q26. Why does imputation hurt at 20%?**
 Observed: recovery -0.0054. The mechanism was not tested. A plausible reading is that imputed values are guesses that
@@ -587,7 +627,10 @@ conservative, but in-sample and untested elsewhere. It also means small datasets
 never auto-approve imputation.
 
 **Q35. Would your findings hold for a neural network or logistic regression?**
-Unknown. Only Random Forest was tested; Logistic Regression is the stated next step.
+Partly known. Phase 16 re-tested the key results with gradient boosting: the ordering (label errors first) held, but the size
+of the damage, several repair verdicts and the bottom of the priority ranking did not (5 of 10 pre-registered criteria
+failed), and the Bank Marketing check did not replicate on macro-F1. Neural networks and Logistic Regression were not
+tested; Logistic Regression is the next step and the harness takes any model.
 
 **Q36. What would you do with more time?**
 Logistic Regression validation; more datasets; structured (non-random) error injection; a calibration test on more
@@ -606,7 +649,9 @@ decline rules.
 - *"Your result proves X."* Say "directional evidence, 5 seeds, 3 rates".
 - *"Did you tune things to get these numbers?"* The research phases were frozen: no re-tuning or re-running to improve
   results, and weak or negative results were kept. The two fixes made after the second-dataset validation (AUC, the 0.01
-  cap) were decided after seeing that data, and are disclosed as exploratory.
+  cap) were decided after seeing that data, and are disclosed as exploratory. Phase 16's criteria were written before its
+  results; its two amendments (G3 wording, G9 premise) were made after and are recorded as amendments, and the Bank AUC
+  comparison is labelled exploratory.
 
 ---
 

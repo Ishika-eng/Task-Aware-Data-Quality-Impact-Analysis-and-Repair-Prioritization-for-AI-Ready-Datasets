@@ -70,13 +70,30 @@ def test_demo():
                                        "default_action"]].round(4).to_string(index=False))
 
     approved = default_apply_issues(state)
-    assert approved == {"duplicates"}, "only exact duplicate removal should clear the safe-auto bar"
+    # Phase 16 (G5 failed): on Adult-sourced evidence duplicate removal is proposed, not applied automatically, and no
+    # other repair clears the bar either, so the default (evidence-based) file changes nothing.
+    assert approved == set(), f"nothing should clear the safe-auto bar on Adult-only evidence, got {approved}"
+    pol = state.policy.set_index("issue_key")
+    assert pol.loc["duplicates", "default_action"] == "flag for human review" and not pol.loc["duplicates", "safe_auto"]
+    assert "Proposed, not applied automatically" in pol.loc["duplicates", "reason"] or \
+        "does not meet the safe-auto bar" in pol.loc["duplicates", "reason"]
+    assert set(pol.loc[["missing_values", "duplicates", "outliers", "label_errors"], "model_check"]) <= \
+        {"agree", "model-dependent"}, "Adult-sourced evidence must carry the gradient-boosting model check"
+    assert pol.loc["feature_corruption", "model_check"] == "not tested" and pol.loc["inconsistency", "model_check"] == "not tested"
     result = apply_repairs(state)
     assert list(result.cleaned.columns) == list(df.columns)
     assert changed_cells(df, result.cleaned) == set(), "default policy must not modify any surviving cell"
-    assert not result.cleaned.duplicated().any(), "no full-record duplicates may remain"
+    assert len(result.cleaned) == len(df), "default policy drops no rows on Adult-only evidence"
     assert_log_honest(df, result.cleaned, result.repair_log, "evidence-based")
-    print(f"OK evidence-based file: {len(df) - len(result.cleaned)} duplicates dropped, no other cell changed")
+    notes = {r["issue"]: r["model_note"] for r in result.readiness["benchmark_task_impact"]}
+    assert all("Random Forest" in n for k, n in notes.items() if n), "impact estimates must name the model"
+    print("OK evidence-based file: nothing applied automatically on Adult-only evidence; model check present")
+
+    # A human can still approve duplicate removal, and the log stays honest.
+    dup_only = apply_repairs(state, {"duplicates"})
+    assert not dup_only.cleaned.duplicated().any() and changed_cells(df, dup_only.cleaned) == set()
+    assert_log_honest(df, dup_only.cleaned, dup_only.repair_log, "duplicates approved by hand")
+    print(f"OK duplicates approved by hand: {len(df) - len(dup_only.cleaned)} dropped, no other cell changed")
 
     # The aggressive variant is a real, different, model-ready file ...
     assert result.cleaned_aggressive.drop(columns=[]).isna().values.sum() < df.isna().values.sum(), \

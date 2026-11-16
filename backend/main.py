@@ -383,6 +383,10 @@ def benchmark():
         "baseline": _read("phase2_clean_baseline.csv"), "impact": _read("phase7_impact_summary_full.csv"),
         "detection": _read("phase5_detection_scores.csv"), "repair": _read("phase9_repair_summary_full.csv"),
         "evidence": _read("phase10_evidence_table.csv"), "priority": _read("phase10_priority_headline.csv"),
+        "model_check": {"evidence": _read("phase16_gb_evidence_table.csv"), "priority": _read("phase16_gb_priority_headline.csv"),
+                        "damage": _read("phase16_gb_damage_summary.csv"),
+                        "criteria": json.loads((RESULTS / "phase16_gb_criteria.json").read_text())
+                        if (RESULTS / "phase16_gb_criteria.json").exists() else {}},
         "sensitivity": _read("phase10_sensitivity_all_rates.csv"), "tracking": _read("phase11b_validation.csv"),
         "correlation": _read("phase11b_correlation.csv"), "baseline_rates": baseline_rates,
         "bank": {"posf1": _read(base + "posf1.csv"), "macrof1": _read(base + "macrof1.csv"), "auc": _read(base + "auc.csv"),

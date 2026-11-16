@@ -303,7 +303,7 @@ elif view == "Task impact":
             for e, b in zip(imp.benchmark_impact_estimate, imp.is_boundary_estimate)],
         "Impact (ROC-AUC)": [("-" if pd.isna(e) else num(e)) for e in imp.impact_estimate_auc],
         "Metrics disagree": ["yes" if d else "" for d in imp.metrics_disagree],
-        "Unit": imp.impact_unit, "Based on": imp.impact_source,
+        "Unit": imp.impact_unit, "Based on": imp.impact_source, "Model": imp.impact_model_note,
         "Repair evidence": imp.repairability_status, "Decision": imp.policy_decision,
         "Recommendation": imp.recommendation})
     st.dataframe(show, width="stretch", hide_index=True)

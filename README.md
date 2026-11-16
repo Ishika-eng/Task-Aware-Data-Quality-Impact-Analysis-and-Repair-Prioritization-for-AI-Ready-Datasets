@@ -20,7 +20,7 @@ It is both a **research project** (controlled experiments on UCI Adult, 11 phase
 4. [Quick start](#quick-start)
 5. [Outputs](#outputs)
 6. [How the repair policy decides](#how-the-repair-policy-decides)
-7. [Research results](#research-results)
+7. [Research results](#research-results) (including [the model check, Phase 16](#is-this-about-the-errors-or-about-the-model-phase-16))
 8. [Reproducing the experiments](#reproducing-the-experiments)
 9. [Project structure](#project-structure)
 10. [Limitations](#limitations)
@@ -33,7 +33,9 @@ It is both a **research project** (controlled experiments on UCI Adult, 11 phase
 1. **Task-aware impact analysis.** Inject one error type at a time into clean data, retrain, and measure the F1
    loss on an untouched clean test set. Impact is measured, not assumed.
 2. **Evidence-based repair, not blanket cleaning.** "Detected" does not mean "safe to repair". A repair is applied
-   automatically only if, in the controlled benchmark, it showed zero observed harm and high precision.
+   automatically only if, in the controlled benchmark, it showed zero observed harm and high precision. On the
+   Adult evidence it must also pass under a **second model family** (gradient boosting, Phase 16); where the two
+   models disagree the stricter verdict is used.
 3. **Honest uncertainty.** Every dimension carries an *evidence status* (validated / weak / inverted /
    not estimable) separate from its observed rate. No single readiness score is reported, because the evidence
    did not justify one.
@@ -201,6 +203,8 @@ What it deliberately refuses to do:
 
 On the Adult demo, calibrating on its own 2,916-row reference (about 20 s) reaches the same decisions as the
 five-seed, 32,000-row research: duplicate removal is safe; missing-value imputation, outliers and labels go to review.
+That calibration is Random Forest only; the Adult evidence it is compared with was additionally re-checked with gradient
+boosting (see the model check below).
 
 ## Handling real-world CSVs
 
@@ -224,19 +228,29 @@ corruption rate, all of these hold:
 - repair precision was at least **0.95** (it rarely overwrote legitimate data),
 - the repairability status was not *negative*.
 
-On the benchmark evidence this is satisfied by **exact duplicate removal only**, so `dataset_cleaned.csv` changes
-little by design. Everything else is logged as a proposal and flagged for human review. If you need a model-ready
+On the Random Forest benchmark evidence this was satisfied by exact duplicate removal only. Re-measured with gradient
+boosting (Phase 16), duplicate removal did **not** pass the gate at every rate (it failed at 5% and 20%, because with
+no training noise the damage it removes is within the corruption-draw noise, so some seeds show a tiny "harm"). The
+pre-registered rule therefore applies: on **Adult-sourced evidence nothing is applied automatically**, and duplicate
+removal is a *proposal* you can approve in one click. A calibration on your own data (Random Forest, with exact
+restoration treated as harmless) can still certify it. Everything is logged as a proposal and flagged for human
+review, so `dataset_cleaned.csv` is unchanged by default unless you calibrate or approve a repair. If you need a model-ready
 file, `dataset_cleaned_aggressive.csv` applies those proposals too (never feature-anomaly repairs) and its log shows
 exactly what changed, so you can judge the risk yourself. You can override per issue type in the app, and
 overrides are recorded in the log. The 0.95 threshold is a documented policy parameter in
 [`src/taskclean.py`](src/taskclean.py) (`SAFE_REPAIR_MIN_PRECISION`).
+
+**Model check.** Each decision on Adult-sourced evidence carries a *model check* column: `agree` (the Random Forest and
+gradient-boosting statuses match), `model-dependent` (they differ, and the stricter status is used), or `not tested`
+(dataset-calibrated evidence, and the Phase 14 inconsistency repair, which was not re-measured). There is no model
+selector: the product never re-labels Random Forest evidence as gradient-boosting evidence.
 
 *"Repair not recommended" means the evaluated strategy was harmful in testing, not that the underlying error is
 inherently unrepairable.*
 
 ## Research results
 
-All experiments use UCI Adult with a Random Forest (300 trees). The clean baseline is **F1 = 0.680**
+All experiments below use UCI Adult with a Random Forest (300 trees); [Phase 16](#is-this-about-the-errors-or-about-the-model-phase-16) re-checks the key results with gradient boosting. The clean baseline is **F1 = 0.680**
 (accuracy 0.851, ROC-AUC 0.903); Logistic Regression reaches F1 = 0.662. Corruption rates are 5/10/20%;
 experiments use seeds 42-46 and the train/test split is fixed.
 
@@ -253,7 +267,8 @@ Mean F1 damage vs. the clean baseline, mean ± std over 5 seeds:
 | Duplicates | 0.0005 ± 0.0040 | 0.0020 ± 0.0050 | 0.0020 ± 0.0052 |
 
 Label errors dominate. Duplicates' damage is smaller than its own standard deviation, so it is statistically
-indistinguishable from zero.
+indistinguishable from zero. **These are Random Forest numbers.** Re-measured with gradient boosting (Phase 16, below)
+label errors are still the largest damage, but about 0.45 times as large (0.030 rather than 0.065 at 20%).
 
 ### Detection: can each error be found without ground truth? (Phase 5)
 
@@ -294,7 +309,10 @@ rate. Headline at 10% with equal weights: **label errors (0.66) > duplicates (0.
 values (0.16) > feature corruption (-0.26)**.
 
 Across a grid of 15 weight combinations at 10%, label errors rank first and feature corruption last in **100%** of
-them. That robustness is **severity-dependent**: at 5% label errors rank first in 53% of combinations, and at 20%
+them (Random Forest). **Model-dependent ranking:** under gradient boosting the top three are identical and label errors
+are first in all 15, but missing values, not feature corruption, ranks last (the KNN-imputation repair hurts gradient
+boosting). The two are nearly tied, and the pre-registered check (label first *and* feature corruption last in at least
+80% of combinations) failed with 0%. That robustness is **severity-dependent**: at 5% label errors rank first in 53% of combinations, and at 20%
 missing-value repair turns harmful and competes with feature corruption for last place.
 
 ### AI-readiness (Phase 11)
@@ -340,6 +358,39 @@ ground truth, and the product was run on Heart Disease and German credit. Full w
   when the noise floor exceeds 0.01. The false approval is gone, but all evidence sources now tie on this dataset, so
   calibration is still not shown to beat the transferred evidence for that decision (see the follow-up in the report).
 
+## Is this about the errors, or about the model? (Phase 16)
+
+Every number above was measured with a Random Forest. Phase 16 re-measured the damage and repair evidence with a
+second family, scikit-learn's `HistGradientBoostingClassifier` (changing only the downstream model; the data,
+corruptors, preprocessing, detectors and repairs are the frozen code, and the harness reproduces the frozen Random
+Forest numbers exactly). The method and ten pass/fail criteria were written before the results:
+[`docs/PHASE16_SPEC.md`](docs/PHASE16_SPEC.md) (results and amendments at the end).
+
+**Result: five of ten criteria pass, five fail.**
+
+- **Held up:** label errors are the largest damage under both models and under three model capacities (G2, G8);
+  feature-corruption repair is net-harmful under both; the top three priorities are the same.
+- **Did not hold up:** the *size* of the damage (median 0.35 times the forest's, G3), the repair verdict for several cells
+  (status agreement 11 of 15, the minimum, against 8 for "everything weak"; G4), duplicate removal's automatic approval
+  (G5), a missing-values repair that hurts gradient boosting by about 0.02 though not the forest (G6), the bottom of the
+  priority ranking (G7), and the Bank Marketing replication on macro-F1 (G9).
+- **Bank Marketing:** on macro-F1 the models do not agree (Spearman 0.00, 9 of 15 statuses). On ROC-AUC they agree closely
+  (Spearman 0.87, 14 of 15), but that comparison was made after seeing the macro-F1 result, so it is exploratory. There,
+  gradient-boosting label-error damage is about *twice* the forest's, the opposite of Adult: the size of the damage
+  depends on the dataset and the model together.
+
+What the product does about it (only ever more cautious): impact estimates are labelled with the model and the
+gradient-boosting ratio where it is outside 0.5-2.0; Adult-sourced repairs need to pass under both models;
+disagreeing cells are marked `model-dependent`; duplicate removal is a proposal on Adult evidence; the priority ranking
+carries a model-dependent note. The statement "label errors dominate" stays; the statement about *how much* is
+labelled Random Forest.
+
+Limits: two model families, one implementation of each; GB's hyperparameters were fixed from clean Adult data and not
+re-tuned for Bank Marketing; Logistic Regression was not part of this phase; the inconsistency repair (Phase 14) was
+not re-measured; the detectors are Random-Forest-based inside, so only the downstream model varied. Two explanations
+were not tested: that gradient boosting's smaller Adult damage reflects its higher clean accuracy, and why imputed values
+hurt it.
+
 ## Reproducing the experiments
 
 Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`).
@@ -359,6 +410,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | product | `python3 test_taskclean.py` | end-to-end invariants |
 | calibration | `python3 test_selfbench.py` | about a minute |
 | 13 | `python3 phase13_transfer.py data` then `groundtruth` (about 8 min), `calibration`, `regimes`, `report` | second-dataset validation |
+| 16 | `python3 phase16_gb.py --stage N` for N = 0..6 (stage 4 about 90 min, stage 6 about 13 min); `python3 test_phase16.py` | gradient-boosting check; stage 7 not built |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -399,7 +451,9 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 - **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
   with the precision/recall limits above. A flagged rate is not a confirmed error rate.
 - **Benchmark transfer.** Without calibration, impact estimates and repair evidence come from Adult + Random Forest
-  and do not transfer automatically to another dataset or model. Calibration measures them on your data, but with a
+  and do not transfer automatically to another dataset or model (Phase 16 showed the size of the damage differs
+  between a Random Forest and gradient boosting, and that the Bank Marketing comparison did not replicate on macro-F1).
+  Calibration measures them on your data, but with a
   Random Forest, macro-F1, a few seeds, and a clean-ish reference rather than true ground truth: undetected problems
   left in the reference and selection bias from dropping incomplete rows can make damage look smaller or repairs
   easier. It injects random errors, so measured repair precision can be optimistic for structured real-world errors.
@@ -426,7 +480,10 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 
 ## Not done yet
 
-- Logistic Regression validation of the Random Forest findings.
+- Logistic Regression validation of the Random Forest findings (the Phase 16 harness takes any model, so this needs
+  only its own pre-registration).
+- Phase 14 (inconsistency repair) under gradient boosting; wiring the on-your-data calibration to a second model;
+  the missing-values-hurts-gradient-boosting finding, whose cause was not tested.
 - More than one extra dataset; Logistic Regression is likewise untested.
 - Calibration of feature-anomaly repair (it stays on the Adult evidence and is never applied automatically).
 - Validating calibration against more datasets than Adult and synthetic data.

@@ -52,6 +52,7 @@ export function RepairPlan() {
                     <span>Repair precision <b className="text-fg">{pct(p.benchmark_repair_precision, 0)}</b></span>
                     <span>Observed harm risk <b className="text-fg">{num(p.benchmark_risk)}</b></span>
                     <span>Source: {p.evidence_source}</span>
+                    <span>Model check: <Badge tone={p.model_check === "model-dependent" ? "warn" : "neutral"}>{p.model_check}</Badge></span>
                   </div>
                   {on && p.repairability_status === "negative" && <div className="mt-3"><Alert tone="warn">Benchmark testing found this repair strategy net-harmful. That does not mean the error is unrepairable, only that this strategy made models worse in testing.</Alert></div>}
                   {on && !isDefault && <div className="mt-3"><Alert tone="warn">Human override: the evidence does not support applying this automatically.</Alert></div>}

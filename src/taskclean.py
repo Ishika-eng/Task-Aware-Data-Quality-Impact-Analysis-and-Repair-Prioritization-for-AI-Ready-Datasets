@@ -491,6 +491,50 @@ def _nearest_evidence_row(ev: pd.DataFrame, issue: str, observed_rate: float):
     return sub.iloc[(sub["rate"] - observed_rate).abs().argsort().iloc[0]]
 
 
+# --- Phase 16 model check (docs/PHASE16_SPEC.md, Results R5): the Adult evidence was measured with a Random Forest; the
+# same repair cells were re-measured with gradient boosting. Dataset-calibrated evidence (selfbench) is Random Forest only.
+GB_EVIDENCE_FILE = "phase16_gb_evidence_table.csv"
+GB_DAMAGE_FILE = "phase16_gb_damage_summary.csv"
+ADULT_PROPOSAL_ONLY = {"duplicates"}       # Phase 16 G5 failed: duplicate removal is proposed, not auto-applied, on Adult evidence
+GB_RATIO_RANGE = (0.5, 2.0)                # Phase 16 G3: damage ratios outside this range are called out
+MODEL_CHECK_NOT_TESTED = "not tested"
+IS_ADULT_SOURCE = lambda source: str(source).startswith("UCI Adult")     # noqa: E731
+
+
+def _gb_check(issue: str, observed_rate: float) -> dict | None:
+    """The gradient-boosting re-measurement of the Adult repair evidence at the nearest evaluated rate, or None when it
+    was not measured (no file, or an issue Phase 16 did not cover)."""
+    path = os.path.join(RESULTS_DIR, GB_EVIDENCE_FILE)
+    if not os.path.exists(path):
+        return None
+    row = _nearest_evidence_row(pd.read_csv(path), issue, observed_rate)
+    if row is None:
+        return None
+    return {"rate": float(row["rate"]), "rf_status": row["rf_status"], "gb_status": row["repairability_status"],
+            "agree": bool(row["rf_status"] == row["repairability_status"]), "effective_status": row["effective_status"],
+            "gb_safe": bool(row["gb_safe_auto"]), "gb_risk": float(row["risk"]), "rf_risk": float(row["rf_risk"])}
+
+
+def _gb_damage_note(issue: str, observed_rate: float) -> str:
+    """Model label for an Adult-benchmark impact estimate (Phase 16 G3): which model it is, and the GB-to-RF damage ratio."""
+    path = os.path.join(RESULTS_DIR, GB_DAMAGE_FILE)
+    base = "Measured with a Random Forest on UCI Adult. "
+    if not os.path.exists(path):
+        return base + "Not tested under gradient boosting."
+    row = _nearest_evidence_row(pd.read_csv(path), issue, observed_rate)
+    if row is None:
+        return base + "Not tested under gradient boosting."
+    if not bool(row["informative"]):
+        return (base + "Under gradient boosting the damage at this rate was too small to compare "
+                f"(Random Forest damage below 0.005), so the models cannot be told apart here.")
+    ratio, lo, hi = float(row["gb_over_rf"]), *GB_RATIO_RANGE
+    if lo <= ratio <= hi:
+        return base + f"Gradient boosting gave {ratio:.2f}x the damage, within {lo}-{hi}x: similar size under both models."
+    return (base + f"Gradient boosting gave {ratio:.2f}x the damage, outside {lo}-{hi}x: the SIZE of this impact is "
+            "model-specific; the ordering of issues held under both models.")
+
+
+
 def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | None:
     """Repair evidence for an issue at the nearest evaluated corruption rate. Uses this dataset's own
     self-benchmark when it measured the issue; otherwise falls back to the UCI Adult benchmark."""
@@ -513,9 +557,25 @@ def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | No
             up = row.get("underpowered")
             floor = row.get("noise_floor")
             floor_auc = row.get("noise_floor_auc")
-            return {"rate": float(row["rate"]), "status": row["repairability_status"],
-                    "risk": float(material if use_material else row["risk"]),
-                    "risk_kind": "harm beyond the noise floor" if use_material else "observed harm",
+            status = row["repairability_status"]
+            risk = float(material if use_material else row["risk"])
+            risk_kind = "harm beyond the noise floor" if use_material else "observed harm"
+            gb_ok, model_check, check_detail = True, MODEL_CHECK_NOT_TESTED, ""
+            if not IS_ADULT_SOURCE(source):
+                check_detail = "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting."
+            else:
+                gb = _gb_check(issue, float(row["rate"])) if issue not in PHASE14_ISSUES else None
+                if gb is None:
+                    check_detail = "Not tested under gradient boosting."
+                else:
+                    model_check = "agree" if gb["agree"] else "model-dependent"
+                    status = gb["effective_status"]          # stricter of the two; 'positive' only if both are
+                    risk, gb_ok = max(risk, gb["rf_risk"], gb["gb_risk"]), gb["gb_safe"]
+                    risk_kind = "observed harm (the larger of Random Forest and gradient boosting)"
+                    check_detail = (f"Random Forest: {gb['rf_status']}; gradient boosting: {gb['gb_status']} -> "
+                                    f"{model_check}" + ("" if gb["agree"] else f"; the stricter status ('{status}') is used"))
+            return {"rate": float(row["rate"]), "status": status, "risk": risk, "risk_kind": risk_kind,
+                    "model_check": model_check, "model_check_detail": check_detail, "gb_ok": gb_ok,
                     "precision": float(row["repair_precision"]), "recall": float(row["repair_recall"]),
                     "underpowered": bool(up) if up is not None and not pd.isna(up) else False,
                     "noise_floor": max([float(f) for f in (floor, floor_auc) if f is not None and not pd.isna(f)]
@@ -549,6 +609,7 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
                          "default_action": "not assessed", "evidence_source": "-",
+                         "model_check": MODEL_CHECK_NOT_TESTED, "model_check_detail": "",
                          "reason": skipped.get(det_key, "detector did not run")})
             continue
         if issue in FLAG_ONLY_ISSUES:
@@ -558,17 +619,21 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
                          "default_action": "flag for human review" if n_flag else "nothing to repair",
                          "evidence_source": "Phase 15 validation (detection only)",
+                         "model_check": MODEL_CHECK_NOT_TESTED, "model_check_detail": "No repair exists to test.",
                          "reason": "Flag-only: no repair exists for this issue and nothing is written to the cleaned file. "
                                    + JOINT_OUTLIER_VALIDATION})
             continue
         ev = _evidence_for(issue, det.rate, selfbench)
         source = ev["source"] if ev else "-"
+        model_check, check_detail = (ev["model_check"], ev["model_check_detail"]) if ev else (MODEL_CHECK_NOT_TESTED, "")
         if ev is None:
             safe, reason = False, "no repair evidence available"
             status, risk, prec = "unknown", np.nan, np.nan
         else:
             status, risk, prec = ev["status"], ev["risk"], ev["precision"]
             safe = risk <= 1e-9 and prec >= SAFE_REPAIR_MIN_PRECISION and status != "negative"
+            safe = safe and ev["gb_ok"]               # Phase 16: Adult-sourced evidence must pass under BOTH models
+            proposal_only = IS_ADULT_SOURCE(source) and issue in ADULT_PROPOSAL_ONLY
             guarded = issue in NEVER_AUTO_APPLY
             underpowered = ev["underpowered"]
             reason = (f"{source}, nearest evaluated rate ({ev['rate']:.0%}): repair precision "
@@ -581,8 +646,14 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "modestly" if underpowered and safe else
                          "meets the bar for safe automatic repair" if safe else
                          f"does not meet the safe-auto bar (risk must be 0 and precision >= "
-                         f"{SAFE_REPAIR_MIN_PRECISION:.2f}, status not 'negative')"))
-            safe = safe and not guarded and not underpowered
+                         f"{SAFE_REPAIR_MIN_PRECISION:.2f}, status not 'negative', and, on Adult evidence, no "
+                         f"harm under gradient boosting either)")
+                      + (f". Model check: {check_detail}." if check_detail else "")
+                      + (". Proposed, not applied automatically: duplicate removal did not pass the safe-auto gate under "
+                         "gradient boosting at every measured rate, so Adult-sourced evidence is not enough to apply it "
+                         "unattended (Phase 16, G5). You can still approve it by hand, and a calibration on your own data "
+                         "can certify it." if proposal_only and safe else ""))
+            safe = safe and not guarded and not underpowered and not proposal_only
         if n_auto == 0 and n_flag == 0:
             action = "nothing to repair"
         elif safe and n_auto > 0:
@@ -593,7 +664,8 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                      "detected_rate": det.rate, "n_repair_candidates": n_auto, "n_flag_only": n_flag,
                      "repairability_status": status, "benchmark_risk": risk,
                      "benchmark_repair_precision": prec, "safe_auto": bool(safe),
-                     "default_action": action, "evidence_source": source, "reason": reason})
+                     "default_action": action, "evidence_source": source,
+                     "model_check": model_check, "model_check_detail": check_detail, "reason": reason})
     return pd.DataFrame(rows)
 
 
@@ -1025,7 +1097,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": np.nan,
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
                          "impact_source": "-", "impact_unit": "-", "impact_estimate_auc": np.nan,
-                         "metrics_disagree": False, "metric_note": "",
+                         "metrics_disagree": False, "metric_note": "", "impact_model_note": "",
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "policy_decision": "not assessed", "recommendation": p.reason})
             continue
@@ -1034,7 +1106,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
                          "impact_source": "none measured (flag-only issue)", "impact_unit": "-",
                          "impact_estimate_auc": np.nan, "metrics_disagree": False, "metric_note": "",
-                         "repairability_status": p.repairability_status, "benchmark_risk": np.nan,
+                         "impact_model_note": "", "repairability_status": p.repairability_status, "benchmark_risk": np.nan,
                          "policy_decision": ("flagged for human review (not applied)"
                                              if p.n_flag_only else "nothing to repair"),
                          "recommendation": "Review the flagged rows yourself. Nothing is repaired and no impact on a "
@@ -1042,6 +1114,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             continue
         own = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate) if sb is not None else None
         est_auc, disagree, metric_note = np.nan, False, ""
+        model_note = "Random Forest on this dataset's reference. Not tested under gradient boosting."
         if own is not None:
             (est, boundary), source, unit = own, "this dataset (self-benchmark)", sb.metric
             own_auc = _impact_curve_estimate(sb.impact_curve, issue, p.detected_rate, "mean_damage_auc")
@@ -1053,8 +1126,10 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
         else:
             if issue in PHASE14_ISSUES:
                 est, boundary = _phase14_impact(issue, p.detected_rate)
+                model_note = "Measured with a Random Forest on UCI Adult. Not tested under gradient boosting."
             else:
                 est, boundary = _estimate_impact(issue, p.detected_rate)
+                model_note = _gb_damage_note(issue, p.detected_rate)
             source, unit = "UCI Adult benchmark", "F1 (positive class)"
         if issue in apply_issues and p.n_repair_candidates > 0:
             decision = "applied" + ("" if p.safe_auto else " (human override)")
@@ -1065,7 +1140,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
         rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
                      "benchmark_impact_estimate": est, "is_boundary_estimate": boundary,
                      "impact_source": source, "impact_unit": unit, "impact_estimate_auc": est_auc,
-                     "metrics_disagree": disagree, "metric_note": metric_note,
+                     "metrics_disagree": disagree, "metric_note": metric_note, "impact_model_note": model_note,
                      "repairability_status": p.repairability_status, "benchmark_risk": p.benchmark_risk,
                      "policy_decision": decision,
                      "recommendation": RECOMMENDATION_TEXT.get(p.repairability_status, RECOMMENDATION_TEXT["unknown"])})
@@ -1131,7 +1206,8 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "columns_skipped_by_model_based_detectors": state.unmodeled_columns,
             "model_used_for_benchmark_validation": (
                 f"RandomForestClassifier (n_estimators={sb.n_estimators}) on this dataset's clean-ish reference; "
-                f"{sb.metric}" if sb is not None else "RandomForestClassifier (n_estimators=300), UCI Adult"),
+                f"{sb.metric}" if sb is not None else "RandomForestClassifier (n_estimators=300), UCI Adult; repair evidence re-checked with "
+                "gradient boosting (HistGradientBoostingClassifier)"),
         },
         "dimensions": dims,
         "benchmark_task_impact": [{
@@ -1140,7 +1216,7 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "is_boundary_estimate": bool(r.is_boundary_estimate), "impact_source": r.impact_source,
             "impact_unit": r.impact_unit, "impact_estimate_auc": None if pd.isna(r.impact_estimate_auc) else float(r.impact_estimate_auc),
             "metrics_disagree": bool(r.metrics_disagree), "metric_note": r.metric_note,
-            "repairability_status": r.repairability_status,
+            "model_note": r.impact_model_note, "repairability_status": r.repairability_status,
             "policy_decision": r.policy_decision, "recommendation": r.recommendation,
         } for r in impact.itertuples()],
         "impact_estimate_note": (
@@ -1149,20 +1225,24 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "held-out reference rows; a repair counts as safe only if neither metric shows material harm, and "
             "disagreements between the two are flagged). It is an estimate of relative harm for this data and a "
             "Random Forest, not a validated prediction of your model's loss. Beyond the highest measured rate the value is a boundary "
-            "estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve."
+            "estimate, not an extrapolation. Issues the self-benchmark did not measure use the UCI Adult curve. This "
+            "dataset's measurement uses a Random Forest only; it was not tested under gradient boosting."
             if sb is not None else
             "Benchmark-based task-impact estimate: the detected rate is mapped onto the controlled Phase 7 "
             "damage curve (UCI Adult / Random Forest, rates 5-20%). It is not a measured or validated "
             "prediction of F1 loss for this dataset. Where the observed rate exceeds the validated 0-20% "
-            "range the value is a boundary estimate (the 20% benchmark), not an extrapolation."),
+            "range the value is a boundary estimate (the 20% benchmark), not an extrapolation. The curve is a Random "
+            "Forest's; each issue's note gives the gradient-boosting damage ratio (the ordering of issues held under both "
+            "models, the size did not)."),
         "repair_policy": {
             "safe_auto_requires": (f"observed harm risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, "
-                                   "status != negative -- evaluated on "
+                                   "status != negative (on Adult evidence: under both a Random Forest and gradient "
+                                   "boosting; duplicate removal is proposed, not auto-applied, on Adult evidence) -- evaluated on "
                                    + ("this dataset's self-benchmark where measured, else the UCI Adult benchmark"
                                       if sb is not None else "the UCI Adult benchmark")),
             "issues_applied": sorted(apply_issues), "human_overrides": overrides,
             "decisions": state.policy[["issue", "default_action", "repairability_status", "evidence_source",
-                                       "reason"]].to_dict("records"),
+                                       "model_check", "reason"]].to_dict("records"),
         },
         "self_benchmark": (state.selfbench.summary() if state.selfbench is not None else
                            {"ran": False, "reason": "not requested: all evidence comes from the UCI Adult benchmark"}),
@@ -1177,7 +1257,9 @@ LIMITATIONS = [
     "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes "
     "from a detector with known precision/recall limits (Phase 5). A flagged rate is not a confirmed error rate.",
     "Benchmark-based impact estimates come from UCI Adult + Random Forest and do not transfer automatically to "
-    "another dataset or model.",
+    "another dataset or model. Re-measured with gradient boosting on Adult, the ORDER of issues held (label errors "
+    "largest) but the SIZE of the damage did not (about 0.35x the forest's at the median), and on Bank Marketing the "
+    "agreement was not replicated on macro-F1.",
     "The false-positive floors used for 'Attention/Good' status on statistical detectors (outliers, feature "
     "anomalies, labels) were measured on clean Adult data and are NOT recalibrated for this dataset.",
     "The label-error detector's flagged rate showed an INVERTED relationship with real damage in validation; a "
@@ -1197,8 +1279,9 @@ LIMITATIONS = [
     "be over-counted as missing.",
     "Files above the model-detector row limit are audited on a stratified sample for the label/feature "
     "detectors; their findings and proposals then cover only the sampled rows.",
-    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the benchmark only "
-    "duplicate removal met the safe-auto bar, so every other repair in that file carries the risks described above.",
+    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the Random Forest "
+    "benchmark only duplicate removal met the safe-auto bar, and under gradient boosting it did not at every rate, so "
+    "on Adult evidence no repair in that file is certified safe and every one carries the risks described above.",
     "Impact is measured with F1-type metrics, which depend on the decision threshold. On a heavily imbalanced target "
     "(bank-marketing, 11.7% positive) label noise RAISED F1 while ROC-AUC fell by up to 0.05, so F1-based impact "
     "estimates can hide or invert the harm of label noise. Check the class balance before trusting them. (A "
@@ -1223,7 +1306,8 @@ SELFBENCH_LIMITATIONS = [
     "differently. When the measurement noise on either metric exceeds "
     + str(MAX_CERTIFIABLE_NOISE_FLOOR) + ", non-exact repairs cannot be certified safe at all.",
     "Issues the self-benchmark did not measure (feature anomalies, consistency) still use the UCI Adult "
-    "evidence, and each decision names its evidence source.",
+    "evidence, and each decision names its evidence source. That Adult evidence was also re-checked with gradient "
+    "boosting (the 'model check'); your own dataset's measurement was not.",
     "The self-benchmark injects RANDOM errors. Real errors are often structured (systematic mislabeling, a "
     "faulty sensor), so measured repair precision can be optimistic. That is why label and feature-anomaly "
     "repairs are never applied automatically, whatever the evidence.",

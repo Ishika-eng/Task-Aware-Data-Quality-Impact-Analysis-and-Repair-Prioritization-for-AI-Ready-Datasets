@@ -101,6 +101,7 @@ export function Review() {
                     <span>Repair precision <b className="text-fg">{pct(p.benchmark_repair_precision, 0)}</b></span>
                     <span>Observed harm risk <b className="text-fg">{num(p.benchmark_risk)}</b></span>
                     <span>Source: {p.evidence_source}</span>
+                    <span>Model check: <Badge tone={p.model_check === "model-dependent" ? "warn" : "neutral"}>{p.model_check}</Badge></span>
                   </div>
                 )}
                 <div className="mt-3 flex gap-2">

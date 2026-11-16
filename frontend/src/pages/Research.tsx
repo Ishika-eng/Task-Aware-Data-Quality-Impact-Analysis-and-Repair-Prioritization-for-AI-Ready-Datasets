@@ -26,6 +26,16 @@ export function Research() {
   const recovery = ISSUE_ORDER.map((k) => ({ name: ISSUE_NAME[k], ...Object.fromEntries(RATES.map((r) => [rateName(r), (find(b.repair, k, r)?.mean_recovery ?? 0) * 100])) }));
   const repair10 = ISSUE_ORDER.map((k) => { const r = find(b.repair, k, 0.1); return { name: ISSUE_NAME[k], Precision: r?.mean_repair_precision, Recall: r?.mean_repair_recall }; });
   const priority = [...b.priority].sort((x, y) => y.priority_score - x.priority_score).map((r) => ({ key: r.error_type, name: ISSUE_NAME[r.error_type], score: r.priority_score }));
+  const mc = b.model_check;
+  const rank10 = (model: string) => mc.priority.filter((r) => r.model === model && r.rate === 0.1).sort((x, y) => x.rank - y.rank).map((r) => ISSUE_NAME[r.error_type]);
+  const CRITERIA: [string, string][] = [
+    ["G0", "Harness reproduces the frozen Random Forest numbers"], ["G1", "Gradient boosting is a competent model (clean F1)"],
+    ["G2", "Damage ordering transfers (label errors largest)"], ["G3", "Damage size transfers (median ratio 0.5–2.0)"],
+    ["G4", "Repair status agrees (11 of 15 cells)"], ["G5", "Duplicate removal passes the safe-auto gate at every rate"],
+    ["G6", "No gradient-boosting-only harm"], ["G7", "Priority ranking transfers"],
+    ["G8", "Label errors dominate at every model capacity"], ["G9", "Bank Marketing agrees (macro-F1)"],
+  ];
+  const passed = CRITERIA.filter(([k]) => mc.criteria[k]?.pass === true).length;
   const bank = ISSUE_ORDER.map((k) => ({
     name: ISSUE_NAME[k],
     "Positive-class F1": find(b.bank.posf1, k, 0.2)?.mean_damage, "Macro-F1": find(b.bank.macrof1, k, 0.2)?.mean_damage, "ROC-AUC": find(b.bank.auc, k, 0.2)?.mean_damage,
@@ -140,7 +150,7 @@ export function Research() {
             </ResponsiveContainer>
           </div>
         </Card>
-        <Card title="Repair priority at 10%" description="Priority = impact − risk + repairability, each rescaled within the rate. Label errors rank first and feature corruption last in every one of 15 weight combinations at 10%.">
+        <Card title="Repair priority at 10%" description="Random Forest. Priority = impact − risk + repairability, each rescaled within the rate. Label errors rank first and feature corruption last in every one of 15 weight combinations at 10%. Under gradient boosting the top three are the same but missing values ranks last: a model-dependent ranking (see the model check below).">
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={priority} layout="vertical" margin={{ top: 8, right: 16, left: 24, bottom: 0 }}>
@@ -155,6 +165,27 @@ export function Research() {
           </div>
         </Card>
       </div>
+
+      <Card title="Model check: is this about the errors or about the model? (Phase 16)" description={`The key results were re-measured with gradient boosting (only the downstream model changed). ${passed} of ${CRITERIA.length} pre-registered criteria passed.`}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ul className="space-y-1.5 text-sm">
+            {CRITERIA.map(([k, text]) => {
+              const ok = mc.criteria[k]?.pass === true;
+              return <li key={k} className="flex items-start gap-2"><span className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center justify-center rounded text-[11px] font-semibold ${ok ? "bg-good-soft text-good" : "bg-bad-soft text-bad"}`}>{k}</span><span className="flex-1">{text}</span><span className={`shrink-0 text-xs font-medium ${ok ? "text-good" : "text-bad"}`}>{ok ? "pass" : "fail"}</span></li>;
+            })}
+          </ul>
+          <div className="space-y-3 text-[13px] leading-relaxed text-muted">
+            <p><b className="text-fg">Held up:</b> label errors are the largest damage under both models and every capacity tried; feature-corruption repair is net-harmful under both; the top three priorities are the same.</p>
+            <p><b className="text-fg">Did not hold up:</b> the size of the damage (about 0.35× the forest's), several repair verdicts, duplicate removal's automatic approval, and the bottom of the priority ranking. On Bank Marketing the macro-F1 comparison did not replicate.</p>
+            <div className="rounded-lg border border-line p-3">
+              <div className="text-xs uppercase tracking-wide">Priority at 10%, equal weights</div>
+              <div className="mt-1 text-fg"><b>Random Forest:</b> {rank10("RF").join(" > ")}</div>
+              <div className="text-fg"><b>Gradient boosting:</b> {rank10("GB").join(" > ")}</div>
+              <div className="mt-1">Model-dependent ranking: treat the order of the bottom two as unsettled.</div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card title="Does a detector's flagged rate track real damage?" description="Detected rate (x) against measured damage (y) at 5%, 10% and 20% true corruption. Only three points per error type: directional, not statistically significant.">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

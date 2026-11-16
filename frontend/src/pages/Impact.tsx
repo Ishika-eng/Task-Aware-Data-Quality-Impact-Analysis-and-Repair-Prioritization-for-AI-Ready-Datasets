@@ -19,7 +19,7 @@ export function Impact() {
     { key: "e", header: `Impact (${unit.replace(" (positive class)", "")})`, align: "right", cell: (r) => r.benchmark_impact_estimate === null ? "–" : <span><b>{signed(r.benchmark_impact_estimate)}</b>{r.is_boundary_estimate && <Badge tone="warn" className="ml-1.5">boundary</Badge>}</span> },
     ...(hasAuc ? [{ key: "a", header: "Impact (ROC-AUC)", align: "right" as const, cell: (r: ImpactRow) => (r.impact_estimate_auc === null ? "–" : signed(r.impact_estimate_auc)) }] : []),
     { key: "d", header: "Metrics", cell: (r) => (r.metrics_disagree ? <Badge tone="warn" className="whitespace-normal">F1 and AUC disagree</Badge> : <span className="text-muted">–</span>) },
-    { key: "s", header: "Based on", cell: (r) => <span className="text-xs text-muted">{r.impact_source}</span> },
+    { key: "s", header: "Based on", cell: (r) => <span className="block max-w-[20rem] text-xs text-muted">{r.impact_source}{r.impact_model_note && <span className="mt-1 block">{r.impact_model_note}</span>}</span> },
     { key: "ev", header: "Repair evidence", cell: (r) => <Status value={r.repairability_status} /> },
     { key: "dec", header: "Decision", cell: (r) => <Badge tone={r.policy_decision.startsWith("applied") ? "good" : r.policy_decision.startsWith("flagged") ? "warn" : "neutral"}>{r.policy_decision.replace(" (not applied)", "")}</Badge> },
     { key: "rec", header: "Recommendation", cell: (r) => <span className="block max-w-[24rem] text-xs text-muted">{r.recommendation}</span> },

@@ -89,6 +89,9 @@ export interface PolicyRow {
   safe_auto: boolean;
   default_action: string;
   evidence_source: string;
+  /** Phase 16: "agree" | "model-dependent" | "not tested" (Random Forest vs gradient boosting, Adult-sourced evidence only). */
+  model_check: string;
+  model_check_detail: string;
   reason: string;
 }
 
@@ -103,6 +106,7 @@ export interface ImpactRow {
   impact_estimate_auc: number | null;
   metrics_disagree: boolean;
   metric_note: string;
+  impact_model_note: string;
   repairability_status: string;
   benchmark_risk: number | null;
   policy_decision: string;
@@ -276,6 +280,7 @@ export interface Benchmark {
   tracking: Rec[];
   correlation: Rec[];
   baseline_rates: Rec;
+  model_check: { evidence: Rec[]; priority: Rec[]; damage: Rec[]; criteria: Rec };
   bank: { posf1: Rec[]; macrof1: Rec[]; auc: Rec[]; decisions: Rec[]; damage_corr: Rec[]; regimes: Rec[] };
 }
 
