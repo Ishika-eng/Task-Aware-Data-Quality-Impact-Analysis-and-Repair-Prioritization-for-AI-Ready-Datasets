@@ -1,0 +1,193 @@
+{
+  "G0": {
+    "checks": 5,
+    "passed": 5,
+    "pass": true
+  },
+  "G1": {
+    "gb_clean_posf1_mean": 0.714824120603015,
+    "threshold": 0.6704,
+    "pass": true,
+    "gb_seed_std": 0.0,
+    "rf_seed42": 0.6803537586860392
+  },
+  "G2": {
+    "n_cells": 15,
+    "spearman": 0.8571428571428571,
+    "top_at_10pct": "label_errors",
+    "top_at_20pct": "label_errors",
+    "pass": true
+  },
+  "G3": {
+    "n_informative": 8,
+    "ratios": {
+      "feature_corruption@10%": 0.31793258080588055,
+      "feature_corruption@20%": 0.31329007336779674,
+      "label_errors@5%": 0.38179077333039513,
+      "label_errors@10%": 0.44771736755511626,
+      "label_errors@20%": 0.45362018075896576,
+      "missing_values@20%": 0.7396365777110082,
+      "outliers@10%": 0.3149250512426458,
+      "outliers@20%": 0.204865309570642
+    },
+    "median_ratio": 0.34986167706813787,
+    "pass": false
+  },
+  "G8": {
+    "cases": {
+      "deep@10%": "label_errors",
+      "deep@20%": "label_errors",
+      "selected@10%": "label_errors",
+      "selected@20%": "label_errors",
+      "shallow@10%": "label_errors",
+      "shallow@20%": "label_errors"
+    },
+    "pass": true
+  },
+  "G4": {
+    "n_cells": 15,
+    "agree": 11,
+    "needed": 11,
+    "chance_baseline_all_weak": 8,
+    "cohens_kappa": 0.5522388059701493,
+    "disagreements": [
+      "missing_values@5%: RF weak / GB negative",
+      "label_errors@10%: RF positive / GB weak",
+      "missing_values@10%: RF weak / GB negative",
+      "duplicates@20%: RF positive / GB weak"
+    ],
+    "pass": true
+  },
+  "G5": {
+    "cells": {
+      "5%": {
+        "status": "weak",
+        "risk": 0.0012643914591522,
+        "precision": 0.9838308457711444,
+        "material_risk": 0.0006221225889928,
+        "safe": false
+      },
+      "10%": {
+        "status": "positive",
+        "risk": 0.0,
+        "precision": 0.9918520839862112,
+        "material_risk": 0.0,
+        "safe": true
+      },
+      "20%": {
+        "status": "weak",
+        "risk": 0.0009781311902435,
+        "precision": 0.9959100204498976,
+        "material_risk": 0.0,
+        "safe": false
+      }
+    },
+    "pass": false
+  },
+  "G6": {
+    "n_gb_only_harm": 2,
+    "duplicates_harmed": 0,
+    "cells": [
+      "missing_values@5%: RF weak -> GB negative",
+      "missing_values@10%: RF weak -> GB negative"
+    ],
+    "pass": false
+  },
+  "G7": {
+    "rate": 0.1,
+    "rf_ranking": [
+      "label_errors",
+      "duplicates",
+      "outliers",
+      "missing_values",
+      "feature_corruption"
+    ],
+    "gb_ranking": [
+      "label_errors",
+      "duplicates",
+      "outliers",
+      "feature_corruption",
+      "missing_values"
+    ],
+    "kendall_tau": 0.7999999999999999,
+    "tau_needed": 0.6,
+    "gb_share_label_first_feature_last": 0.0,
+    "rf_share_label_first_feature_last": 1.0,
+    "share_needed": 0.8,
+    "n_combos": 15,
+    "pass": false
+  },
+  "G9": {
+    "n_cells": 15,
+    "spearman": 0.0035714285714285704,
+    "a_spearman_pass": false,
+    "top_at_10pct": {
+      "gb": "feature_corruption",
+      "rf": "feature_corruption"
+    },
+    "top_at_20pct": {
+      "gb": "label_errors",
+      "rf": "feature_corruption"
+    },
+    "b_agree": 9,
+    "b_needed": 11,
+    "b_chance_baseline_all_weak": 11,
+    "b_kappa": -0.18421052631578938,
+    "b_disagreements": [
+      "duplicates@5%: RF weak / GB positive",
+      "feature_corruption@10%: RF positive / GB weak",
+      "outliers@10%: RF positive / GB weak",
+      "duplicates@20%: RF weak / GB positive",
+      "missing_values@20%: RF negative / GB weak",
+      "outliers@20%: RF positive / GB weak"
+    ],
+    "b_pass": false,
+    "c_duplicates": {
+      "5%": {
+        "status": "positive",
+        "material_risk": 0.0,
+        "strict_risk": 0.0009133515939706,
+        "precision": 1.0,
+        "safe": true
+      },
+      "10%": {
+        "status": "weak",
+        "material_risk": 0.0,
+        "strict_risk": 0.0,
+        "precision": 1.0,
+        "safe": true
+      },
+      "20%": {
+        "status": "positive",
+        "material_risk": 0.0,
+        "strict_risk": 0.0,
+        "precision": 1.0,
+        "safe": true
+      }
+    },
+    "c_pass": true,
+    "pass": false,
+    "bank_meta": {
+      "gb_clean_seed42": {
+        "posf1": 0.5,
+        "macrof1": 0.7201492537313433,
+        "auc": 0.9095357891584307
+      },
+      "rf_clean_seed42": {
+        "posf1": 0.4049079754601227,
+        "macrof1": 0.6728266205950583,
+        "auc": 0.911367175801138
+      },
+      "gb_noise_floor": {
+        "posf1": 0.018836985765441936,
+        "macrof1": 0.010093852384794447,
+        "auc": 0.003683701913889869
+      },
+      "rf_noise_floor": {
+        "posf1": 0.013636688471763164,
+        "macrof1": 0.007355385663173486,
+        "auc": 0.003
+      }
+    }
+  }
+}

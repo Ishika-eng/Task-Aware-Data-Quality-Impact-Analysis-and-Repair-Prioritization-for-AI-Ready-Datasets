@@ -1,0 +1,40 @@
+{
+  "dataset": "bank-marketing",
+  "positive_class": "2",
+  "clean_rows": 12000,
+  "train_rows": 8400,
+  "test_rows": 1800,
+  "gb_params": {
+    "max_iter": 400,
+    "learning_rate": 0.1
+  },
+  "gb_clean_seed42": {
+    "posf1": 0.5,
+    "macrof1": 0.7201492537313433,
+    "auc": 0.9095357891584307
+  },
+  "rf_clean_seed42": {
+    "posf1": 0.4049079754601227,
+    "macrof1": 0.6728266205950583,
+    "auc": 0.911367175801138
+  },
+  "gb_clean_identical_across_seeds": true,
+  "gb_noise_floor": {
+    "posf1": 0.018836985765441936,
+    "macrof1": 0.010093852384794447,
+    "auc": 0.003683701913889869
+  },
+  "gb_null_noise": {
+    "posf1": 0.018836985765441936,
+    "macrof1": 0.010093852384794447,
+    "auc": 0.003683701913889869
+  },
+  "rf_noise_floor": {
+    "posf1": 0.013636688471763164,
+    "macrof1": 0.007355385663173486,
+    "auc": 0.003
+  },
+  "harness_check_pass": true,
+  "harness_check_max_abs_diff": 1.1102230246251565e-16,
+  "seconds": 766.7765723750927
+}

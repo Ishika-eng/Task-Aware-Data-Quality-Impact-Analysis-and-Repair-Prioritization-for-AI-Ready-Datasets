@@ -1,0 +1,11 @@
+error_type,n_weight_combos,mean_rank,min_rank,max_rank,rank_1_pct,rank_stable,model
+label_errors,15,1.0,1,1,1.0,True,RF
+duplicates,15,2.066666666666667,2,3,0.0,True,RF
+outliers,15,2.933333333333333,2,3,0.0,True,RF
+missing_values,15,4.0,4,4,0.0,True,RF
+feature_corruption,15,5.0,5,5,0.0,True,RF
+label_errors,15,1.0,1,1,1.0,True,GB
+duplicates,15,2.0,2,2,0.0,True,GB
+outliers,15,3.0,3,3,0.0,True,GB
+feature_corruption,15,4.0,4,4,0.0,True,GB
+missing_values,15,5.0,5,5,0.0,True,GB

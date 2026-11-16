@@ -1,0 +1,6 @@
+check,cell,frozen,harness,abs_diff,tolerance,pass,informative_diffs
+phase7 dirty_f1,label_errors 10%,0.654795376444861,0.654795376444861,0.0,1e-09,True,
+phase7 dirty_f1,duplicates 5%,0.6790785736825496,0.6790785736825496,0.0,1e-09,True,
+phase7 dirty_f1,outliers 20%,0.6700669429391138,0.6700669429391138,0.0,1e-09,True,
+phase9 repaired_f1,feature_corruption 10%,0.6641025641025641,0.6641025641025641,0.0,1e-09,True,"{""clean_f1"": 0.0, ""dirty_f1"": 0.0, ""oracle_f1"": 0.0}"
+gb determinism,max_iter=100 lr=0.1,0.0,0.0,0.0,0.0,True,
