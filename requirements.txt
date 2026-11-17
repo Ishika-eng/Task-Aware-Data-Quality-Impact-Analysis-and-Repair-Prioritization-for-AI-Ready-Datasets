@@ -6,3 +6,5 @@ streamlit
 fastapi
 uvicorn
 python-multipart
+openpyxl
+pyarrow

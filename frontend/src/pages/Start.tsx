@@ -21,9 +21,9 @@ function Dropzone({ onFile, busy }: { onFile: (f: File) => void; busy: boolean }
       className={clsx("flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition", over ? "border-accent bg-accent-soft" : "border-line bg-surface")}
     >
       {busy ? <Loader2 className="h-8 w-8 animate-spin text-accent" /> : <UploadCloud className="h-8 w-8 text-accent" />}
-      <p className="mt-3 text-base font-semibold">{busy ? "Reading your file…" : "Drop a CSV, JSON or Parquet file here"}</p>
+      <p className="mt-3 text-base font-semibold">{busy ? "Reading your file…" : "Drop a CSV, Excel, JSON or Parquet file here"}</p>
       <p className="mt-1 text-sm text-muted">Tabular data with a classification or regression target. For CSV, encoding, delimiter and decimal comma are detected for you.</p>
-      <input ref={input} type="file" accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson,.parquet,.pq" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      <input ref={input} type="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm,.json,.jsonl,.ndjson,.parquet,.pq" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         <Button variant="primary" onClick={() => input.current?.click()} disabled={busy}>
           <FileSpreadsheet className="h-4 w-4" /> Choose a file
@@ -122,6 +122,7 @@ export function Start() {
   }, []);
   const upload = useMutation({ mutationFn: api.uploadDataset, onSuccess: load });
   const demo = useMutation({ mutationFn: api.demoDataset, onSuccess: load });
+  const sheet = useMutation({ mutationFn: (name: string) => api.pickSheet(ds!.id, name), onSuccess: load });
   const start = useMutation({ mutationFn: api.startAudit, onSuccess: (r) => setJobId(r.job_id) });
 
   const maxClasses = config.data?.max_classes ?? 20;
@@ -140,7 +141,7 @@ export function Start() {
   // follow the automatic suggestion until the user picks a task themselves
   const suggested = health.data?.suggested_task?.task;
   useEffect(() => { if (hasTarget && suggested && !taskTouched && suggested !== task) setTask(suggested); }, [suggested, hasTarget, taskTouched, task]);
-  const error = (upload.error ?? demo.error ?? start.error) as Error | null;
+  const error = (upload.error ?? demo.error ?? sheet.error ?? start.error) as Error | null;
 
   const run = () => ds && start.mutate({
     dataset_id: ds.id, target: hasTarget ? target : null, task, include_feature_anomalies: feat, include_joint_outliers: joint,
@@ -181,8 +182,17 @@ export function Start() {
   return (
     <Page
       title={ds.name}
-      subtitle={<>{int(ds.rows)} rows · {ds.n_columns} columns · {ds.input_format.format && ds.input_format.format !== "csv" ? `${ds.input_format.format.toUpperCase()} file` : `${ds.input_format.encoding}, “${ds.input_format.delimiter}” delimiter`}</>}
-      actions={<Button variant="ghost" onClick={() => { setDs(null); setJobId(null); }} disabled={start.isPending}>Choose another file</Button>}
+      subtitle={<>{int(ds.rows)} rows · {ds.n_columns} columns · {ds.input_format.format && ds.input_format.format !== "csv" ? `${ds.input_format.format.toUpperCase()} file${ds.input_format.sheet ? `, sheet “${ds.input_format.sheet}”` : ""}` : `${ds.input_format.encoding}, “${ds.input_format.delimiter}” delimiter`}</>}
+      actions={<>
+        {(ds.input_format.sheets?.length ?? 0) > 1 && (
+          <label className="flex items-center gap-2 text-sm"><span className="text-muted">Sheet</span>
+            <select value={ds.input_format.sheet} disabled={sheet.isPending || start.isPending} onChange={(e) => sheet.mutate(e.target.value)} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm">
+              {ds.input_format.sheets!.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
+        <Button variant="ghost" onClick={() => { setDs(null); setJobId(null); }} disabled={start.isPending}>Choose another file</Button>
+      </>}
     >
       {error && <Alert tone="bad" title="Something went wrong">{error.message}</Alert>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">

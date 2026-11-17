@@ -412,7 +412,7 @@ not correctness of the data (Amendment A2).
 
 ## Model panel and file formats (Phase 19, Stage U)
 
-Upload accepts **CSV, JSON, JSON Lines and Parquet**. After the audit, a background job trains **four model families**
+Upload accepts **CSV, Excel (.xlsx/.xlsm), JSON, JSON Lines and Parquet**. An Excel workbook with several sheets reads the first sheet that has data; a sheet picker on the Start page switches sheets without re-uploading (Phase 22). Legacy `.xls` is not supported and says so (save as .xlsx or CSV). Merged cells, formulas that Excel never calculated, and empty rows are reported as notes, not silently changed. After the audit, a background job trains **four model families**
 (logistic regression, random forest, gradient boosting, a small neural net) on your raw rows and on the repaired rows (default
 file, aggressive file, each repair alone) with the same split and seed, and scores them on the same untouched held-out rows.
 Repairs are fitted on the training rows only. Each change is read against a measured noise floor and labelled improved, worse or
@@ -505,6 +505,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 19 | `python3 test_phase19.py` | file intake (CSV/JSON/Parquet) and the four-model panel (Stage U; Stage S not run) |
 | 20 | `python3 test_phase20.py` (run: `python3 controlled_proof.py`) | controlled proof on a clean held-out set: tuned-selection leakage, summary logic, saved result endpoint |
 | 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
+| 22 | `python3 test_phase22.py` | Excel intake: round trip, sheets, layout, robustness, upload equals the same CSV ([spec](docs/PHASE22_SPEC.md)) |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.

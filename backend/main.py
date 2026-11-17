@@ -128,7 +128,8 @@ def store_dataset(df: pd.DataFrame, info: dict, name: str, demo: bool = False, r
         traceback.print_exc()
         error = f"{type(e).__name__}: {e}"
     DATASETS[dataset_id] = {"df": df, "info": info, "name": name, "demo": demo, "snapshot": snapshot,
-                            "snapshot_error": error}
+                            "snapshot_error": error,
+                            "raw": raw if info.get("format") == "xlsx" else None}     # kept so another sheet can be read
     return dataset_id
 
 
@@ -157,6 +158,23 @@ async def upload_dataset(file: UploadFile = File(...)):
     except Exception as e:                      # a malformed file is user input, not a server bug
         raise HTTPException(400, f"Could not read that file ({', '.join(SUPPORTED)} are supported): {e}")
     return dataset_payload(store_dataset(df, info, name, raw=raw))
+
+
+class SheetRequest(BaseModel):
+    sheet: str
+
+
+@app.post("/api/datasets/{dataset_id}/sheet")
+def pick_sheet(dataset_id: str, req: SheetRequest):
+    """Read another sheet of an uploaded workbook. It becomes a new dataset with its own baseline health report."""
+    ds = get_dataset(dataset_id)
+    if not ds.get("raw"):
+        raise HTTPException(400, "this dataset is not an Excel workbook")
+    try:
+        df, info = load_table(ds["raw"], ds["name"], sheet=req.sheet)
+    except Exception as e:                      # noqa: BLE001
+        raise HTTPException(400, str(e))
+    return dataset_payload(store_dataset(df, info, ds["name"], raw=ds["raw"]))
 
 
 @app.post("/api/datasets/demo")

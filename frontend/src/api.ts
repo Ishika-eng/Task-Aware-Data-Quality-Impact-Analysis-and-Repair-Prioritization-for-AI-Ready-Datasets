@@ -14,7 +14,7 @@ export interface DatasetInfo {
   name: string;
   rows: number;
   n_columns: number;
-  input_format: { format?: string; encoding?: string; delimiter?: string; decimal?: string; rows: number; columns: number };
+  input_format: { format?: string; encoding?: string; delimiter?: string; decimal?: string; sheet?: string; sheets?: string[]; rows: number; columns: number };
   columns: ColumnInfo[];
   suggested_target: string | null;
   preview: Record<string, unknown>[];
@@ -472,6 +472,7 @@ export const api = {
   datasetHealth: (id: string, target: string | null, task: Task = "classification") =>
     fetch(`/api/datasets/${id}/health${target ? `?target=${encodeURIComponent(target)}&task=${task}` : ""}`).then((r) =>
       parse<{ snapshot: HealthSnapshot; target: TargetProfile | null; suggested_task?: { task: Task; reason: string } }>(r)),
+  pickSheet: (id: string, sheet: string) => fetch(`/api/datasets/${id}/sheet`, json({ sheet })).then((r) => parse<DatasetInfo>(r)),
   demoDataset: () => fetch("/api/datasets/demo", { method: "POST" }).then((r) => parse<DatasetInfo>(r)),
   startAudit: (req: AuditRequest) => fetch("/api/audits", json(req)).then((r) => parse<{ job_id: string }>(r)),
   job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => parse<Job>(r)),
