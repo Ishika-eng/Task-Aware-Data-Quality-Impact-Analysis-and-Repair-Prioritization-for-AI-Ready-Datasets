@@ -417,6 +417,34 @@ The `*_full.csv` files in `results/` are the authoritative 5-seed results; `*_si
 
 ## Project structure
 
+## Why does KNN imputation hurt gradient boosting? (Phase 17)
+
+Phase 16 found that the missing-values repair lowers gradient-boosting F1 by about 0.02 *below* leaving the cells blank
+(the shared pipeline already median-fills them). Phase 17 (`docs/PHASE17_SPEC.md`, written before any code) isolates
+where. Every arm shares one corruption draw and one KNN run and changes only which blanked cells get KNN values.
+
+| Result (Adult, GB, positive-class F1 vs leaving cells blank) | 10% | 20% |
+|---|---|---|
+| frozen repair (KNN on all six numeric columns) | -0.0178 | -0.0212 |
+| KNN on four columns, median for capital-gain/capital-loss | -0.0032 | +0.0002 |
+| KNN on capital-gain/capital-loss only | -0.0180 | -0.0202 |
+
+- **Located:** the harm sits in the two zero-inflated columns. KNN fills those cells exactly right 49% of the time (the
+  median: 92%), is twice as far off on average, is biased high, and half its values exist nowhere in the data.
+  KNN is a worse point estimate than the median on every numeric column; it matters to the model only in these two.
+- **Not caused by:** model capacity (a shallow booster keeps most of the harm, K4 failed) or, mostly, rounding of integer
+  columns (K3: small, mixed). The Random Forest is not clearly hurt (within noise).
+- **Not shown:** which property of the imputed values makes the booster react; and that it travels: on Bank Marketing the
+  harm was below that dataset's noise floor, so the test was **not evaluable**.
+- **The fix (shipped).** Numeric columns whose most common value covers at least half the observed cells (here capital-gain
+  and capital-loss) are now imputed with the median instead of KNN; other columns still use KNN. This departs from the
+  pre-registered rule (which required the Bank test to pass) at the user's request, and is recorded as amendment A3 in
+  the spec. Validated on the real product code path: the Adult harm falls from -0.0145 / -0.0195 to -0.0034 / -0.0014
+  (10% / 20%; the 10% result clears its 75%-removed bar narrowly, at 76%). On Bank it is neutral within noise. It is
+  diagnosed and validated on Adult only.
+
+Run: `.venv/bin/python src/phase17_knn.py --stage a|b|c|d` (about 13, 5, 5 and 11 minutes); tests: `src/test_phase17.py`.
+
 ```
 app.py                         Streamlit front end
 src/
@@ -437,6 +465,7 @@ src/
   training_log.py              provenance log of every model fit
   make_demo_dataset.py         builds data/demo_dirty_adult.csv
   errors.py train.py impact.py repair.py readiness.py pipeline.py
+| 17 | `python3 phase17_knn.py --stage a`, `b`, `c`, `d`; `python3 test_phase17.py` | why KNN imputation hurts gradient boosting, and the fix |
                                superseded v1 prototype (breast-cancer data); not used by the current pipeline
 data/                          Adult (original + clean) and the demo dataset with its corruption log
 results/                       raw and summary CSVs for every experiment
@@ -481,8 +510,9 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 
 - Logistic Regression validation of the Random Forest findings (the Phase 16 harness takes any model, so this needs
   only its own pre-registration).
-- Wiring the on-your-data calibration to a second model; the missing-values-hurts-gradient-boosting finding, whose
-  cause was not tested. (The Phase 14 inconsistency result under gradient boosting is measured and shown in the product
+- Wiring the on-your-data calibration to a second model; *why* gradient boosting reacts to KNN-imputed capital values
+  (Phase 17 located it and the product now avoids it; it did not isolate which property of the imputed values the booster
+  reacts to, and Bank was too noisy to test whether the finding travels). (The Phase 14 inconsistency result under gradient boosting is measured and shown in the product
   as "model-dependent": injected inconsistencies cost the forest about 0.01 F1 and gradient boosting nothing, status
   `weak` against `negative`, so the repair stays in review.)
 - More than one extra dataset; Logistic Regression is likewise untested.

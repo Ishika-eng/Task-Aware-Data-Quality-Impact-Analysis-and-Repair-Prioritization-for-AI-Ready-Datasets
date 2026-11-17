@@ -259,9 +259,10 @@ Five pass and five fail. G4 passes at exactly its threshold, so it should not be
   (recovery -0.014 to -0.019 against -0.005 to -0.008).
 * The missing-values repair (KNN imputation) is harmful under GB at 10% and 20% (-0.018, -0.021 positive-F1;
   ROC-AUC also falls, -0.008 and -0.010) although it touches exactly the right cells (precision 1.0) and the oracle
-  recovers about 0. Under RF it is near zero. This was not predicted. The cause was not tested; a candidate
+  recovers about 0. Under RF it is near zero. This was not predicted. The cause was not tested here; a candidate
   explanation is that GB responds differently to the imputed values than to the median fill the pipeline already
-  applies.
+  applies. (Followed up afterwards in `docs/PHASE17_SPEC.md`: the harm is localised to the capital-gain and capital-loss
+  columns on Adult.)
 * Duplicate removal: the repaired model is the same in every seed, so recovery varies only with the dirty model,
   which moves by about 0.003-0.006 with the corruption draw. The gate counts any negative seed as risk, so 5% and 20%
   fail. With the noise-aware material risk, 10% and 20% would pass and 5% would still fail by a hair (-0.0031 against

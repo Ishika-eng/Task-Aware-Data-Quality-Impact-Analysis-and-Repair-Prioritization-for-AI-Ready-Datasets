@@ -274,7 +274,7 @@ Detect blind, repair only what the detector is confident about, leave the rest f
   threshold decides what is auto-repaired (label confidence 0.97 vs 0.90; outlier k = 3.0 vs 1.5; feature categorical
   0.01 vs 0.05; feature numeric z 6.0 vs 4.0).
 
-Repair method per type: duplicates, drop; missing, KNN imputation (k = 5, on standardised numeric columns) and the mode for
+Repair method per type: duplicates, drop; missing, KNN imputation (k = 5, on standardised numeric columns; the median for columns where one value covers at least half the cells) and the mode for
 categoricals; outliers, clip to the IQR fence; labels, set to the out-of-fold prediction; features, replace with the
 cross-feature model's prediction.
 
@@ -470,6 +470,27 @@ Source: `docs/PHASE16_SPEC.md` (pre-registered, with Results and two visible ame
   under GB and `negative` under the forest; the stricter status keeps it in review, so nothing changes for the user. The product labels it "model-dependent".
 
 ---
+
+## 7c. Why does KNN imputation hurt gradient boosting? (Phase 17)
+
+- **Question.** Phase 16 found the missing-values repair lowers GB F1 by ~0.02 below doing nothing, and recorded the cause
+  as untested. Phase 17 tests it with one-variable arms sharing a corruption draw (`docs/PHASE17_SPEC.md`).
+- **Answer for Adult.** The harm is in capital-gain and capital-loss (zero in 92% and 95% of rows). Using the median for
+  just those two columns removes 82-101% of it; KNN on just those two keeps 95-101%. KNN fills those cells exactly
+  right 49% of the time against 92% for the median, and half the values it writes exist nowhere in the data.
+- **What it does not show.** Why the booster reacts (false thresholds vs the upward bias was not separated). Whether it
+  travels: Bank Marketing harm (0.009, 0.006 macro-F1) is below Bank's noise floor (0.010), so the out-of-sample test K6
+  was **not evaluable**, and a post-hoc positive-F1 look there does not support the guard. So the diagnosis is
+  Adult-specific.
+- **The fix.** The product now imputes numeric columns dominated by one value (at least 50% of observed cells: here
+  capital-gain and capital-loss) with the median instead of KNN. Per the pre-registered rule it should not have changed
+  (the Bank test was not evaluable); it was changed at the user's request and recorded as amendment A3. Validated on the
+  real code path on Adult: harm -0.0145 -> -0.0034 (10%, 76% removed, a narrow pass of the 75% bar) and -0.0195 -> -0.0014
+  (20%); neutral within noise on Bank. It is no longer harmful; it is not shown to be helpful.
+- **Side finding.** KNN is a worse point estimate than the median on every Adult numeric column; the Phase 9 comment
+  calling it "more informed" does not hold there.
+- **Scorecard.** K0, K1, K2, K5 pass; K3 not rejected (mixed, small); K4 fails (capacity is not the explanation); K6 not
+  evaluable. P4 was wrong by the rule.
 
 ## 8. Honest limits (list these yourself)
 

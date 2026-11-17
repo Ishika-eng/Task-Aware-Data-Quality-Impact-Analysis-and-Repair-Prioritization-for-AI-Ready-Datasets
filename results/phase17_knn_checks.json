@@ -1,0 +1,13 @@
+{
+ "pass": true,
+ "K0a_frame_equal": true,
+ "K0d_guard_selects_capital": true,
+ "K0bc_scores_equal": true,
+ "n_cells": 15,
+ "score_max_abs_diff": {
+  "dirty_vs_phase16": 0.0,
+  "knn_all_vs_phase16": 0.0,
+  "median_explicit_vs_dirty": 0.0
+ },
+ "max_numeric_frame_diff": 0.0
+}

@@ -1,0 +1,55 @@
+{
+ "K0_bank": {
+  "pass": true,
+  "K0a_frame_equal": true,
+  "K0d_guard_selects_capital": true,
+  "K0bc_scores_equal": true,
+  "n_cells": 15,
+  "score_max_abs_diff": {
+   "dirty_vs_phase16": 0.0,
+   "knn_all_vs_phase16": 0.0,
+   "median_explicit_vs_dirty": 0.0
+  },
+  "max_numeric_frame_diff": 0.0,
+  "guard_columns_seen": [
+   [
+    "V14",
+    "V15"
+   ]
+  ]
+ },
+ "K6": {
+  "verdict": "not evaluable",
+  "knn_all_harm": {
+   "0.1": 0.008972915415631366,
+   "0.2": 0.005851282243755462
+  },
+  "noise_floor": 0.010093852384794447,
+  "evaluable_rates": []
+ },
+ "K6_positive_f1_report": {
+  "verdict": "fail",
+  "knn_all_harm": {
+   "0.1": 0.017206053616564722,
+   "0.2": 0.013169206505871634
+  },
+  "noise_floor": 0.010093852384794447,
+  "evaluable_rates": [
+   0.1,
+   0.2
+  ],
+  "removed_by_guard": {
+   "0.1": 0.18153385909428815,
+   "0.2": -0.4281739178902257
+  }
+ },
+ "K6_auc_report": {
+  "verdict": "not evaluable",
+  "knn_all_harm": {
+   "0.1": -0.0006684636118598819,
+   "0.2": -0.006770889487870635
+  },
+  "noise_floor": 0.010093852384794447,
+  "evaluable_rates": []
+ }
+}

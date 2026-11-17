@@ -106,6 +106,7 @@ MAX_CERTIFIABLE_NOISE_FLOOR = 0.01
 # values, duplicates and inconsistency.
 MAX_CAT_LEVELS = 50
 MAX_CLASSES = 20            # classification only; more distinct targets looks like regression/IDs
+POINT_MASS_SHARE = 0.5     # Phase 17: a numeric column whose most frequent value covers >= this share is imputed with the median, not KNN
 KNN_MAX_ROWS = 40_000       # above this, numeric imputation falls back to the median (KNN is O(n^2))
 # Never applied automatically, whatever the measured evidence says: label repair rewrites the target, and the
 # benchmark injects RANDOM noise whereas real label errors are usually structured, so a measured precision
@@ -344,11 +345,27 @@ def _records(issue, rows, column, original, proposed, method, tier, score) -> pd
     })
 
 
-def _propose_missing(X, integer_like, cell_mask, original: pd.DataFrame) -> list[pd.DataFrame]:
+def _point_mass_columns(X: pd.DataFrame, columns, share: float = POINT_MASS_SHARE) -> list[str]:
+    """Numeric columns whose most frequent observed value covers at least `share` of the observed cells (for example
+    capital-gain, 0 in 92% of Adult rows). A KNN average of such a column invents in-between values that appear nowhere
+    in the data; Phase 17 found that this, in capital-gain and capital-loss, is where the gradient-boosting harm of the
+    KNN repair sits. For these columns the median (which equals that dominant value) is used instead."""
+    out = []
+    for c in columns:
+        obs = X[c].dropna()
+        if len(obs) and obs.value_counts(normalize=True).iloc[0] >= share:
+            out.append(c)
+    return out
+
+
+def _propose_missing(X, integer_like, cell_mask, original: pd.DataFrame,
+                     point_mass_share: float = POINT_MASS_SHARE) -> list[pd.DataFrame]:
     frames = []
     num_cols = [c for c in X.columns if pd.api.types.is_numeric_dtype(X[c])]
     miss_num = [c for c in num_cols if cell_mask[c].any()]
     if miss_num:
+        point_mass = set(_point_mass_columns(X, num_cols, point_mass_share))
+        median = X[num_cols].median()
         if len(X) <= KNN_MAX_ROWS and len(num_cols) >= 2:
             # Standardise first so KNN distance isn't dominated by large-scale
             # columns (same approach as the Phase 9 evaluation).
@@ -359,15 +376,20 @@ def _propose_missing(X, integer_like, cell_mask, original: pd.DataFrame) -> list
                                    index=X.index, columns=num_cols) * stds + means
             method = "KNN imputation (k=5, standardised numeric columns)"
         else:
-            imputed = X[num_cols].fillna(X[num_cols].median())
+            imputed = X[num_cols].fillna(median)
             method = "median imputation" + (" (KNN skipped: dataset too large)" if len(X) > KNN_MAX_ROWS else "")
         for c in miss_num:
             rows = X.index[cell_mask[c]]
-            vals = imputed.loc[rows, c]
+            if c in point_mass:
+                vals = pd.Series(median[c], index=rows)
+                col_method = (f"median imputation (the most common value covers at least {point_mass_share:.0%} of this "
+                              "column, so a KNN average would invent values that do not occur)")
+            else:
+                vals, col_method = imputed.loc[rows, c], method
             if integer_like.get(c):
                 vals = vals.round()
             frames.append(_records("missing_values", rows, c, original.loc[rows, c].values, vals.values,
-                                   method, "exact", np.nan))
+                                   col_method, "exact", np.nan))
     for c in [c for c in X.columns if c not in num_cols and cell_mask[c].any()]:
         mode = X[c].mode(dropna=True)
         if len(mode) == 0:

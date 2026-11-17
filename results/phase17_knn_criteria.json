@@ -1,0 +1,72 @@
+{
+ "K0": {
+  "pass": true,
+  "K0a_frame_equal": true,
+  "K0d_guard_selects_capital": true,
+  "K0bc_scores_equal": true,
+  "n_cells": 15,
+  "score_max_abs_diff": {
+   "dirty_vs_phase16": 0.0,
+   "knn_all_vs_phase16": 0.0,
+   "median_explicit_vs_dirty": 0.0
+  },
+  "max_numeric_frame_diff": 0.0
+ },
+ "K1": {
+  "verdict": "pass",
+  "removed_by_no_capital": {
+   "0.1": 0.8181081114828378,
+   "0.2": 1.0095990230490304
+  },
+  "kept_by_capital_only": {
+   "0.1": 1.006078751882983,
+   "0.2": 0.9509113238805077
+  }
+ },
+ "K2": {
+  "pass": true,
+  "largest": {
+   "0.1": "capital-gain",
+   "0.2": "capital-gain"
+  },
+  "harms": {
+   "0.1": {
+    "age": -0.0011320096098994,
+    "fnlwgt": 0.0043173167073405,
+    "education-num": 0.0014539760739924,
+    "capital-gain": 0.0129846300616373,
+    "capital-loss": 0.0057818957795986,
+    "hours-per-week": 0.0032525966098984
+   },
+   "0.2": {
+    "age": 0.0008215169297148,
+    "fnlwgt": 0.0003565309635366,
+    "education-num": -0.002370074856523,
+    "capital-gain": 0.0133024991466432,
+    "capital-loss": 0.0020886843903446,
+    "hours-per-week": 0.0017063291349992
+   }
+  }
+ },
+ "K3": {
+  "H2_rejected": false,
+  "abs_difference": {
+   "0.1": 0.003366496645396299,
+   "0.2": 0.0017483618653252007
+  }
+ },
+ "K5": {
+  "verdict": "pass",
+  "removed": {
+   "0.1": 0.8181081114828378,
+   "0.2": 1.0095990230490304
+  }
+ },
+ "K4": {
+  "verdict": "fail",
+  "shallow_over_deep": {
+   "0.1": 0.6154056821757055,
+   "0.2": 0.9148233485421907
+  }
+ }
+}
