@@ -495,6 +495,7 @@ def _nearest_evidence_row(ev: pd.DataFrame, issue: str, observed_rate: float):
 # same repair cells were re-measured with gradient boosting. Dataset-calibrated evidence (selfbench) is Random Forest only.
 GB_EVIDENCE_FILE = "phase16_gb_evidence_table.csv"
 GB_DAMAGE_FILE = "phase16_gb_damage_summary.csv"
+GB_INCONSISTENCY_FILE = "phase16_gb_inconsistency_summary.csv"   # Stage 7: the Phase 14 repair re-measured under GB
 ADULT_PROPOSAL_ONLY = {"duplicates"}       # Phase 16 G5 failed: duplicate removal is proposed, not auto-applied, on Adult evidence
 GB_RATIO_RANGE = (0.5, 2.0)                # Phase 16 G3: damage ratios outside this range are called out
 MODEL_CHECK_NOT_TESTED = "not tested"
@@ -504,6 +505,8 @@ IS_ADULT_SOURCE = lambda source: str(source).startswith("UCI Adult")     # noqa:
 def _gb_check(issue: str, observed_rate: float) -> dict | None:
     """The gradient-boosting re-measurement of the Adult repair evidence at the nearest evaluated rate, or None when it
     was not measured (no file, or an issue Phase 16 did not cover)."""
+    if issue in PHASE14_ISSUES:
+        return _gb_check_phase14(issue, observed_rate)
     path = os.path.join(RESULTS_DIR, GB_EVIDENCE_FILE)
     if not os.path.exists(path):
         return None
@@ -513,6 +516,28 @@ def _gb_check(issue: str, observed_rate: float) -> dict | None:
     return {"rate": float(row["rate"]), "rf_status": row["rf_status"], "gb_status": row["repairability_status"],
             "agree": bool(row["rf_status"] == row["repairability_status"]), "effective_status": row["effective_status"],
             "gb_safe": bool(row["gb_safe_auto"]), "gb_risk": float(row["risk"]), "rf_risk": float(row["rf_risk"])}
+
+
+def _gb_check_phase14(issue: str, observed_rate: float) -> dict | None:
+    """Stage 7 (report only): the Phase 14 inconsistency repair under gradient boosting. The summary has no stricter-status
+    column, so it is derived here with the same rule as Phase 16 (negative if either is negative)."""
+    gb_path = os.path.join(RESULTS_DIR, GB_INCONSISTENCY_FILE)
+    rf_path = os.path.join(RESULTS_DIR, "phase14_evidence_table.csv")
+    if not (os.path.exists(gb_path) and os.path.exists(rf_path)):
+        return None
+    row = _nearest_evidence_row(pd.read_csv(gb_path).assign(error_type=issue), issue, observed_rate)
+    rf = _nearest_evidence_row(pd.read_csv(rf_path), issue, float(row["rate"])) if row is not None else None
+    if row is None or rf is None:
+        return None
+    rf_status, gb_status = row["rf_status"], row["repairability_status"]
+    effective = "negative" if "negative" in (rf_status, gb_status) else (
+        "positive" if rf_status == gb_status == "positive" else "weak")
+    gb_risk = float(row["risk"])
+    return {"rate": float(row["rate"]), "rf_status": rf_status, "gb_status": gb_status,
+            "agree": bool(rf_status == gb_status), "effective_status": effective,
+            "gb_safe": bool(gb_risk <= 1e-9 and float(row["repair_precision"]) >= SAFE_REPAIR_MIN_PRECISION
+                            and gb_status != "negative"),
+            "gb_risk": gb_risk, "rf_risk": float(rf["risk"])}
 
 
 def _gb_damage_note(issue: str, observed_rate: float) -> str:
@@ -533,6 +558,19 @@ def _gb_damage_note(issue: str, observed_rate: float) -> str:
     return (base + f"Gradient boosting gave {ratio:.2f}x the damage, outside {lo}-{hi}x: the SIZE of this impact is "
             "model-specific; the ordering of issues held under both models.")
 
+
+
+def _gb_phase14_damage_note(issue: str, observed_rate: float) -> str:
+    """Model label for the Phase 14 impact estimate (Stage 7): under gradient boosting the damage was about zero."""
+    base = "Measured with a Random Forest on UCI Adult. "
+    path = os.path.join(RESULTS_DIR, GB_INCONSISTENCY_FILE)
+    if not os.path.exists(path):
+        return base + "Not tested under gradient boosting."
+    row = _nearest_evidence_row(pd.read_csv(path).assign(error_type=issue), issue, observed_rate)
+    if row is None:
+        return base + "Not tested under gradient boosting."
+    return (base + f"Gradient boosting showed {float(row['mean_damage_posf1']):+.3f} damage where the Random Forest "
+            f"showed {float(row['rf_mean_damage']):.3f}: the SIZE of this impact is model-specific.")
 
 
 def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | None:
@@ -564,7 +602,7 @@ def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | No
             if not IS_ADULT_SOURCE(source):
                 check_detail = "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting."
             else:
-                gb = _gb_check(issue, float(row["rate"])) if issue not in PHASE14_ISSUES else None
+                gb = _gb_check(issue, float(row["rate"]))
                 if gb is None:
                     check_detail = "Not tested under gradient boosting."
                 else:
@@ -1126,7 +1164,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
         else:
             if issue in PHASE14_ISSUES:
                 est, boundary = _phase14_impact(issue, p.detected_rate)
-                model_note = "Measured with a Random Forest on UCI Adult. Not tested under gradient boosting."
+                model_note = _gb_phase14_damage_note(issue, p.detected_rate)
             else:
                 est, boundary = _estimate_impact(issue, p.detected_rate)
                 model_note = _gb_damage_note(issue, p.detected_rate)

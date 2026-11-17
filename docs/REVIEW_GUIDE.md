@@ -465,7 +465,9 @@ Source: `docs/PHASE16_SPEC.md` (pre-registered, with Results and two visible ame
   (opposite of Adult), so the size of the damage is dataset-and-model specific. G5's failure is partly a property of the
   strict risk definition on a model with no training noise, not evidence that removal harms. GB's smaller Adult damage may
   reflect its higher clean accuracy (untested). Two amendments were made after the results (G3 wording, G9 premise) and are
-  recorded as such. Logistic Regression and Phase 14 under GB were not done.
+  recorded as such. Logistic Regression was not done. Phase 14 (inconsistency repair) was run under GB afterwards and
+  is report-only: injected inconsistencies cost the forest about 0.01 F1 and gradient boosting nothing, so the repair is `weak`
+  under GB and `negative` under the forest; the stricter status keeps it in review, so nothing changes for the user. The product labels it "model-dependent".
 
 ---
 

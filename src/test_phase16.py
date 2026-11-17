@@ -437,6 +437,22 @@ def test_stage6_refuses_without_config():
         g.CONFIG_PATH = old
 
 
+def test_inconsistency_summary_arithmetic_and_status():
+    runs = pd.DataFrame([{"rate": 0.1, "seed": s, "damage_posf1": 0.01, "recovery_posf1": r, "recovery_auc": 0.001,
+                          "recovery_macrof1": 0.0, "repair_precision": 1.0, "repair_recall": 0.6}
+                         for s, r in zip(range(5), [-0.004, -0.005, -0.006, -0.004, -0.002])])
+    out = g.inconsistency_summary(runs, 0.003).iloc[0]
+    assert abs(out.mean_recovery_posf1 + 0.0042) < 1e-12 and out.sign_agreement == 1.0
+    assert out.repairability_status == "negative" and out.n_neg_seeds == 5 and abs(out.risk - 0.0042) < 1e-12
+    runs["recovery_posf1"] = [0.004, 0.005, 0.006, 0.004, 0.002]
+    assert g.inconsistency_summary(runs, 0.003).iloc[0].repairability_status == "positive"
+    runs["recovery_posf1"] = [0.004, -0.005, 0.006, -0.004, 0.002]
+    assert g.inconsistency_summary(runs, 0.003).iloc[0].repairability_status == "weak"
+    frozen = pd.read_csv(os.path.join(g.RESULTS_DIR, "phase14_evidence_table.csv"))
+    merged = g.inconsistency_summary(runs.assign(rate=0.05), 0.003, frozen)
+    assert merged.rf_status.iloc[0] == "negative" and "status_agrees" in merged
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

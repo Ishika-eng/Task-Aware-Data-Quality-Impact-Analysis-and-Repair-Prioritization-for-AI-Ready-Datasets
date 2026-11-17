@@ -16,7 +16,8 @@ Writes only results/phase16_*. It never touches results/training_log.csv or any 
     .venv/bin/python src/phase16_gb.py --stage 4     repair: dirty / repaired / oracle, status, risk, evidence table (G4-G6)
     .venv/bin/python src/phase16_gb.py --stage 5     priority ranking on the GB evidence table (G7); seconds, no model fits
     .venv/bin/python src/phase16_gb.py --stage 6     Bank Marketing replication of the Phase 13 ground-truth protocol (G9)
-Stage 7 is not built yet. Every stage after 1 refuses to run without results/phase16_gb_config.json.
+    .venv/bin/python src/phase16_gb.py --stage 7     Phase 14 inconsistency repair re-measured under GB (report only, no criterion)
+Every stage after 1 refuses to run without results/phase16_gb_config.json.
 """
 
 from __future__ import annotations
@@ -325,7 +326,8 @@ PATHS = {k: os.path.join(RESULTS_DIR, f"phase16_gb_{k}") for k in
           "repair_raw.csv", "repair_summary.csv", "evidence_table.csv",
           "priority_headline.csv", "priority_combos.csv", "priority_sensitivity.csv",
           "bank_runs.csv", "bank_meta.json", "bank_harness_check.csv", "bank_evidence_posf1.csv",
-          "bank_evidence_macrof1.csv", "bank_evidence_auc.csv")}
+          "bank_evidence_macrof1.csv", "bank_evidence_auc.csv",
+          "inconsistency.csv", "inconsistency_summary.csv", "inconsistency_harness_check.csv")}
 SAFE_MIN_PRECISION = 0.95                           # taskclean.SAFE_REPAIR_MIN_PRECISION (the product's gate)
 SAFE_MAX_RISK = 1e-9
 
@@ -880,6 +882,107 @@ def stage6() -> pd.DataFrame:
     return runs
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# Stage 7: Phase 14 (inconsistent-value repair) under GB. Report only: the spec attaches no criterion to it.
+# ---------------------------------------------------------------------------------------------------------------
+def inconsistency_summary(runs: pd.DataFrame, floor: float, frozen_evidence: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Per rate: GB damage and recovery (positive-F1 and ROC-AUC), Phase 10's status rule at the GB floor, risk."""
+    rows = []
+    for rate, g in runs.groupby("rate"):
+        rec = g["recovery_posf1"].to_numpy(dtype=float)
+        p_harm, magnitude, risk = harm_risk(rec)
+        rows.append({"rate": float(rate), "mean_damage_posf1": g["damage_posf1"].mean(),
+                     "mean_recovery_posf1": rec.mean(), "mean_recovery_auc": g["recovery_auc"].mean(),
+                     "mean_recovery_macrof1": g["recovery_macrof1"].mean(),
+                     "sign_agreement": max((rec > 0).sum(), (rec < 0).sum()) / len(rec),
+                     "n_pos_seeds": int((rec > 0).sum()), "n_neg_seeds": int((rec < 0).sum()),
+                     "repairability_status": classify_repairability(rec, floor), "risk": risk, "noise_floor": floor,
+                     "repair_precision": g["repair_precision"].mean(), "repair_recall": g["repair_recall"].mean()})
+    out = pd.DataFrame(rows).sort_values("rate").reset_index(drop=True)
+    if frozen_evidence is not None:
+        rf = frozen_evidence[frozen_evidence.error_type == "inconsistency"].rename(
+            columns={"mean_damage": "rf_mean_damage", "mean_recovery": "rf_mean_recovery",
+                     "repairability_status": "rf_status"})
+        out = out.merge(rf[["rate", "rf_mean_damage", "rf_mean_recovery", "rf_status"]], on="rate", how="left")
+        out["status_agrees"] = out.repairability_status == out.rf_status
+    return out
+
+
+def stage7() -> pd.DataFrame:
+    config = require_config()
+    p = selected_params(config)
+    if not os.path.exists(PATHS["noise.json"]):
+        raise SystemExit("run --stage 2 first: the GB noise floor comes from its null experiment")
+    floor = float(json.load(open(PATHS["noise.json"]))["posf1"]["noise_floor"])
+    import phase14_validation as p14
+    from phase14_injectors import inject_inconsistency
+    from taskclean import _apply, audit_dataset
+    t0 = time.monotonic()
+    X_tr, X_te, y_tr, y_te = p14.load_split()                 # Phase 14's own split and object-typed frames
+    factory = gb_factory(p)
+    base = {s: scores(factory(X_tr, s).fit(X_tr, y_tr), X_te, y_te) for s in SEEDS}
+    rf_base = p14.fit_scores(X_tr, y_tr, X_te, y_te, SEEDS[0])
+    frozen = pd.read_csv(os.path.join(RESULTS_DIR, "phase14_inconsistency_runs.csv"))
+    print(f"Stage 7: Phase 14 inconsistency repair, GB {p}, {len(RATES)} rates x {len(SEEDS)} seeds, floor {floor}")
+
+    rows, check = [], []
+    for rate in RATES:
+        for seed in SEEDS:
+            tc = time.monotonic()
+            X_d, y_d, inj = inject_inconsistency(X_tr, y_tr, rate=rate, seed=seed)        # Phase 14's calls, unchanged
+            pos = X_d.index.get_indexer(inj.row_id)
+            injected = {(int(q), c) for q, c in zip(pos, inj.column)}
+            d = X_d.reset_index(drop=True)
+            d[p14.TARGET] = y_d.values
+            st = audit_dataset(d, p14.TARGET, detectors={"inconsistency"}, seed=seed)
+            cleaned, rlog = _apply(st, {"inconsistency"}, [])
+            applied = rlog[rlog.action == "applied"]
+            applied_set = {(int(r), c) for r, c in zip(applied.row_id, applied["column"])}
+            clean_orig = {(q, c): X_tr.iat[q, X_tr.columns.get_loc(c)] for q, c in applied_set | injected}
+            correct = {(q, c) for q, c in applied_set if cleaned.at[q, c] == clean_orig[(q, c)]}
+            X_rep = p14.obj_frame(cleaned.drop(columns=p14.TARGET))
+            X_rep.index = X_d.index
+            dirty = scores(factory(X_d, seed).fit(X_d, y_d), X_te, y_te)
+            rep = scores(factory(X_rep, seed).fit(X_rep, y_d), X_te, y_te)
+            row = {"rate": rate, "seed": seed, "n_injected": len(injected), "n_applied": len(applied_set),
+                   "n_applied_correct": len(correct),
+                   "repair_precision": len(correct) / len(applied_set) if applied_set else 1.0,
+                   "repair_recall": len(correct & injected) / len(injected) if injected else float("nan")}
+            for m in METRICS:
+                row.update({f"base_{m}": base[seed][m], f"dirty_{m}": dirty[m], f"repaired_{m}": rep[m],
+                            f"damage_{m}": base[seed][m] - dirty[m], f"recovery_{m}": rep[m] - dirty[m]})
+            rows.append(row)
+            if seed == SEEDS[0]:                               # harness check: frozen RF scorer on the same frames
+                fr = frozen[(frozen.rate == rate) & (frozen.seed == seed)].iloc[0]
+                rf_d, rf_r = p14.fit_scores(X_d, y_d, X_te, y_te, seed), p14.fit_scores(X_rep, y_d, X_te, y_te, seed)
+                for name, val, ref in (("dirty_f1", rf_d["f1"], fr.dirty_f1), ("repaired_f1", rf_r["f1"], fr.repaired_f1),
+                                       ("baseline_f1", rf_base["f1"], fr.baseline_f1),
+                                       ("n_applied", float(len(applied_set)), float(fr.n_applied)),
+                                       ("n_applied_correct", float(len(correct)), float(fr.n_applied_correct))):
+                    check.append({"rate": rate, "seed": seed, "quantity": name, "reproduced": float(val),
+                                  "frozen": float(ref), "abs_diff": abs(float(val) - float(ref))})
+            print(f"  rate {rate:4.0%} seed {seed}: {time.monotonic() - tc:5.1f}s | damage {row['damage_posf1']:+.4f} "
+                  f"recovery {row['recovery_posf1']:+.4f} (AUC {row['recovery_auc']:+.4f}) | repair P/R "
+                  f"{row['repair_precision']:.3f}/{row['repair_recall']:.3f}", flush=True)
+    runs = pd.DataFrame(rows)
+    runs.to_csv(PATHS["inconsistency.csv"], index=False)
+    chk = pd.DataFrame(check)
+    chk["pass"] = chk.abs_diff <= G0_TOLERANCE
+    chk.to_csv(PATHS["inconsistency_harness_check.csv"], index=False)
+    ok = bool(chk["pass"].all())
+    print(f"\nHarness check (frozen RF scorer and counts vs frozen Phase 14, seed {SEEDS[0]}): {int(chk['pass'].sum())}/{len(chk)} "
+          f"within {G0_TOLERANCE:g}, max diff {chk.abs_diff.max():.2e} -> {'PASS' if ok else 'FAIL: results below are not reported'}")
+    if not ok:
+        return runs
+    summ = inconsistency_summary(runs, floor, pd.read_csv(os.path.join(RESULTS_DIR, "phase14_evidence_table.csv")))
+    summ.to_csv(PATHS["inconsistency_summary.csv"], index=False)
+    print("\nInconsistency repair under GB vs the frozen Random Forest (positive-class F1 unless stated)")
+    print(summ[["rate", "mean_damage_posf1", "rf_mean_damage", "mean_recovery_posf1", "rf_mean_recovery", "mean_recovery_auc",
+                "sign_agreement", "repairability_status", "rf_status", "risk", "repair_precision"]].round(4).to_string(index=False))
+    print(f"({time.monotonic() - t0:.0f}s) Saved phase16_gb_inconsistency*.csv")
+    return runs
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", type=int, required=True)
@@ -889,11 +992,8 @@ def main(argv=None):
         stage0()
     elif args.stage == 1:
         stage1()
-    elif args.stage in (2, 3, 4, 5, 6):
-        {2: stage2, 3: stage3, 4: stage4, 5: stage5, 6: stage6}[args.stage]()
-    elif args.stage == 7:
-        require_config()
-        raise SystemExit(f"stage {args.stage} is not built yet")
+    elif args.stage in (2, 3, 4, 5, 6, 7):
+        {2: stage2, 3: stage3, 4: stage4, 5: stage5, 6: stage6, 7: stage7}[args.stage]()
     else:
         raise SystemExit("stage must be 0-7")
 

@@ -386,8 +386,7 @@ carries a model-dependent note. The statement "label errors dominate" stays; the
 labelled Random Forest.
 
 Limits: two model families, one implementation of each; GB's hyperparameters were fixed from clean Adult data and not
-re-tuned for Bank Marketing; Logistic Regression was not part of this phase; the inconsistency repair (Phase 14) was
-not re-measured; the detectors are Random-Forest-based inside, so only the downstream model varied. Two explanations
+re-tuned for Bank Marketing; Logistic Regression was not part of this phase; the detectors are Random-Forest-based inside, so only the downstream model varied. Two explanations
 were not tested: that gradient boosting's smaller Adult damage reflects its higher clean accuracy, and why imputed values
 hurt it.
 
@@ -410,7 +409,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | product | `python3 test_taskclean.py` | end-to-end invariants |
 | calibration | `python3 test_selfbench.py` | about a minute |
 | 13 | `python3 phase13_transfer.py data` then `groundtruth` (about 8 min), `calibration`, `regimes`, `report` | second-dataset validation |
-| 16 | `python3 phase16_gb.py --stage N` for N = 0..6 (stage 4 about 90 min, stage 6 about 13 min); `python3 test_phase16.py` | gradient-boosting check; stage 7 not built |
+| 16 | `python3 phase16_gb.py --stage N` for N = 0..7 (stage 4 about 90 min, stage 6 about 13 min, stage 7 about 15 min); `python3 test_phase16.py` | gradient-boosting check |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -482,8 +481,10 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 
 - Logistic Regression validation of the Random Forest findings (the Phase 16 harness takes any model, so this needs
   only its own pre-registration).
-- Phase 14 (inconsistency repair) under gradient boosting; wiring the on-your-data calibration to a second model;
-  the missing-values-hurts-gradient-boosting finding, whose cause was not tested.
+- Wiring the on-your-data calibration to a second model; the missing-values-hurts-gradient-boosting finding, whose
+  cause was not tested. (The Phase 14 inconsistency result under gradient boosting is measured and shown in the product
+  as "model-dependent": injected inconsistencies cost the forest about 0.01 F1 and gradient boosting nothing, status
+  `weak` against `negative`, so the repair stays in review.)
 - More than one extra dataset; Logistic Regression is likewise untested.
 - Calibration of feature-anomaly repair (it stays on the Adult evidence and is never applied automatically).
 - Validating calibration against more datasets than Adult and synthetic data.

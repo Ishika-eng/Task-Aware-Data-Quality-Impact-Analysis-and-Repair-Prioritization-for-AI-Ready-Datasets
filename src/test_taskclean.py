@@ -79,7 +79,9 @@ def test_demo():
         "does not meet the safe-auto bar" in pol.loc["duplicates", "reason"]
     assert set(pol.loc[["missing_values", "duplicates", "outliers", "label_errors"], "model_check"]) <= \
         {"agree", "model-dependent"}, "Adult-sourced evidence must carry the gradient-boosting model check"
-    assert pol.loc["feature_corruption", "model_check"] == "not tested" and pol.loc["inconsistency", "model_check"] == "not tested"
+    assert pol.loc["feature_corruption", "model_check"] == "not tested"
+    assert pol.loc["inconsistency", "model_check"] == "model-dependent", "Stage 7: RF negative vs GB weak"
+    assert not pol.loc["inconsistency", "safe_auto"], "the stricter status stays negative, so the repair stays in review"
     result = apply_repairs(state)
     assert list(result.cleaned.columns) == list(df.columns)
     assert changed_cells(df, result.cleaned) == set(), "default policy must not modify any surviving cell"

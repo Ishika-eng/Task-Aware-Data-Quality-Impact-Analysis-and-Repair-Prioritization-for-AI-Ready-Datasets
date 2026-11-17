@@ -205,7 +205,7 @@ section E could be read two ways. They change no criterion threshold.
 
 ---
 
-# Results (written 2026-11-16, after Stages 0-6; Stage 7 not run)
+# Results (written 2026-11-16, after Stages 0-6; Stage 7 was run afterwards and is in R8)
 
 Everything below is read from `results/phase16_gb_*`. `phase16_gb_criteria.json` recomputes G0-G9 mechanically from the
 files on disk. Nothing was judged by eye, and no criterion threshold was changed after a result was seen. Section G-bis
@@ -316,7 +316,7 @@ stricter status and the larger risk of the two models and must pass the safe-aut
 is proposal-only on Adult-sourced evidence (a human can approve it, and a calibration on the user's own data can still
 certify it); impact estimates carry a model note with the GB-to-RF ratio where outside 0.5-2.0; the limitations text and
 the report notes name the models. Dataset-calibrated evidence is unchanged and labelled Random Forest only; the Phase 14
-inconsistency repair is "not tested". The React and Streamlit front ends show the model check; the Research page has the
+inconsistency repair is labelled "model-dependent" after Stage 7 (see R8). The React and Streamlit front ends show the model check; the Research page has the
 criteria table and both priority rankings. README and REVIEW_GUIDE updated. No frozen file was edited. One existing
 product test (`test_taskclean.test_demo`) changed by design: it asserted that duplicate removal clears the bar on Adult
 evidence, and now asserts that nothing does and that a human can still approve it. The rule that evidence may only make
@@ -343,6 +343,36 @@ the product more cautious held throughout; nothing here unlocks an automatic rep
   approval on Adult-sourced evidence, and the bottom of the priority ranking are model- and dataset-specific.
 * **Limits:** two model families, one implementation of each; five seeds; Adult is the anchor and Bank is a noisy
   replication; GB's configuration was fixed from clean Adult and not re-tuned for Bank; Stage 7 (Phase 14 under GB) was
-  not run; the detectors are unchanged and Random-Forest-based inside, so this phase varies only the downstream model.
+  run afterwards and is reported in R8, with no criterion; the detectors are unchanged and Random-Forest-based inside, so this phase varies only the downstream model.
 * **Untested explanations** (stated as such): that GB's smaller Adult damage reflects its higher clean accuracy; that
   the missing-values harm reflects how GB treats KNN-imputed values.
+
+## R8. Stage 7: Phase 14 (inconsistent-value repair) under GB (run 2026-11-16, after R1-R7 were written; report only)
+
+The spec attaches no criterion to this stage. Same Phase 14 injector, detector and repair (the product path:
+`audit_dataset` then `_apply`), seeds 42-46, rates 5/10/20%, GB configuration unchanged, noise floor 0.003. The harness
+check (the frozen Random Forest scorer and the repair counts on the same frames, seed 42) passed: 15 of 15 values
+identical (max difference 0.0).
+
+| Rate | GB damage | RF damage | GB recovery | RF recovery | GB status | RF status | Repair precision / recall |
+|---|---|---|---|---|---|---|---|
+| 5% | -0.0003 | 0.0127 | -0.0002 | -0.0035 | weak | negative | 1.00 / 0.64 |
+| 10% | +0.0007 | 0.0104 | -0.0002 | -0.0045 | weak | negative | 1.00 / 0.64 |
+| 20% | -0.0048 | 0.0103 | -0.0030 | -0.0068 | weak | negative | 1.00 / 0.57 |
+
+* Injected inconsistencies (case, spacing, punctuation, abbreviations) cost the Random Forest about 0.010-0.013 F1 but cost
+  gradient boosting nothing measurable (|damage| below the noise at 5% and 10%; at 20% the dirty model scores *higher*
+  than the clean one, which is noise, not benefit).
+* With nothing to recover, repair recovery under GB is about zero and the status is `weak` at all three rates (sign
+  agreement 0.6), where the forest gave `negative` at all three. Repair precision (1.00) and recall (0.57-0.64) are properties of
+  the detector and are the same under both models.
+* The consequence for the product is none: the stricter of the two statuses is still `negative`, so the repair stays in
+  the review queue, as before. The product still labels this repair "not tested under gradient boosting"; that label is
+  now out of date (see below).
+* Why GB is untouched is not tested. A candidate explanation is that a one-hot-encoded spelling variant is a new
+  category that a boosted model gives little weight; this is a hypothesis.
+* Files: `results/phase16_gb_inconsistency.csv`, `_inconsistency_summary.csv`, `_inconsistency_harness_check.csv`.
+* **Applied afterwards (2026-11-17, closing Phase 16):** the product's model check for the inconsistency repair now
+  reads "model-dependent" (RF negative / GB weak, effective status negative) and its impact note gives the RF and GB
+  damage. No behaviour changes: the stricter status stays negative, so the repair stays in review. Covered by
+  `test_taskclean.test_demo`.
