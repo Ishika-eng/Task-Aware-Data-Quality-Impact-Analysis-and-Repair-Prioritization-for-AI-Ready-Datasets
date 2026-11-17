@@ -2,8 +2,8 @@
 
 Written **2026-11-17, before any code or run**. Fixed in advance; outcomes are reported whatever they are. Anything that has to change
 afterwards is appended as a visible Amendment. Additive: classification and regression behaviour must stay byte-identical (K0), frozen
-research files untouched, new results go to `results/phase24_*`. Status: **draft for the user's review**; no code is written until it is
-accepted.
+research files untouched, new results go to `results/phase24_*`. Status: **DEFERRED (2026-11-17): the user decided to leave clustering out of scope.** No code was written. Kept as a design record; the README
+lists clustering under Limitations.
 
 ## Why
 

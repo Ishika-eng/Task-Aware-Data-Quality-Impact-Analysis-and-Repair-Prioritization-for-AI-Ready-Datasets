@@ -5,7 +5,7 @@ repairs are safe to apply automatically, and reports its confidence honestly, in
 things worse.
 
 It is both a **research project** (controlled experiments on UCI Adult, 11 phases) and a **usable tool**
-(upload a CSV, get a cleaned dataset, a full repair log, and a multidimensional readiness report).
+(upload a CSV or Excel file, choose classification or regression, get a cleaned dataset, a full repair log, and a multidimensional readiness report).
 
 > **Research question.** Most cleaning pipelines ask *"is this data wrong?"* TaskClean asks *"is this problem
 > actually hurting my ML task, can it be repaired safely, and is it worth the effort?"*
@@ -572,6 +572,10 @@ look at". Cleaning did not improve any model on these files.
   does not prove a repair correct. Changes below the measured noise floor are labelled as such.
 - **Placeholders and blanks that mean "absent".** A token such as `-`, `N/A` or `None` that is a genuine category in your data is over-counted as missing, and a blank that means "no such feature" (Ames: no pool, no garage) looks like a missing value. Imputation of columns the calibration could not cover is held back (Phase 23 A1), but the rest is still imputed under calibration. Only you know which blanks are real.
 - **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
+- **Clustering is not supported.** The tool covers two ML tasks: **classification** and **regression**. Choosing no target audits and cleans
+  the file (Quality audit, Baseline, repairs), but it does not rank issues by their impact on a clustering task or compare clustering before and
+  after cleaning. This was a deliberate scope decision (2026-11-17): clustering has no ground truth, so a before/after comparison could only
+  measure stability, a weaker claim than the other two tasks make. A draft design is kept in `docs/PHASE24_SPEC.md` (deferred, no code written).
 - **Scope.** Classification targets (up to 20 classes), regression targets (a number; Phase 21), or no target at all. Duplicates are full-record duplicates (features +
   target). Inconsistent-value repair (Phase 14: case, spacing, punctuation, unique abbreviations) is exact
   (precision 1.0 in validation) but the measured model recovery was negative, so the evidence rule keeps it in the
