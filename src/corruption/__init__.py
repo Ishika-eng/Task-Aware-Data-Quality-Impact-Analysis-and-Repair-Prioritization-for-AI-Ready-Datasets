@@ -5,7 +5,7 @@ all error types generically: CORRUPTORS[name](X, y, rate, seed).
 
 import itertools
 
-from . import missing_values, label_errors, duplicates, outliers, feature_corruption
+from . import missing_values, label_errors, duplicates, outliers, feature_corruption, target_errors
 
 CORRUPTORS = {
     "missing_values": missing_values.corrupt,
@@ -14,6 +14,15 @@ CORRUPTORS = {
     "outliers": outliers.corrupt,
     "feature_corruption": feature_corruption.corrupt,
 }
+
+# Regression (Phase 21): the same issue key "label_errors" (the product's internal name for "wrong target values") maps to
+# the numeric-target corruptor. Classification keeps CORRUPTORS exactly as before.
+CORRUPTORS_REGRESSION = {**CORRUPTORS, "label_errors": target_errors.corrupt}
+
+
+def corruptors_for(task: str):
+    return CORRUPTORS_REGRESSION if task == "regression" else CORRUPTORS
+
 
 RATES = [0.05, 0.10, 0.20]
 

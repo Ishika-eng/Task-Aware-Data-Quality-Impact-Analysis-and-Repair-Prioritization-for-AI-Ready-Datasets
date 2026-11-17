@@ -24,8 +24,8 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import mutual_info_classif
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
@@ -132,20 +132,22 @@ def _probe_columns(n: int, rng: np.random.Generator) -> pd.DataFrame:
     return pd.DataFrame(cols)
 
 
-def _relevance_scores(Xc: pd.DataFrame, y: pd.Series, seed: int) -> pd.DataFrame | str:
+def _relevance_scores(Xc: pd.DataFrame, y: pd.Series, seed: int, task: str = "classification") -> pd.DataFrame | str:
     """Permutation importance and mutual information for every column of Xc plus 12 random probes.
     Returns a DataFrame indexed by column, or a string explaining why the test could not run."""
     rng = np.random.default_rng([seed, PROBE_SEED_SALT])
     labeled = y.notna()
-    Xc, y = Xc.loc[labeled], y.loc[labeled].astype(str)
+    reg = task == "regression"
+    Xc, y = Xc.loc[labeled], (y.loc[labeled].astype(float) if reg else y.loc[labeled].astype(str))
     if len(Xc) < PROBE_MIN_ROWS:
         return f"fewer than {PROBE_MIN_ROWS} labeled rows"
-    vc = y.value_counts()
-    keep_classes = vc[vc >= PROBE_MIN_CLASS_ROWS].index
-    if len(keep_classes) < 2:
-        return f"fewer than two classes with at least {PROBE_MIN_CLASS_ROWS} rows"
-    sel = y.isin(keep_classes)
-    Xc, y = Xc.loc[sel], y.loc[sel]
+    if not reg:
+        vc = y.value_counts()
+        keep_classes = vc[vc >= PROBE_MIN_CLASS_ROWS].index
+        if len(keep_classes) < 2:
+            return f"fewer than two classes with at least {PROBE_MIN_CLASS_ROWS} rows"
+        sel = y.isin(keep_classes)
+        Xc, y = Xc.loc[sel], y.loc[sel]
     if len(Xc) > PROBE_MAX_ROWS:
         pick = rng.choice(len(Xc), PROBE_MAX_ROWS, replace=False)
         Xc, y = Xc.iloc[np.sort(pick)], y.iloc[np.sort(pick)]
@@ -162,26 +164,26 @@ def _relevance_scores(Xc: pd.DataFrame, y: pd.Series, seed: int) -> pd.DataFrame
     if num_cols:
         parts.append(("num", SimpleImputer(strategy="median"), num_cols))
     pipe = Pipeline([("prep", ColumnTransformer(parts)),
-                     ("rf", RandomForestClassifier(n_estimators=PROBE_TREES, min_samples_leaf=2,
-                                                   random_state=seed, n_jobs=-1))])
-    stratify = y if y.value_counts().min() >= 2 else None
+                     ("rf", (RandomForestRegressor if reg else RandomForestClassifier)(
+                         n_estimators=PROBE_TREES, min_samples_leaf=2, random_state=seed, n_jobs=-1))])
+    stratify = None if reg else (y if y.value_counts().min() >= 2 else None)
     D_tr, D_te, y_tr, y_te = train_test_split(D, y, test_size=PROBE_TEST_SIZE, random_state=seed, stratify=stratify)
     pipe.fit(D_tr, y_tr)
     pi = permutation_importance(pipe, D_te, y_te, n_repeats=PROBE_REPEATS, random_state=seed,
-                                scoring="balanced_accuracy", n_jobs=1)
+                                scoring="r2" if reg else "balanced_accuracy", n_jobs=1)
     M = D.copy()
     for c in cat_cols:
         M[c] = pd.factorize(M[c])[0].astype(float)
     for c in num_cols:
         M[c] = M[c].fillna(M[c].median())
-    mi = mutual_info_classif(M.values, y.values, discrete_features=np.array([c in cat_cols for c in M.columns]),
-                             random_state=seed)
+    mi = (mutual_info_regression if reg else mutual_info_classif)(
+        M.values, y.values, discrete_features=np.array([c in cat_cols for c in M.columns]), random_state=seed)
     return pd.DataFrame({"perm_importance": pi.importances_mean, "perm_importance_std": pi.importances_std,
                          "mutual_info": mi}, index=D.columns)
 
 
 def assess_features(X: pd.DataFrame, y: pd.Series | None, seed: int = 42,
-                    integer_like: dict[str, bool] | None = None) -> pd.DataFrame:
+                    integer_like: dict[str, bool] | None = None, task: str = "classification") -> pd.DataFrame:
     """One row per column of X: verdict, reason, evidence and a recommendation."""
     integer_like = integer_like or {}
     flags = _structural_flags(X, integer_like)
@@ -204,7 +206,7 @@ def assess_features(X: pd.DataFrame, y: pd.Series | None, seed: int = 42,
         why_not = f"more than {PROBE_MAX_COLUMNS} candidate columns: relevance test skipped"
     elif not modelled:
         why_not = "no columns left to test"
-    scores = _relevance_scores(X[modelled], y, seed) if why_not is None else why_not
+    scores = _relevance_scores(X[modelled], y, seed, task) if why_not is None else why_not
     if isinstance(scores, str):
         for c in modelled:
             rows[c].update(verdict="not_assessed", reason=scores)

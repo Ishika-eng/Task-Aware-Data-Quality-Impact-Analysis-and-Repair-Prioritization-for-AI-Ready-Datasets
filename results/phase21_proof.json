@@ -1,0 +1,717 @@
+{
+  "status": "ok",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "n_seeds": 5,
+  "rows": 8000,
+  "rate_per_error_type": 0.05,
+  "metric": "R-squared on CLEAN held-out rows",
+  "models": [
+    {
+      "model": "ridge",
+      "label": "Ridge regression",
+      "noise_floor": 0.00455913139398011,
+      "clean_f1": 0.6123573496594208,
+      "dirty_f1": 0.46474675248639397,
+      "damage": 0.14761059717302677,
+      "damage_beyond_noise": true
+    },
+    {
+      "model": "random_forest",
+      "label": "Random forest",
+      "noise_floor": 0.005256925937076055,
+      "clean_f1": 0.7738641889621155,
+      "dirty_f1": 0.7560921587899576,
+      "damage": 0.017772030172158025,
+      "damage_beyond_noise": true
+    },
+    {
+      "model": "gradient_boosting",
+      "label": "Gradient boosting",
+      "noise_floor": 0.005322742975925822,
+      "clean_f1": 0.8217605873139512,
+      "dirty_f1": 0.7716732314801759,
+      "damage": 0.05008735583377542,
+      "damage_beyond_noise": true
+    },
+    {
+      "model": "neural_net",
+      "label": "Neural net (MLP)",
+      "noise_floor": 0.011846296267384131,
+      "clean_f1": 0.7328649432705274,
+      "dirty_f1": 0.6577619004580622,
+      "damage": 0.07510304281246524,
+      "damage_beyond_noise": true
+    }
+  ],
+  "arms": [
+    {
+      "key": "clean",
+      "label": "Clean ceiling",
+      "text": "Trained on the clean training rows: the most perfect cleaning could reach."
+    },
+    {
+      "key": "dirty",
+      "label": "Dirty (control)",
+      "text": "Trained on the training rows after all five error types were injected. No cleaning."
+    },
+    {
+      "key": "default",
+      "label": "Default file",
+      "text": "The repairs the evidence-based policy applies without review."
+    },
+    {
+      "key": "aggressive",
+      "label": "Aggressive file",
+      "text": "Every proposed repair except feature-anomaly repairs."
+    },
+    {
+      "key": "duplicates",
+      "label": "Duplicates only",
+      "text": "Exact duplicate rows removed."
+    },
+    {
+      "key": "missing_values",
+      "label": "Missing values only",
+      "text": "Missing cells filled."
+    },
+    {
+      "key": "outliers",
+      "label": "Outliers only",
+      "text": "Extreme values replaced by the fence value."
+    },
+    {
+      "key": "inconsistency",
+      "label": "Spellings only",
+      "text": "Spelling variants merged."
+    },
+    {
+      "key": "label_errors",
+      "label": "Target fixes only",
+      "text": "Suspected wrong labels corrected."
+    },
+    {
+      "key": "tuned",
+      "label": "Tuned cleaning",
+      "text": "Per model: the best repair on a validation slice of the dirty rows, kept only if it beats raw by more than 0.005; otherwise raw. Chosen without clean data or test data."
+    },
+    {
+      "key": "tuned_v0",
+      "label": "Tuned (raw validation)",
+      "text": "As tuned, but the validation slice is used as is, including rows that are copies of training rows (the original design, kept so the effect of the leak-free change is visible)."
+    }
+  ],
+  "results": [
+    {
+      "model": "ridge",
+      "arm": "clean",
+      "f1_mean": 0.6123573496594208,
+      "f1_std": 0.014577448187334911,
+      "auc_mean": 0.724552708319594,
+      "n_seeds": 5,
+      "delta_f1": null,
+      "verdict": "ceiling",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "ridge",
+      "arm": "dirty",
+      "f1_mean": 0.46474675248639397,
+      "f1_std": 0.028078490678596045,
+      "auc_mean": 0.8511360832894079,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "baseline",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "ridge",
+      "arm": "default",
+      "f1_mean": 0.46474675248639397,
+      "f1_std": 0.028078490678596045,
+      "auc_mean": 0.8511360832894079,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "ridge",
+      "arm": "aggressive",
+      "f1_mean": 0.47701924776448446,
+      "f1_std": 0.12432038431806394,
+      "auc_mean": 0.8364214515124792,
+      "n_seeds": 5,
+      "delta_f1": 0.012272495278090378,
+      "verdict": "improved",
+      "seeds_agree": 0.8,
+      "share_recovered": 0.08314101773942935
+    },
+    {
+      "model": "ridge",
+      "arm": "duplicates",
+      "f1_mean": 0.515838179170812,
+      "f1_std": 0.018665048581990668,
+      "auc_mean": 0.8096781667538359,
+      "n_seeds": 5,
+      "delta_f1": 0.05109142668441795,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.34612302682123425
+    },
+    {
+      "model": "ridge",
+      "arm": "missing_values",
+      "f1_mean": 0.4696151160342753,
+      "f1_std": 0.02819472893447535,
+      "auc_mean": 0.8472462050810552,
+      "n_seeds": 5,
+      "delta_f1": 0.004868363547881338,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.032981124940336906
+    },
+    {
+      "model": "ridge",
+      "arm": "outliers",
+      "f1_mean": -0.12235903604420643,
+      "f1_std": 1.2751081047410566,
+      "auc_mean": 1.0921565419652048,
+      "n_seeds": 5,
+      "delta_f1": -0.5871057885306004,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "ridge",
+      "arm": "inconsistency",
+      "f1_mean": 0.46474675248639397,
+      "f1_std": 0.028078490678596045,
+      "auc_mean": 0.8511360832894079,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "ridge",
+      "arm": "label_errors",
+      "f1_mean": 0.4715636419723264,
+      "f1_std": 0.029060625529863805,
+      "auc_mean": 0.8456613703886708,
+      "n_seeds": 5,
+      "delta_f1": 0.006816889485932442,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.04618157243779587
+    },
+    {
+      "model": "ridge",
+      "arm": "tuned",
+      "f1_mean": 0.5019637230358243,
+      "f1_std": 0.0419194786105366,
+      "auc_mean": 0.8204616929244455,
+      "n_seeds": 5,
+      "delta_f1": 0.03721697054943025,
+      "verdict": "improved",
+      "seeds_agree": 0.8,
+      "share_recovered": 0.2521293949228125
+    },
+    {
+      "model": "ridge",
+      "arm": "tuned_v0",
+      "f1_mean": 0.47425240298393784,
+      "f1_std": 0.03406145616790431,
+      "auc_mean": 0.8434366101302826,
+      "n_seeds": 5,
+      "delta_f1": 0.009505650497543794,
+      "verdict": "within noise",
+      "seeds_agree": 0.2,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "clean",
+      "f1_mean": 0.7738641889621155,
+      "f1_std": 0.011996288697207407,
+      "auc_mean": 0.5532511147000665,
+      "n_seeds": 5,
+      "delta_f1": null,
+      "verdict": "ceiling",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "dirty",
+      "f1_mean": 0.7560921587899576,
+      "f1_std": 0.010109662196257552,
+      "auc_mean": 0.5746863223011166,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "baseline",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "default",
+      "f1_mean": 0.7560921587899576,
+      "f1_std": 0.010109662196257552,
+      "auc_mean": 0.5746863223011166,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "aggressive",
+      "f1_mean": 0.7589869975326022,
+      "f1_std": 0.005837101452056394,
+      "auc_mean": 0.5714038257675635,
+      "n_seeds": 5,
+      "delta_f1": 0.002894838742644801,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "duplicates",
+      "f1_mean": 0.7647362434714908,
+      "f1_std": 0.011092032936503432,
+      "auc_mean": 0.5643756441748126,
+      "n_seeds": 5,
+      "delta_f1": 0.008644084681533304,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.48638701362747394
+    },
+    {
+      "model": "random_forest",
+      "arm": "missing_values",
+      "f1_mean": 0.7601210491497266,
+      "f1_std": 0.010024698060359043,
+      "auc_mean": 0.5699105880008604,
+      "n_seeds": 5,
+      "delta_f1": 0.0040288903597691435,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "outliers",
+      "f1_mean": 0.7449755584290589,
+      "f1_std": 0.0077636615250112305,
+      "auc_mean": 0.5877211766431609,
+      "n_seeds": 5,
+      "delta_f1": -0.011116600360898631,
+      "verdict": "worse",
+      "seeds_agree": 1.0,
+      "share_recovered": -0.6255109997682815
+    },
+    {
+      "model": "random_forest",
+      "arm": "inconsistency",
+      "f1_mean": 0.7560921587899576,
+      "f1_std": 0.010109662196257552,
+      "auc_mean": 0.5746863223011166,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "label_errors",
+      "f1_mean": 0.7566252438984511,
+      "f1_std": 0.009240905602674473,
+      "auc_mean": 0.5740816469947242,
+      "n_seeds": 5,
+      "delta_f1": 0.0005330851084936361,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "tuned",
+      "f1_mean": 0.759246542837556,
+      "f1_std": 0.010725077722502283,
+      "auc_mean": 0.5709181614698735,
+      "n_seeds": 5,
+      "delta_f1": 0.0031543840475984687,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "random_forest",
+      "arm": "tuned_v0",
+      "f1_mean": 0.761225332313566,
+      "f1_std": 0.01022320424266452,
+      "auc_mean": 0.5685917527717665,
+      "n_seeds": 5,
+      "delta_f1": 0.005133173523608492,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "clean",
+      "f1_mean": 0.8217605873139512,
+      "f1_std": 0.01156961012317484,
+      "auc_mean": 0.4910668980817793,
+      "n_seeds": 5,
+      "delta_f1": null,
+      "verdict": "ceiling",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "dirty",
+      "f1_mean": 0.7716732314801759,
+      "f1_std": 0.004841122365585527,
+      "auc_mean": 0.5561548879497901,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "baseline",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "default",
+      "f1_mean": 0.7716732314801759,
+      "f1_std": 0.004841122365585527,
+      "auc_mean": 0.5561548879497901,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "aggressive",
+      "f1_mean": 0.7927683453434976,
+      "f1_std": 0.007792104310757432,
+      "auc_mean": 0.52978853134651,
+      "n_seeds": 5,
+      "delta_f1": 0.021095113863321725,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.4211664503378845
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "duplicates",
+      "f1_mean": 0.7897346096206087,
+      "f1_std": 0.009012312478529084,
+      "auc_mean": 0.5335794705916845,
+      "n_seeds": 5,
+      "delta_f1": 0.018061378140432915,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.36059755680401845
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "missing_values",
+      "f1_mean": 0.7735813209464659,
+      "f1_std": 0.008302262255728348,
+      "auc_mean": 0.5537322796037365,
+      "n_seeds": 5,
+      "delta_f1": 0.0019080894662901748,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "outliers",
+      "f1_mean": 0.7688502346241327,
+      "f1_std": 0.0038864548525932288,
+      "auc_mean": 0.5596133175145512,
+      "n_seeds": 5,
+      "delta_f1": -0.0028229968560429695,
+      "verdict": "within noise",
+      "seeds_agree": 0.8,
+      "share_recovered": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "inconsistency",
+      "f1_mean": 0.7716732314801759,
+      "f1_std": 0.004841122365585527,
+      "auc_mean": 0.5561548879497901,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "label_errors",
+      "f1_mean": 0.782153905032686,
+      "f1_std": 0.0052333647548172555,
+      "auc_mean": 0.5432783911144043,
+      "n_seeds": 5,
+      "delta_f1": 0.010480673552510256,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.2092478905712731
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "tuned",
+      "f1_mean": 0.7881129660408583,
+      "f1_std": 0.010642422780433756,
+      "auc_mean": 0.5356094393339498,
+      "n_seeds": 5,
+      "delta_f1": 0.016439734560682505,
+      "verdict": "improved",
+      "seeds_agree": 1.0,
+      "share_recovered": 0.3282212503938308
+    },
+    {
+      "model": "gradient_boosting",
+      "arm": "tuned_v0",
+      "f1_mean": 0.7867067115629987,
+      "f1_std": 0.013751580139845643,
+      "auc_mean": 0.5371934823117257,
+      "n_seeds": 5,
+      "delta_f1": 0.01503348008282288,
+      "verdict": "improved",
+      "seeds_agree": 0.8,
+      "share_recovered": 0.3001452129498389
+    },
+    {
+      "model": "neural_net",
+      "arm": "clean",
+      "f1_mean": 0.7328649432705274,
+      "f1_std": 0.012335713713602736,
+      "auc_mean": 0.6014307961576459,
+      "n_seeds": 5,
+      "delta_f1": null,
+      "verdict": "ceiling",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "dirty",
+      "f1_mean": 0.6577619004580622,
+      "f1_std": 0.032752594777466934,
+      "auc_mean": 0.6800511128674965,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "baseline",
+      "share_recovered": null,
+      "seeds_agree": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "default",
+      "f1_mean": 0.6577619004580622,
+      "f1_std": 0.032752594777466934,
+      "auc_mean": 0.6800511128674965,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "aggressive",
+      "f1_mean": 0.6476740809529078,
+      "f1_std": 0.046338688802835,
+      "auc_mean": 0.6893567431628831,
+      "n_seeds": 5,
+      "delta_f1": -0.010087819505154383,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "duplicates",
+      "f1_mean": 0.6828789669208364,
+      "f1_std": 0.02327452997569957,
+      "auc_mean": 0.6549068652248302,
+      "n_seeds": 5,
+      "delta_f1": 0.02511706646277423,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "missing_values",
+      "f1_mean": 0.659403966649858,
+      "f1_std": 0.020023874695081576,
+      "auc_mean": 0.6789393498387085,
+      "n_seeds": 5,
+      "delta_f1": 0.0016420661917958767,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "outliers",
+      "f1_mean": 0.4155893235880236,
+      "f1_std": 0.1800208777435703,
+      "auc_mean": 0.8792610847470511,
+      "n_seeds": 5,
+      "delta_f1": -0.24217257687003854,
+      "verdict": "worse",
+      "seeds_agree": 1.0,
+      "share_recovered": -3.224537486114263
+    },
+    {
+      "model": "neural_net",
+      "arm": "inconsistency",
+      "f1_mean": 0.6577619004580622,
+      "f1_std": 0.032752594777466934,
+      "auc_mean": 0.6800511128674965,
+      "n_seeds": 5,
+      "delta_f1": 0.0,
+      "verdict": "no change",
+      "seeds_agree": 1.0,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "label_errors",
+      "f1_mean": 0.6652679050933349,
+      "f1_std": 0.032227850565541866,
+      "auc_mean": 0.6724331205425939,
+      "n_seeds": 5,
+      "delta_f1": 0.007506004635272756,
+      "verdict": "within noise",
+      "seeds_agree": 0.6,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "tuned",
+      "f1_mean": 0.6810494098351684,
+      "f1_std": 0.02165130499226223,
+      "auc_mean": 0.6568774921059394,
+      "n_seeds": 5,
+      "delta_f1": 0.02328750937710624,
+      "verdict": "within noise",
+      "seeds_agree": 0.4,
+      "share_recovered": null
+    },
+    {
+      "model": "neural_net",
+      "arm": "tuned_v0",
+      "f1_mean": 0.6810494098351684,
+      "f1_std": 0.02165130499226223,
+      "auc_mean": 0.6568774921059394,
+      "n_seeds": 5,
+      "delta_f1": 0.02328750937710624,
+      "verdict": "within noise",
+      "seeds_agree": 0.4,
+      "share_recovered": null
+    }
+  ],
+  "criteria": {
+    "C0_evaluable": {
+      "pass": true,
+      "models_damaged_beyond_noise": 4
+    },
+    "C1_complete": {
+      "pass": true,
+      "cells": 44
+    },
+    "C2_tuned_positive": {
+      "pass": true,
+      "verdicts": {
+        "ridge": "improved",
+        "random_forest": "within noise",
+        "gradient_boosting": "improved",
+        "neural_net": "within noise"
+      }
+    },
+    "C2_tuned_v0_positive": {
+      "pass": false,
+      "verdicts": {
+        "ridge": "within noise",
+        "random_forest": "within noise",
+        "gradient_boosting": "improved",
+        "neural_net": "within noise"
+      }
+    },
+    "C3_default_not_worse": {
+      "pass": true,
+      "verdicts": {
+        "ridge": "no change",
+        "random_forest": "no change",
+        "gradient_boosting": "no change",
+        "neural_net": "no change"
+      }
+    }
+  },
+  "tuned_choices": {
+    "tuned/ridge": {
+      "duplicates": 4,
+      "dirty": 1
+    },
+    "tuned_v0/ridge": {
+      "dirty": 4,
+      "duplicates": 1
+    },
+    "tuned/random_forest": {
+      "dirty": 2,
+      "duplicates": 2,
+      "label_errors": 1
+    },
+    "tuned_v0/random_forest": {
+      "duplicates": 3,
+      "dirty": 2
+    },
+    "tuned/gradient_boosting": {
+      "duplicates": 4,
+      "label_errors": 1
+    },
+    "tuned_v0/gradient_boosting": {
+      "duplicates": 4,
+      "dirty": 1
+    },
+    "tuned/neural_net": {
+      "duplicates": 3,
+      "dirty": 2
+    },
+    "tuned_v0/neural_net": {
+      "duplicates": 3,
+      "dirty": 2
+    }
+  },
+  "default_issues": [],
+  "select_margin": 0.005,
+  "seconds": 386.0,
+  "caveat": "Synthetic, random errors injected into one dataset (California Housing) at 5% each, one of them wrong target values; test rows are clean. This shows the repairs move training data toward the truth on this setup. It does not show the same gain on another dataset, on real-world errors, or on an upload (which has no clean truth). Feature corruption is injected but not repaired by TaskClean, so the clean ceiling is not expected to be reached.",
+  "task": "regression",
+  "dataset": "California Housing (8,000-row sample)"
+}

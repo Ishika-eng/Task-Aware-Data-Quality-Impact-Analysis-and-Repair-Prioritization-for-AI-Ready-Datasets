@@ -51,6 +51,7 @@ from detect import (DetectionResult, detect_duplicates, detect_feature_corruptio
 from inconsistency import detect_inconsistency_v2     # Phase 14: replaces detect.detect_inconsistency in the product
 from joint_outliers import detect_joint_outliers      # Phase 15: opt-in, flag-only (docs/PHASE15_SPEC.md)
 from relevance import assess_features                 # Phase 14: irrelevant-feature report (report-only)
+from regression import TASKS, detect_target_errors, prepare_target, strat_labels   # Phase 21: numeric targets
 from phase9_repair_engine import (AUTO_REPAIR_FEATURE_CAT_THRESHOLD, AUTO_REPAIR_FEATURE_NUM_Z,
                                    AUTO_REPAIR_LABEL_CONFIDENCE, AUTO_REPAIR_OUTLIER_FALLBACK_Q,
                                    AUTO_REPAIR_OUTLIER_K)
@@ -73,6 +74,14 @@ PROBLEM_TEXT = {
     "inconsistency": "Inconsistent value",
     "joint_outliers": "Unusual combination of values",
 }
+PROBLEM_TEXT_REGRESSION = {**PROBLEM_TEXT, "label_errors": "Potential wrong target value"}
+
+
+def problem_text(task: str) -> dict:
+    """User-facing issue names. The internal key stays 'label_errors' for both tasks (it means 'the target is wrong')."""
+    return PROBLEM_TEXT_REGRESSION if task == "regression" else PROBLEM_TEXT
+
+
 # Issue types whose repair evidence / damage curve / detector scores come from the Phase 14 validation
 # (results/phase14_*), not from the frozen Phase 7-10 files.
 PHASE14_ISSUES = {"inconsistency"}
@@ -81,6 +90,7 @@ PHASE14_ISSUES = {"inconsistency"}
 # (clean-data flag rate 7-30% on Diabetes and Breast Cancer; recall 10-14% on marginally invisible swaps).
 FLAG_ONLY_ISSUES = {"joint_outliers"}
 LABELS = {**LABELS, "joint_outliers": "Joint plausibility"}
+LABELS_REGRESSION = {**LABELS, "label_errors": "Target reliability"}
 JOINT_OUTLIER_VALIDATION = (
     "Phase 15 validation (docs/PHASE15_SPEC.md): well calibrated on synthetic Gaussian data (0.07% of clean rows flagged, "
     "precision 0.95-0.98 at rho 0.8) but it flagged 7% of clean Diabetes rows and 30% of clean Breast Cancer rows, and "
@@ -142,6 +152,7 @@ class AuditState:
     decimal_comma_columns: set = field(default_factory=set)
     selfbench: object | None = None          # dataset-specific evidence (see selfbench.py), if calibrated
     feature_findings: pd.DataFrame | None = None   # Phase 14 irrelevant-feature report (never changes the data)
+    task: str = "classification"             # Phase 21: "classification" or "regression" (numeric target)
 
 
 @dataclass
@@ -204,7 +215,7 @@ def _looks_numeric(masked: pd.Series):
     return None, False
 
 
-def _prepare(df: pd.DataFrame, target: str | None):
+def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification"):
     if target is not None and target not in df.columns:
         raise ValueError(f"target column '{target}' not found in the dataset")
 
@@ -258,6 +269,11 @@ def _prepare(df: pd.DataFrame, target: str | None):
     if target is None:
         return pd.DataFrame(feats, index=df.index), None, integer_like, excluded, notes, comma_cols
 
+    if task == "regression":
+        y_num, target_notes = prepare_target(df, target)
+        notes.extend(target_notes)
+        return pd.DataFrame(feats, index=df.index), y_num, integer_like, excluded, notes, comma_cols
+
     # y covers every row (NaN where the target is missing) so the cheap checks can still clean unlabeled rows;
     # only the label / model-based detectors restrict themselves to labeled rows.
     y = df[target].astype(object).map(lambda v: np.nan if pd.isna(v) else str(v))
@@ -267,7 +283,7 @@ def _prepare(df: pd.DataFrame, target: str | None):
     if n_classes > MAX_CLASSES:
         raise ValueError(
             f"target '{target}' has {n_classes} distinct values; TaskClean supports classification only "
-            f"(<= {MAX_CLASSES} classes). This looks like a regression target or an ID column.")
+            f"(<= {MAX_CLASSES} classes). This looks like a regression target or an ID column: if it is a number to predict, choose the regression task.")
 
     return pd.DataFrame(feats, index=df.index), y, integer_like, excluded, notes, comma_cols
 
@@ -455,6 +471,19 @@ def _propose_labels(y, res: DetectionResult) -> list[pd.DataFrame]:
     return [out]
 
 
+def _propose_target(y, res: DetectionResult) -> list[pd.DataFrame]:
+    """Regression: every flagged target value gets a proposed replacement (the out-of-fold prediction). Whether it is applied
+    is decided by the policy like any other repair; 'label_errors' is never auto-approved (NEVER_AUTO_APPLY)."""
+    rows = res.row_mask[res.row_mask].index
+    if len(rows) == 0:
+        return []
+    out = _records("label_errors", rows, "", y.loc[rows].values, res.extra["oof_pred"].loc[rows].values,
+                   "replace the target with the cross-validated model prediction", "strict",
+                   res.extra["oof_confidence"].loc[rows].values)
+    out["problem"] = PROBLEM_TEXT_REGRESSION["label_errors"]
+    return [out]
+
+
 def _propose_features(X, integer_like, res: DetectionResult) -> list[pd.DataFrame]:
     frames = []
     for col, info in res.extra["per_column"].items():
@@ -595,14 +624,14 @@ def _gb_phase14_damage_note(issue: str, observed_rate: float) -> str:
             f"showed {float(row['rf_mean_damage']):.3f}: the SIZE of this impact is model-specific.")
 
 
-def _evidence_for(issue: str, observed_rate: float, selfbench=None) -> dict | None:
+def _evidence_for(issue: str, observed_rate: float, selfbench=None, task: str = "classification") -> dict | None:
     """Repair evidence for an issue at the nearest evaluated corruption rate. Uses this dataset's own
     self-benchmark when it measured the issue; otherwise falls back to the UCI Adult benchmark."""
     sources = []
     if selfbench is not None and getattr(selfbench, "ok", False):
         sources.append(("this dataset (self-benchmark)", selfbench.evidence))
     path = os.path.join(RESULTS_DIR, "phase10_evidence_table.csv")
-    if os.path.exists(path):
+    if os.path.exists(path) and task != "regression":     # the Adult benchmark is a classification benchmark
         adult = pd.read_csv(path)
         p14 = os.path.join(RESULTS_DIR, "phase14_evidence_table.csv")     # inconsistency (Phase 14, also Adult)
         if os.path.exists(p14):
@@ -655,8 +684,9 @@ def _impact_curve_estimate(curve: pd.DataFrame, issue: str, rate: float, col: st
     return float(np.interp(rate, rates, damages)), bool(rate > rates.max())
 
 
-def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFrame:
+def _build_policy(detections, proposals, skipped, selfbench=None, task: str = "classification") -> pd.DataFrame:
     rows = []
+    PT = problem_text(task)
     for issue in ISSUES:
         det_key = "label_noise" if issue == "label_errors" else issue
         det = detections.get(det_key)
@@ -664,7 +694,7 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
         n_auto = int(sub.tier.isin(["exact", "strict"]).sum())
         n_flag = int((sub.tier == "loose").sum())
         if det is None:
-            rows.append({"issue_key": issue, "issue": PROBLEM_TEXT[issue], "detector_ran": False,
+            rows.append({"issue_key": issue, "issue": PT[issue], "detector_ran": False,
                          "detected_rate": np.nan, "n_repair_candidates": 0, "n_flag_only": 0,
                          "repairability_status": "not_assessed", "benchmark_risk": np.nan,
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
@@ -673,7 +703,7 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "reason": skipped.get(det_key, "detector did not run")})
             continue
         if issue in FLAG_ONLY_ISSUES:
-            rows.append({"issue_key": issue, "issue": PROBLEM_TEXT[issue], "detector_ran": True,
+            rows.append({"issue_key": issue, "issue": PT[issue], "detector_ran": True,
                          "detected_rate": det.rate, "n_repair_candidates": 0, "n_flag_only": n_flag,
                          "repairability_status": "flag_only", "benchmark_risk": np.nan,
                          "benchmark_repair_precision": np.nan, "safe_auto": False,
@@ -683,11 +713,13 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
                          "reason": "Flag-only: no repair exists for this issue and nothing is written to the cleaned file. "
                                    + JOINT_OUTLIER_VALIDATION})
             continue
-        ev = _evidence_for(issue, det.rate, selfbench)
+        ev = _evidence_for(issue, det.rate, selfbench, task)
         source = ev["source"] if ev else "-"
         model_check, check_detail = (ev["model_check"], ev["model_check_detail"]) if ev else (MODEL_CHECK_NOT_TESTED, "")
         if ev is None:
-            safe, reason = False, "no repair evidence available"
+            safe, reason = False, ("no repair evidence available" if task != "regression" else
+                                   "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure "
+                                   "this repair; until then it is proposed for review and not applied automatically")
             status, risk, prec = "unknown", np.nan, np.nan
         else:
             status, risk, prec = ev["status"], ev["risk"], ev["precision"]
@@ -720,7 +752,7 @@ def _build_policy(detections, proposals, skipped, selfbench=None) -> pd.DataFram
             action = "auto-repair"
         else:
             action = "flag for human review"
-        rows.append({"issue_key": issue, "issue": PROBLEM_TEXT[issue], "detector_ran": True,
+        rows.append({"issue_key": issue, "issue": PT[issue], "detector_ran": True,
                      "detected_rate": det.rate, "n_repair_candidates": n_auto, "n_flag_only": n_flag,
                      "repairability_status": status, "benchmark_risk": risk,
                      "benchmark_repair_precision": prec, "safe_auto": bool(safe),
@@ -746,7 +778,7 @@ def _stratified_sample_index(y: pd.Series | None, index: pd.Index, n: int, seed:
 def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalies: bool = False, seed: int = 42,
                   progress: Progress | None = None, max_model_rows: int = MAX_MODEL_ROWS,
                   input_info: dict | None = None, detectors: set[str] | None = None,
-                  include_joint_outliers: bool = False) -> AuditState:
+                  include_joint_outliers: bool = False, task: str = "classification") -> AuditState:
     """Detect problems and propose repairs. Expensive (model-based detectors).
 
     target=None runs in no-target mode: missing values, duplicates, outliers and inconsistent values are
@@ -760,10 +792,13 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     say = progress or (lambda f, m: None)
     want = lambda name: detectors is None or name in detectors     # noqa: E731
     t0 = time.monotonic()
+    if task not in TASKS:
+        raise ValueError(f"task must be one of {TASKS}, not {task!r}")
+    regression = task == "regression"
     df = df.reset_index(drop=True).copy()
     if df.empty:
         raise ValueError("the dataset has no rows")
-    X, y, integer_like, excluded, notes, comma_cols = _prepare(df, target)
+    X, y, integer_like, excluded, notes, comma_cols = _prepare(df, target, task)
 
     unmodeled = {c: f"{X[c].nunique()} distinct values (> {MAX_CAT_LEVELS}); skipped by model-based detectors"
                  for c in X.columns if not pd.api.types.is_numeric_dtype(X[c]) and X[c].nunique() > MAX_CAT_LEVELS}
@@ -777,7 +812,8 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
 
     sampled = len(X_model) > max_model_rows
     if sampled:
-        sample_idx = _stratified_sample_index(y_lab, X_model.index, max_model_rows, seed)
+        sample_idx = _stratified_sample_index(strat_labels(y_lab) if regression and y_lab is not None else y_lab,
+                                              X_model.index, max_model_rows, seed)
         X_model = X_model.loc[sample_idx]
         y_model = None if y_lab is None else y_lab.loc[sample_idx]
         notes.append(f"{len(labeled):,} rows exceed the {max_model_rows:,}-row limit for the model-based detectors: they ran "
@@ -829,6 +865,11 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         skipped["label_noise"] = "not requested"
     elif y_model is None:
         skipped["label_noise"] = "no target column selected"
+    elif regression and X_model.shape[1] >= 1 and len(y_model) >= 50:
+        say(0.25, "Estimating target reliability (cross-validated regression model)")
+        detections["label_noise"] = timed("label_noise", lambda: detect_target_errors(X_model, y_model, seed=seed))
+    elif regression:
+        skipped["label_noise"] = ("no modellable feature columns" if X_model.shape[1] == 0 else "fewer than 50 rows with a target")
     elif X_model.shape[1] >= 1 and y_model.value_counts().min() >= 2:
         say(0.25, "Estimating label reliability (cross-validated model)")
         detections["label_noise"] = timed("label_noise", lambda: detect_label_noise(
@@ -853,7 +894,7 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         say(0.80, "Checking feature relevance (random-probe test)")
         try:
             feature_findings = timed("feature_relevance", lambda: assess_features(
-                X, y, seed=seed, integer_like=integer_like))
+                X, y, seed=seed, integer_like=integer_like, task=task))
         except Exception as e:        # a report-only extra must never break the audit, but must never fail silently
             notes.append(f"the feature-relevance check could not run ({type(e).__name__}: {e})")
 
@@ -873,7 +914,7 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     if "outliers" in detections:
         frames += _propose_outliers(X, integer_like, detections["outliers"])
     if "label_noise" in detections:
-        frames += _propose_labels(y, detections["label_noise"])
+        frames += (_propose_target if regression else _propose_labels)(y, detections["label_noise"])
     if "feature_corruption" in detections:
         frames += _propose_features(X_model, integer_like, detections["feature_corruption"])
     if "joint_outliers" in detections:
@@ -881,13 +922,13 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     proposals = (pd.concat(frames, ignore_index=True) if frames else
                  pd.DataFrame(columns=["issue_key", "row_id", "column", "problem", "original_value",
                                        "proposed_value", "method", "tier", "detector_score"]))
-    policy = _build_policy(detections, proposals, skipped)
+    policy = _build_policy(detections, proposals, skipped, None, task)
 
     meta = {
         "seed": seed, "n_rows_uploaded": len(df), "n_rows_analysed": len(X), "n_rows_missing_target": n_unlabeled,
         "n_columns": df.shape[1], "include_feature_anomalies": include_feature_anomalies,
         "include_joint_outliers": include_joint_outliers,
-        "no_target_mode": target is None,
+        "no_target_mode": target is None, "task": task,
         "model_detector_rows": len(X_model), "model_detectors_sampled": sampled,
         "input_format": input_info or {}, "notes": notes,
         "detector_seconds": timings, "audit_seconds": round(time.monotonic() - t0, 2),
@@ -896,7 +937,7 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     return AuditState(df=df, target=target, X=X, y=y, integer_like=integer_like, excluded_columns=excluded,
                       unmodeled_columns=unmodeled, detections=detections, skipped=skipped,
                       proposals=proposals, policy=policy, meta=meta, decimal_comma_columns=comma_cols,
-                      feature_findings=feature_findings)
+                      feature_findings=feature_findings, task=task)
 
 
 # ---------------------------------------------------------------------------
@@ -906,7 +947,7 @@ def attach_self_benchmark(state: AuditState, selfbench) -> AuditState:
     """Make the policy, impact estimates and reports use this dataset's own measured evidence. If the
     self-benchmark could not run (`ok` False) the Adult evidence stays in force and the reason is reported."""
     state.selfbench = selfbench
-    state.policy = _build_policy(state.detections, state.proposals, state.skipped, selfbench)
+    state.policy = _build_policy(state.detections, state.proposals, state.skipped, selfbench, state.task)
     return state
 
 
@@ -949,7 +990,8 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
     prop["applied_value"] = pd.Series([np.nan] * len(prop), dtype=object)
     modified: set[tuple] = set()
     drop_ids: list[int] = []
-    label_map = ({str(v): v for v in state.df[state.target].dropna().unique()} if state.target is not None else {})
+    label_map = ({str(v): v for v in state.df[state.target].dropna().unique()}
+                 if state.target is not None and state.task != "regression" else {})
     # Rows that will be removed as duplicates: repairing cells on a row we are
     # about to delete would make the log claim a change that does not exist in
     # the output file, so those repairs are skipped (and logged as such).
@@ -999,7 +1041,7 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
                        "repair_evidence_status", "human_override"]].copy()
     repair_log["column"] = repair_log["column"].replace("", np.nan)
     if state.target is not None:
-        repair_log.loc[(repair_log.problem == PROBLEM_TEXT["label_errors"]), "column"] = state.target
+        repair_log.loc[(repair_log.problem == problem_text(state.task)["label_errors"]), "column"] = state.target
     return cleaned, repair_log
 
 
@@ -1020,8 +1062,8 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     cleaned_agg, log_agg = _apply(state, aggressive_issues, aggressive_overrides)
     summary_agg = _summary(state, log_agg, cleaned_agg, aggressive_issues, aggressive_overrides)
 
-    after = _after_cleaning_rates(cleaned, state.target)
-    after_agg = _after_cleaning_rates(cleaned_agg, state.target)
+    after = _after_cleaning_rates(cleaned, state.target, state.task)
+    after_agg = _after_cleaning_rates(cleaned_agg, state.target, state.task)
     quality = _quality_report(state)
     impact = _impact_report(state, apply_issues)
     summary = _summary(state, repair_log, cleaned, apply_issues, overrides)
@@ -1043,10 +1085,10 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
 # ---------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------
-def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None) -> dict:
+def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None, task: str = "classification") -> dict:
     """Cheap, deterministic detectors only -- the model-based ones are not re-run."""
     try:
-        X, y, _, _, _, _ = _prepare(cleaned.reset_index(drop=True), target)
+        X, y, _, _, _, _ = _prepare(cleaned.reset_index(drop=True), target, task)
     except ValueError:
         return {}
     return {"missing_values": detect_missing(X).rate,
@@ -1085,21 +1127,26 @@ def _phase14_impact(issue: str, rate: float):
     return float("nan"), False
 
 
-def _evidence_status(issue: str, tracking: pd.DataFrame | None) -> tuple[str, str]:
+def _evidence_status(issue: str, tracking: pd.DataFrame | None, task: str = "classification") -> tuple[str, str]:
     """(status, note) for how far a detector's flagged rate can be trusted as a severity signal: measured on this
     dataset when calibrated, else the UCI Adult validation (Phase 11B)."""
     if tracking is not None and issue in tracking.index:
         return tracking.loc[issue, "evidence_status"], tracking.loc[issue, "note"]
+    if task == "regression":
+        return "not_estimable", ("Whether this detector's flagged rate tracks damage to a regression model has not been "
+                                 "validated; run the calibration on your data to measure it.")
     if issue in PHASE14_EVIDENCE_NOTES:
         return EVIDENCE_STATUS.get(issue, "not_estimable"), PHASE14_EVIDENCE_NOTES[issue]
     return EVIDENCE_STATUS.get(issue, "not_estimable"), EVIDENCE_NOTES.get(issue, "")
 
 
 def _quality_report(state: AuditState) -> pd.DataFrame:
+    reg = state.task == "regression"          # the Adult detector scores are classification results: not shown for regression
     p5_path = os.path.join(RESULTS_DIR, "phase5_detection_scores.csv")
-    p5 = pd.read_csv(p5_path).set_index("error_type") if os.path.exists(p5_path) else None
+    p5 = pd.read_csv(p5_path).set_index("error_type") if os.path.exists(p5_path) and not reg else None
     p14_path = os.path.join(RESULTS_DIR, "phase14_detection_scores.csv")
-    p14d = pd.read_csv(p14_path).set_index("error_type") if os.path.exists(p14_path) else None
+    p14d = pd.read_csv(p14_path).set_index("error_type") if os.path.exists(p14_path) and not reg else None
+    LB = LABELS_REGRESSION if reg else LABELS
     sb = _ok_selfbench(state)
     reliability = sb.detector_reliability.set_index("error_type") if sb is not None else None
     tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
@@ -1113,7 +1160,7 @@ def _quality_report(state: AuditState) -> pd.DataFrame:
              ("joint_outliers", "joint_outliers", "statistical estimate", "rows")]
     for det_key, issue, dtype, unit in order:
         det = state.detections.get(det_key)
-        rec = {"dimension": LABELS.get(issue, issue), "issue_key": issue, "detector_type": dtype}
+        rec = {"dimension": LB.get(issue, issue), "issue_key": issue, "detector_type": dtype}
         if det is None:
             rec.update(detected_rate=np.nan, detected_count=np.nan, count_unit=unit, benchmark_precision=np.nan,
                        benchmark_recall=np.nan, reliability_source=None, evidence_status="not_run",
@@ -1133,7 +1180,7 @@ def _quality_report(state: AuditState) -> pd.DataFrame:
             elif p14d is not None and issue in p14d.index:
                 prec, rec_ = float(p14d.loc[issue, "precision"]), float(p14d.loc[issue, "recall"])
                 rel_source = "UCI Adult benchmark (Phase 14)"
-            ev_status, ev_note = _evidence_status(issue, tracking)
+            ev_status, ev_note = _evidence_status(issue, tracking, state.task)
             note = ("flagged rate, not a confirmed error rate. Case, spacing and unique-abbreviation variants are "
                     "repair candidates; possible typos and ambiguous abbreviations are flag-only"
                     if issue == "inconsistency" else
@@ -1151,10 +1198,11 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
     pol = state.policy.set_index("issue_key")
     sb = _ok_selfbench(state)
     rows = []
+    PT = problem_text(state.task)
     for issue in ISSUES:
         p = pol.loc[issue]
         if not p.detector_ran:
-            rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": np.nan,
+            rows.append({"issue": PT[issue], "issue_key": issue, "detected_rate": np.nan,
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
                          "impact_source": "-", "impact_unit": "-", "impact_estimate_auc": np.nan,
                          "metrics_disagree": False, "metric_note": "", "impact_model_note": "",
@@ -1162,7 +1210,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
                          "policy_decision": "not assessed", "recommendation": p.reason})
             continue
         if issue in FLAG_ONLY_ISSUES:       # no damage curve was measured and no repair exists
-            rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
+            rows.append({"issue": PT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
                          "benchmark_impact_estimate": np.nan, "is_boundary_estimate": False,
                          "impact_source": "none measured (flag-only issue)", "impact_unit": "-",
                          "impact_estimate_auc": np.nan, "metrics_disagree": False, "metric_note": "",
@@ -1183,6 +1231,9 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             md = sb.metric_disagreement
             if md is not None and not md.empty and issue in set(md.error_type):
                 disagree, metric_note = True, md.set_index("error_type").loc[issue, "note"]
+        elif state.task == "regression":
+            est, boundary, source, unit = np.nan, False, "not measured: run the calibration on this regression dataset", "-"
+            model_note = "No regression benchmark exists; impact on a model is only measured by the calibration."
         else:
             if issue in PHASE14_ISSUES:
                 est, boundary = _phase14_impact(issue, p.detected_rate)
@@ -1197,7 +1248,7 @@ def _impact_report(state: AuditState, apply_issues: set[str]) -> pd.DataFrame:
             decision = "nothing to repair"
         else:
             decision = "flagged for human review (not applied)"
-        rows.append({"issue": PROBLEM_TEXT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
+        rows.append({"issue": PT[issue], "issue_key": issue, "detected_rate": p.detected_rate,
                      "benchmark_impact_estimate": est, "is_boundary_estimate": boundary,
                      "impact_source": source, "impact_unit": unit, "impact_estimate_auc": est_auc,
                      "metrics_disagree": disagree, "metric_note": metric_note, "impact_model_note": model_note,
@@ -1223,14 +1274,16 @@ def _summary(state, repair_log, cleaned, apply_issues, overrides) -> dict:
 
 
 def _readiness(state, quality, impact, apply_issues, overrides, after, summary) -> dict:
-    baseline = {**_load_baseline_rates(), **_phase14_json("phase14_baseline_rates.json").get("detector_floors", {})}
+    reg = state.task == "regression"
+    baseline = ({} if reg else
+                {**_load_baseline_rates(), **_phase14_json("phase14_baseline_rates.json").get("detector_floors", {})})
     sb = _ok_selfbench(state)
     tracking = sb.detector_tracking.set_index("error_type") if sb is not None else None
     dims = []
     for _, q in quality.iterrows():
         issue = q.issue_key
         ran = not pd.isna(q.detected_rate)
-        evidence, evidence_note = _evidence_status(issue, tracking) if ran else ("not_run", "")
+        evidence, evidence_note = _evidence_status(issue, tracking, state.task) if ran else ("not_run", "")
         exact = q.detector_type == "exact check"
         own_floor = sb is not None and issue in sb.baseline_floors
         base = sb.baseline_floors[issue] if own_floor else baseline.get(issue)
@@ -1239,6 +1292,7 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
         status = _status(issue, q.detected_rate, base, evidence) if ran else "Not assessed"
         floor_source = ("0 by construction (exact check)" if exact else
                         "this dataset's clean-ish reference (self-benchmark)" if own_floor else
+                        "no false-positive floor measured for this dataset (calibrate to get one)" if reg else
                         "Adult benchmark floor -- NOT recalibrated for this dataset")
         dims.append({
             "dimension": q.dimension, "issue_key": issue,
@@ -1256,8 +1310,8 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "rows_uploaded": meta["n_rows_uploaded"], "rows_analysed": meta["n_rows_analysed"],
             "rows_without_target_excluded_from_label_checks": meta["n_rows_missing_target"],
             "columns": meta["n_columns"], "target": state.target,
-            "task": "classification" if state.target is not None else "none (no-target mode: label checks skipped)",
-            "n_classes": int(state.y.nunique()) if state.y is not None else None,
+            "task": (state.task if state.target is not None else "none (no-target mode: label checks skipped)"),
+            "n_classes": (int(state.y.nunique()) if state.y is not None and state.task == "classification" else None),
             "input_format": meta.get("input_format", {}),
             "notes": meta.get("notes", []),
             "model_based_detectors_ran_on_rows": meta["model_detector_rows"],
@@ -1265,8 +1319,8 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "columns_not_analysed": state.excluded_columns,
             "columns_skipped_by_model_based_detectors": state.unmodeled_columns,
             "model_used_for_benchmark_validation": (
-                f"RandomForestClassifier (n_estimators={sb.n_estimators}) on this dataset's clean-ish reference; "
-                f"{sb.metric}" if sb is not None else "RandomForestClassifier (n_estimators=300), UCI Adult; repair evidence re-checked with "
+                f"{'RandomForestRegressor' if reg else 'RandomForestClassifier'} (n_estimators={sb.n_estimators}) on this dataset's clean-ish reference; "
+                f"{sb.metric}" if sb is not None else "none: no regression benchmark exists; run the calibration" if reg else "RandomForestClassifier (n_estimators=300), UCI Adult; repair evidence re-checked with "
                 "gradient boosting (HistGradientBoostingClassifier)"),
         },
         "dimensions": dims,
@@ -1280,6 +1334,14 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "policy_decision": r.policy_decision, "recommendation": r.recommendation,
         } for r in impact.itertuples()],
         "impact_estimate_note": (
+            "Self-benchmark impact estimate (regression, R-squared): the detected rate is mapped onto a damage curve measured "
+            "on a clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, R-squared on held-out reference "
+            "rows, Random Forest regressor). It is an estimate of relative harm for this data and one model, not a validated "
+            "prediction of your model's loss. Issues the calibration did not measure have no impact estimate."
+            if reg and sb is not None else
+            "No impact estimate: there is no regression benchmark, so impact on a model is only available from the calibration "
+            "(self-benchmark) on your own data. Run it to rank the problems by their measured effect on R-squared."
+            if reg else
             "Self-benchmark impact estimate: the detected rate is mapped onto a damage curve measured on a "
             "clean-ish reference built from THIS dataset (corruption injected at 5/10/20%, macro-F1 and ROC-AUC on "
             "held-out reference rows; a repair counts as safe only if neither metric shows material harm, and "
@@ -1295,7 +1357,10 @@ def _readiness(state, quality, impact, apply_issues, overrides, after, summary) 
             "Forest's; each issue's note gives the gradient-boosting damage ratio (the ordering of issues held under both "
             "models, the size did not)."),
         "repair_policy": {
-            "safe_auto_requires": (f"observed harm risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, "
+            "safe_auto_requires": ((f"observed harm risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, status != negative, "
+                                    "measured on this dataset's own self-benchmark; with no calibration nothing is applied automatically")
+                                   if reg else
+                                   f"observed harm risk == 0, repair precision >= {SAFE_REPAIR_MIN_PRECISION}, "
                                    "status != negative (on Adult evidence: under both a Random Forest and gradient "
                                    "boosting; duplicate removal is proposed, not auto-applied, on Adult evidence) -- evaluated on "
                                    + ("this dataset's self-benchmark where measured, else the UCI Adult benchmark"
@@ -1374,7 +1439,38 @@ SELFBENCH_LIMITATIONS = [
 ]
 
 
+REGRESSION_LIMITATIONS = [
+    "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector "
+    "with limited precision and recall. A flagged rate is not a confirmed error rate.",
+    "Regression (Phase 21): the wrong-target detector flags target values whose out-of-fold residual is more than 4 robust "
+    "sigmas from the typical residual (scaled within bands of the predicted value). It finds gross errors, not subtle ones, and "
+    "it can flag genuine extreme values. On a clean reference it flagged under 2% of rows; its precision and recall on "
+    "injected errors are in docs/PHASE21_SPEC.md. Its replacement value is a model prediction, so it is never applied "
+    "automatically without evidence from your own data.",
+    "There is no regression benchmark behind the default policy: unless the calibration is run on your data, no repair is "
+    "applied automatically and no impact estimate is shown. The Adult evidence is classification-only and is not used.",
+    "No before/after model metrics are reported in the audit itself: an uploaded dataset has no clean held-out test set. The "
+    "model panel compares models on held-out rows that are as dirty as your file, so a gain there does not prove a repair was right.",
+    "Duplicates are full-record duplicates (features + target). Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted "
+    "as missing in the analysis; a token that is a genuine category in your data will be over-counted as missing.",
+    "Files above the model-detector row limit are audited on a sample (stratified by target quintile) for the target and "
+    "feature detectors; their findings and proposals then cover only the sampled rows.",
+    "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs; with no calibration no repair in it "
+    "is certified safe.",
+]
+
+
 def _limitations(state: AuditState) -> list[str]:
+    if state.task == "regression":
+        out = list(REGRESSION_LIMITATIONS)
+        sb = state.selfbench
+        if sb is not None and getattr(sb, "ok", False):
+            out.insert(0, "Calibration evidence comes from a CLEAN-ISH reference built from your own data (complete rows, no "
+                          "duplicates, wild target values removed), random injected errors, a Random Forest regressor and "
+                          "R-squared: 'no harm observed' means none in those runs, not a guarantee.")
+        elif sb is not None:
+            out.insert(0, f"The calibration did not run on this dataset ({sb.reason}).")
+        return out
     adult_specific = (1, 2, 3)      # benchmark-transfer / Adult-floor / Adult label-detector statements
     sb = state.selfbench
     if sb is not None and getattr(sb, "ok", False):
@@ -1456,8 +1552,10 @@ def main():
     ap = argparse.ArgumentParser(description="TaskClean: task-aware data quality audit and safe repair")
     ap.add_argument("csv")
     ap.add_argument("--target", default=None,
-                    help="target column (classification). Omit for no-target mode: missing values, duplicates, "
+                    help="target column. Omit for no-target mode: missing values, duplicates, "
                          "outliers and inconsistencies only")
+    ap.add_argument("--task", choices=list(TASKS), default="classification",
+                    help="ML task for the target: classification (default) or regression (a numeric target; Phase 21)")
     ap.add_argument("--out", default="taskclean_output")
     ap.add_argument("--feature-anomalies", action="store_true",
                     help="also run the slow feature-anomaly detector (its auto-repair is never recommended)")
@@ -1482,13 +1580,14 @@ def main():
     state = audit_dataset(df, args.target, include_feature_anomalies=args.feature_anomalies, seed=args.seed,
                           include_joint_outliers=args.joint_outliers,
                           progress=lambda f, m: print(f"  [{f:4.0%}] {m}"), max_model_rows=args.max_model_rows,
-                          input_info=info)
+                          input_info=info, task=args.task)
     for note in state.meta["notes"]:
         print("  note:", note)
     if args.calibrate:
         from selfbench import run_self_benchmark       # local import: selfbench imports this module
+        from selfbench_regression import run_self_benchmark_regression
         print("\nCalibrating on this dataset (self-benchmark)...")
-        sb = run_self_benchmark(state, n_seeds=args.calibrate_seeds,
+        sb = (run_self_benchmark_regression if args.task == "regression" else run_self_benchmark)(state, n_seeds=args.calibrate_seeds,
                                 progress=lambda f, m: print(f"  [{f:4.0%}] {m}") if m.endswith("(seed 42)") else None)
         attach_self_benchmark(state, sb)
         if sb.ok:

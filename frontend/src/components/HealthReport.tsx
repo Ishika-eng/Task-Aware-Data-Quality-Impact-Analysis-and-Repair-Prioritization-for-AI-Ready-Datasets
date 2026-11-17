@@ -98,7 +98,24 @@ function ColumnsTable({ s }: { s: HealthSnapshot }) {
   return <DataTable columns={cols} rows={s.columns} rowKey={(r) => r.name} dense />;
 }
 
+function RegressionTargetBlock({ t }: { t: TargetProfile }) {
+  const f = (v?: number) => (v === undefined ? "–" : Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toLocaleString(undefined, { maximumSignificantDigits: 4 }));
+  return (
+    <Card title={`Target column: ${t.target} (regression)`} description="A numeric target. Computed for the column you chose; it is not part of the stored snapshot, because the target is chosen after upload.">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Distinct values" value={int(t.n_distinct ?? 0)} />
+        <Stat label="Rows without a target" value={int(t.rows_without_target)} hint={pct(t.rows_without_target_pct, 2)} tone={t.rows_without_target ? "warn" : "neutral"} />
+        <Stat label="Mean · std" value={`${f(t.mean)} · ${f(t.std)}`} />
+        <Stat label="Skewness" value={t.skew === undefined ? "–" : t.skew.toFixed(2)} tone={t.skew !== undefined && Math.abs(t.skew) > 2 ? "warn" : "neutral"} />
+      </div>
+      <p className="mt-3 text-sm text-muted tabular-nums">Min {f(t.min)} · 25% {f(t.q25)} · median {f(t.median)} · 75% {f(t.q75)} · max {f(t.max)}</p>
+      {t.warnings.map((w) => <div key={w} className="mt-3"><Alert tone="warn">{w}</Alert></div>)}
+    </Card>
+  );
+}
+
 export function TargetBlock({ t }: { t: TargetProfile }) {
+  if (t.task === "regression") return <RegressionTargetBlock t={t} />;
   return (
     <Card title={`Target column: ${t.target}`} description="Computed for the column you chose. It is not part of the stored snapshot, because the target is chosen after upload.">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -143,7 +160,7 @@ export function HealthReport({ snapshot: s, target, actions }: { snapshot: Healt
         <Stat label="Inconsistent spellings" value={s.inconsistencies ? int(s.inconsistencies.cells) : "–"} hint="cells" tone={s.inconsistencies?.cells ? "warn" : "good"} />
       </div>
 
-      <Card title="What the file is" description={`${ov.file_name || "uploaded file"} · read as ${String(ov.input_format.encoding ?? "?")}, “${String(ov.input_format.delimiter ?? "?")}” delimiter, decimal “${String(ov.input_format.decimal ?? ".")}”`}>
+      <Card title="What the file is" description={`${ov.file_name || "uploaded file"} · ${ov.input_format.format && ov.input_format.format !== "csv" ? `read as a ${String(ov.input_format.format).toUpperCase()} file` : `read as ${String(ov.input_format.encoding ?? "?")}, “${String(ov.input_format.delimiter ?? "?")}” delimiter, decimal “${String(ov.input_format.decimal ?? ".")}”`}`}>
         <div className="flex flex-wrap gap-2">
           {types.map(([k, n]) => <Badge key={k} tone={k.includes("stored as text") ? "warn" : "neutral"}>{n} × {k}</Badge>)}
         </div>

@@ -8,8 +8,10 @@ import { rememberAudit } from "./lib";
 import { Baseline } from "./pages/Baseline";
 import { Calibration } from "./pages/Calibration";
 import { Impact } from "./pages/Impact";
+import { ModelPanelPage } from "./pages/ModelPanel";
 import { Outputs } from "./pages/Outputs";
 import { Overview } from "./pages/Overview";
+import { ProofPage } from "./pages/Proof";
 import { Features } from "./pages/Features";
 import { Quality } from "./pages/Quality";
 import { Review } from "./pages/Review";
@@ -76,10 +78,12 @@ export default function App() {
           <Route path="calibration" element={<Calibration />} />
           <Route path="readiness" element={<Readiness />} />
           <Route path="impact" element={<Impact />} />
+          <Route path="panel" element={<ModelPanelPage />} />
           <Route path="repair" element={<RepairPlan />} />
           <Route path="review" element={<Review />} />
           <Route path="outputs" element={<Outputs />} />
         </Route>
+        <Route path="proof" element={<ProofPage />} />
         <Route path="research" element={<Research />} />
         <Route path="*" element={<NotFound />} />
       </Route>

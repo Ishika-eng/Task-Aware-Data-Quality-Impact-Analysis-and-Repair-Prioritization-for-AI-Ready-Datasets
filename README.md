@@ -117,7 +117,7 @@ python3 taskclean.py ../data/demo_dirty_adult.csv --target class --out ../taskcl
 
 | Flag | Meaning |
 |---|---|
-| `--target class` | target column (classification). **Omit it for no-target mode**: missing values, duplicates, outliers and inconsistencies only |
+| `--target class` | target column. **Omit it for no-target mode**: missing values, duplicates, outliers and inconsistencies only |
 | `--feature-anomalies` | also run the slow feature-anomaly detector (its auto-repair is never recommended) |
 | `--apply missing_values,label_errors` | explicit human override of the evidence-based policy |
 | `--calibrate` | self-benchmark on your own data and base the policy on it (needs a target; about 20 s to a few minutes) |
@@ -244,7 +244,7 @@ boosting (see the model check below).
 | Rows with no target value | still checked for missing values, duplicates and outliers; excluded from the label and model-based detectors |
 | No target column | no-target mode (label check skipped) |
 | Very large files | the slow label/feature detectors run on a stratified sample (default limit 30,000 rows); the cheap checks always use every row |
-| Continuous or ID-like target | rejected with a clear message (classification only) |
+| Continuous or ID-like target | rejected under classification with a message pointing to the regression task (`--task regression`, Phase 21) |
 
 ## How the repair policy decides
 
@@ -385,6 +385,41 @@ ground truth, and the product was run on Heart Disease and German credit. Full w
   when the noise floor exceeds 0.01. The false approval is gone, but all evidence sources now tie on this dataset, so
   calibration is still not shown to beat the transferred evidence for that decision (see the follow-up in the report).
 
+## Controlled proof (Phase 20)
+
+The Model panel's held-out rows are as dirty as the file, so a gain there does not show a repair was right. The **Controlled proof**
+page (and `src/controlled_proof.py`) starts from clean Adult rows, keeps a **clean** test set, injects five error types (5% each)
+into the training rows only, repairs them with the real TaskClean path, and scores four model families on the clean test rows.
+Registered 5-seed result (`docs/PHASE20_SPEC.md`, "Results"): **logistic regression improves by +0.015 macro-F1 (5/5 seeds, 44% of the
+damage recovered)**, nothing gets worse, but random forest, gradient boosting and the MLP change only within the noise floor. The
+pre-registered criterion (improve at least two families) was **not met**; this is reported, not tuned away.
+
+## Regression (Phase 21)
+
+Choose **Regression** on the Start page (or `--task regression` on the command line) when the target is a number. The audit then
+checks for **wrong target values** instead of wrong labels (an out-of-fold random-forest regression; a value is flagged when its
+residual is more than 4 robust sigmas from the typical residual, scaled within bands of the predicted value). Impact is measured as
+**R-squared**, the calibration and the Model panel use regressors (Ridge, random forest, gradient boosting, a small neural net), and no
+Adult (classification) evidence is borrowed: without the calibration nothing is repaired automatically.
+
+Controlled proof on California Housing (`docs/PHASE21_SPEC.md`, "Results"; Controlled proof page, Regression tab), 5 seeds, errors injected
+into training rows, clean held-out rows: tuned cleaning **improved Ridge (+0.037 R-squared, 25% of the damage) and gradient boosting (+0.016,
+33%)**, was within noise for the random forest and the neural net, and made no model worse, so the pre-registered positive criterion
+(improve at least two families, worsen none) **passed**. Caveats: the raw-validation variant of tuned cleaning fails the same criterion;
+the Ridge result sits at the 80% seed-agreement threshold; outlier capping can be very harmful for regression (it is never chosen by the
+tuned selector); and on a clean file the Model panel still reports some improved/worse arms because it measures usefulness to a model,
+not correctness of the data (Amendment A2).
+
+## Model panel and file formats (Phase 19, Stage U)
+
+Upload accepts **CSV, JSON, JSON Lines and Parquet**. After the audit, a background job trains **four model families**
+(logistic regression, random forest, gradient boosting, a small neural net) on your raw rows and on the repaired rows (default
+file, aggressive file, each repair alone) with the same split and seed, and scores them on the same untouched held-out rows.
+Repairs are fitted on the training rows only. Each change is read against a measured noise floor and labelled improved, worse or
+within noise (no percentage for the last). It is report-only and shown on the **Model panel** page and the Overview.
+Run: `.venv/bin/python src/test_phase19.py`. What it does not show: that a repair was *correct* (the held-out rows are as dirty as
+the file), or that the panel tracks a clean-test ground truth (criterion U2, not run). Spec and status: `docs/PHASE19_SPEC.md`.
+
 ## Is this about the errors, or about the model? (Phase 16)
 
 Every number above was measured with a Random Forest. Phase 16 re-measured the damage and repair evidence with a
@@ -467,6 +502,9 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 16 | `python3 phase16_gb.py --stage N` for N = 0..7 (stage 4 about 90 min, stage 6 about 13 min, stage 7 about 15 min); `python3 test_phase16.py` | gradient-boosting check |
 | 17 | `python3 phase17_knn.py --stage a`, `b`, `c`, `d`; `python3 test_phase17.py` | why KNN imputation hurts gradient boosting, and the fix |
 | 18 | `python3 test_phase18.py` | baseline health report (a product feature, not an experiment: no results files) |
+| 19 | `python3 test_phase19.py` | file intake (CSV/JSON/Parquet) and the four-model panel (Stage U; Stage S not run) |
+| 20 | `python3 test_phase20.py` (run: `python3 controlled_proof.py`) | controlled proof on a clean held-out set: tuned-selection leakage, summary logic, saved result endpoint |
+| 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -516,11 +554,12 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 - **False-positive floors** for the statistical detectors come from clean Adult data unless you calibrate (then they
   come from your reference), so "Attention / Good" is indicative only without calibration.
 - **Small validation sample.** Detector-vs-damage correlations use 3 corruption rates per error type.
-- **No before/after model metrics for uploads.** An uploaded dataset has no clean held-out test set, and evaluating
-  on a slice of the same dirty data would mislead.
+- **Before/after model metrics for uploads are indicative only.** The Model panel (Phase 19) compares models trained on raw and
+  repaired rows, but an uploaded dataset has no clean held-out test set: the held-out rows are as dirty as the file, so a gain
+  does not prove a repair correct. Changes below the measured noise floor are labelled as such.
 - **Placeholders.** A token such as `-` or `N/A` that is a genuine category in your data is over-counted as missing.
 - **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
-- **Scope.** Classification targets only (up to 20 classes), or no target at all. Duplicates are full-record duplicates (features +
+- **Scope.** Classification targets (up to 20 classes), regression targets (a number; Phase 21), or no target at all. Duplicates are full-record duplicates (features +
   target). Inconsistent-value repair (Phase 14: case, spacing, punctuation, unique abbreviations) is exact
   (precision 1.0 in validation) but the measured model recovery was negative, so the evidence rule keeps it in the
   review queue; typos are flag-only. The irrelevant-feature check (constant, identifier-like, redundant, or no

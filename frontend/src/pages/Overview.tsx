@@ -1,5 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { api } from "../api";
 import { useAudit } from "../audit-context";
 import { Badge, Card, Dot, Page, RateBar, Stat, Status, Disclosure } from "../components/ui";
 import { ISSUE_COLOR, ISSUE_NAME, ISSUE_ORDER, int, num, pct, seconds, signed, tone } from "../lib";
@@ -12,18 +14,25 @@ export function Overview() {
   const quality = by(a.quality), policy = by(a.policy), ready = by(a.readiness), impact = by(a.impact);
   const applied = a.selection.applied.map((k) => ISSUE_NAME[k] ?? k);
   const cal = a.calibration;
+  const panelQ = useQuery({
+    queryKey: ["panel", a.id], queryFn: () => api.panel(a.id), enabled: !!ov.target,
+    refetchInterval: (query) => (["queued", "running"].includes(query.state.data?.status ?? "") ? 3000 : false),
+  });
+  const panel = panelQ.data;
+  const agg = (panel?.results ?? []).filter((c) => c.arm === "aggressive");
+  const labelOf = (k: string) => panel?.models?.find((m) => m.key === k)?.label ?? k;
 
   return (
     <Page
       title={a.dataset_name}
-      subtitle={<>Audit of {int(ov.rows_analysed)} rows · target <b>{ov.target ?? "none"}</b> · {cal.status === "ok" ? "evidence measured on this dataset" : "evidence from the UCI Adult benchmark"}</>}
+      subtitle={<>Audit of {int(ov.rows_analysed)} rows · target <b>{ov.target ?? "none"}</b> · {cal.status === "ok" ? "evidence measured on this dataset" : ov.task === "regression" ? "no regression evidence yet: calibrate to measure impact" : "evidence from the UCI Adult benchmark"} · {ov.task === "regression" ? "regression" : "classification"}</>}
       actions={<Badge tone={cal.status === "ok" ? "good" : "neutral"}>{cal.status === "ok" ? "Calibrated" : "Not calibrated"}</Badge>}
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Stat label="Rows analysed" value={int(ov.rows_analysed)} hint={ov.rows_uploaded !== ov.rows_analysed ? `${int(ov.rows_uploaded)} uploaded` : undefined} />
         <Stat label="Columns" value={ov.columns} />
         <Stat label="Target" value={ov.target ?? "none"} />
-        <Stat label="Classes" value={ov.n_classes ?? "–"} />
+        <Stat label={ov.task === "regression" ? "Task" : "Classes"} value={ov.task === "regression" ? "Regression" : ov.n_classes ?? "–"} />
         <Stat label="Audit time" value={seconds(ov.audit_seconds)} />
       </div>
 
@@ -44,6 +53,23 @@ export function Overview() {
           <Link to={`/audit/${a.id}/repair`} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">Review the repair plan <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
       </Card>
+
+      {ov.target && panel && panel.status !== "none" && (
+        <Card title="Model panel: before and after cleaning" description="Four model families trained on the raw rows and on the repaired rows, scored on the same untouched held-out rows.">
+          {(panel.status === "queued" || panel.status === "running") && <p className="text-sm text-muted">Training in the background… {pct(panel.progress ?? 0, 0)}. Results appear here when it finishes.</p>}
+          {panel.status === "ok" && (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {agg.map((c) => (
+                <Stat key={c.model} label={labelOf(c.model)} value={signed(c.delta_f1)}
+                  tone={c.verdict === "improved" ? "good" : c.verdict === "worse" ? "bad" : "neutral"}
+                  hint={`${c.verdict} (noise ±${c.noise_floor.toFixed(3)}) · all repairs vs raw`} />
+              ))}
+            </div>
+          )}
+          {(panel.status === "declined" || panel.status === "error") && <p className="text-sm text-muted">{panel.reason}</p>}
+          <div className="mt-3"><Link to={`/audit/${a.id}/panel`} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">Open the model panel <ArrowRight className="h-3.5 w-3.5" /></Link></div>
+        </Card>
+      )}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold">Issues at a glance</h2>

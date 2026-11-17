@@ -14,7 +14,7 @@ export interface DatasetInfo {
   name: string;
   rows: number;
   n_columns: number;
-  input_format: { encoding: string; delimiter: string; decimal: string; rows: number; columns: number };
+  input_format: { format?: string; encoding?: string; delimiter?: string; decimal?: string; rows: number; columns: number };
   columns: ColumnInfo[];
   suggested_target: string | null;
   preview: Record<string, unknown>[];
@@ -33,14 +33,50 @@ export interface Job {
   calibrate: boolean;
 }
 
+export type Task = "classification" | "regression";
+
 export interface AuditRequest {
   dataset_id: string;
   target: string | null;
+  task: Task;
   include_feature_anomalies: boolean;
   include_joint_outliers: boolean;
   calibrate: boolean;
+  model_panel: boolean;
   seeds: number;
   max_model_rows: number;
+}
+
+export interface PanelModel { key: string; label: string; role: string; noise_floor: number | null; noise_floor_auc: number | null }
+export interface PanelArm { key: string; label: string; text: string; rows_removed: number; cells_changed: number }
+export interface PanelCell {
+  rmse_mean?: number; delta_rmse?: number;
+  model: string; arm: string; n_seeds: number; f1_mean: number; f1_std: number; auc_mean: number | null; acc_mean: number;
+  f1_noleak_mean: number | null; learnable: boolean; noise_floor: number; delta_f1: number; delta_auc: number | null;
+  delta_pct: number | null; seeds_agree: number; verdict: "baseline" | "improved" | "worse" | "within noise" | "no change" | "no effect" | "not enough runs"; auc_verdict?: string;
+}
+export interface ProofModel { model: string; label: string; noise_floor: number; clean_f1: number; dirty_f1: number; damage: number; damage_beyond_noise: boolean }
+export interface ProofCell {
+  model: string; arm: string; f1_mean: number; f1_std: number; auc_mean: number; n_seeds: number; delta_f1: number | null;
+  verdict: "ceiling" | "baseline" | "improved" | "worse" | "within noise" | "no change" | "no effect"; share_recovered: number | null; seeds_agree: number | null;
+}
+export interface Proof {
+  status: "none" | "queued" | "running" | "ok" | "error"; progress?: number; message?: string; reason?: string; source?: string;
+  seeds?: number[]; n_seeds?: number; rows?: number; rate_per_error_type?: number; metric?: string; seconds?: number; select_margin?: number;
+  models?: ProofModel[]; arms?: { key: string; label: string; text: string }[]; results?: ProofCell[];
+  criteria?: Record<string, { pass: boolean } & Record<string, unknown>>; tuned_choices?: Record<string, Record<string, number>>;
+  default_issues?: string[]; caveat?: string; task?: Task; dataset?: string;
+}
+
+export interface ModelPanel {
+  status: "none" | "queued" | "running" | "ok" | "declined" | "error";
+  task?: Task;
+  progress?: number; message?: string; reason?: string; seconds?: number;
+  metric?: string; seeds?: number[]; n_seeds?: number; rows_used?: number; train_rows?: number; test_rows?: number; n_classes?: number; chance_f1?: number;
+  models?: PanelModel[]; arms?: PanelArm[]; results?: PanelCell[];
+  interaction?: { model: string; aggressive: number; sum_of_singles: number }[];
+  leakage?: { test_rows_with_exact_copy_in_train_pct: number; note: string };
+  default_issues?: string[]; notes?: string[]; caveat?: string; settings?: Record<string, number>;
 }
 
 export interface Overview {
@@ -165,6 +201,7 @@ export interface CurveRow {
 }
 
 export interface Calibration {
+  task?: Task;
   status: "not_run" | "declined" | "ok";
   reason?: string;
   metric?: string;
@@ -300,6 +337,9 @@ export interface TargetProfile {
   imbalance_ratio?: number;
   minority_share?: number;
   rare_classes?: string[];
+  /** regression targets (Phase 21) */
+  task?: Task; n_distinct?: number; non_numeric_values?: number;
+  mean?: number; std?: number; min?: number; q25?: number; median?: number; q75?: number; max?: number; skew?: number;
 }
 
 export interface Audit {
@@ -429,9 +469,9 @@ export const api = {
     fd.append("file", file);
     return fetch("/api/datasets/upload", { method: "POST", body: fd }).then((r) => parse<DatasetInfo>(r));
   },
-  datasetHealth: (id: string, target: string | null) =>
-    fetch(`/api/datasets/${id}/health${target ? `?target=${encodeURIComponent(target)}` : ""}`).then((r) =>
-      parse<{ snapshot: HealthSnapshot; target: TargetProfile | null }>(r)),
+  datasetHealth: (id: string, target: string | null, task: Task = "classification") =>
+    fetch(`/api/datasets/${id}/health${target ? `?target=${encodeURIComponent(target)}&task=${task}` : ""}`).then((r) =>
+      parse<{ snapshot: HealthSnapshot; target: TargetProfile | null; suggested_task?: { task: Task; reason: string } }>(r)),
   demoDataset: () => fetch("/api/datasets/demo", { method: "POST" }).then((r) => parse<DatasetInfo>(r)),
   startAudit: (req: AuditRequest) => fetch("/api/audits", json(req)).then((r) => parse<{ job_id: string }>(r)),
   job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => parse<Job>(r)),
@@ -448,4 +488,19 @@ export const api = {
   downloadUrl: (id: string, name: string) => `/api/audits/${id}/download/${name}`,
   reviewCsvUrl: (id: string, variant: string) => `/api/audits/${id}/review.csv?variant=${variant}`,
   zipUrl: (id: string) => `/api/audits/${id}/download.zip`,
+  proof: (task: Task = "classification") => fetch(`/api/proof?task=${task}`).then((r) => parse<Proof>(r)),
+  startProof: (seeds: number, task: Task = "classification") => fetch("/api/proof", json({ seeds, task })).then((r) => parse<{ status: string }>(r)),
+  panel: (id: string) => fetch(`/api/audits/${id}/panel`).then((r) => parse<ModelPanel>(r)).then(normalisePanel),
+  startPanel: (id: string, seeds: number) => fetch(`/api/audits/${id}/panel`, json({ seeds })).then((r) => parse<{ status: string }>(r)),
 };
+
+/** A regression panel (Phase 21) names its score fields score_*; map them onto the fields the page already reads, so one page
+ * serves both tasks. The page switches its labels on `task`. */
+function normalisePanel(p: ModelPanel): ModelPanel {
+  if (p.task !== "regression" || !p.results) return p;
+  type Raw = PanelCell & { score_mean?: number; score_std?: number; delta_score?: number; score_noleak_mean?: number | null };
+  return { ...p, results: (p.results as Raw[]).map((c) => ({
+    ...c, f1_mean: c.score_mean ?? 0, f1_std: c.score_std ?? 0, delta_f1: c.delta_score ?? 0, f1_noleak_mean: c.score_noleak_mean ?? null,
+    auc_mean: c.rmse_mean ?? null, delta_auc: c.delta_rmse ?? null, acc_mean: 0, delta_pct: null,
+  })) };
+}

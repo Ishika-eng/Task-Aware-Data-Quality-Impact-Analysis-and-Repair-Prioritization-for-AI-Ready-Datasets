@@ -1,0 +1,37 @@
+{
+  "C0_evaluable": {
+    "pass": true,
+    "models_damaged_beyond_noise": 3
+  },
+  "C1_complete": {
+    "pass": true,
+    "cells": 44
+  },
+  "C2_tuned_positive": {
+    "pass": false,
+    "verdicts": {
+      "logistic_regression": "improved",
+      "random_forest": "within noise",
+      "gradient_boosting": "within noise",
+      "neural_net": "within noise"
+    }
+  },
+  "C2_tuned_v0_positive": {
+    "pass": false,
+    "verdicts": {
+      "logistic_regression": "improved",
+      "random_forest": "within noise",
+      "gradient_boosting": "within noise",
+      "neural_net": "within noise"
+    }
+  },
+  "C3_default_not_worse": {
+    "pass": true,
+    "verdicts": {
+      "logistic_regression": "no change",
+      "random_forest": "no change",
+      "gradient_boosting": "no change",
+      "neural_net": "no change"
+    }
+  }
+}

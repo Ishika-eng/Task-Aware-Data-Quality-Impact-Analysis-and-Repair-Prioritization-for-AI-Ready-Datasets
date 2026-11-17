@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { ArrowRight, FileSpreadsheet, Loader2, Play, Sparkles, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type DatasetInfo } from "../api";
+import { api, type DatasetInfo, type Task } from "../api";
 import { HealthReport } from "../components/HealthReport";
 import { Alert, Badge, Button, Card, Page, ProgressBar, Segmented, Switch } from "../components/ui";
 import { cellText, int, seconds } from "../lib";
@@ -21,12 +21,12 @@ function Dropzone({ onFile, busy }: { onFile: (f: File) => void; busy: boolean }
       className={clsx("flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition", over ? "border-accent bg-accent-soft" : "border-line bg-surface")}
     >
       {busy ? <Loader2 className="h-8 w-8 animate-spin text-accent" /> : <UploadCloud className="h-8 w-8 text-accent" />}
-      <p className="mt-3 text-base font-semibold">{busy ? "Reading your file…" : "Drop a CSV file here"}</p>
-      <p className="mt-1 text-sm text-muted">Tabular data with a classification target. Encoding, delimiter and decimal comma are detected for you.</p>
-      <input ref={input} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      <p className="mt-3 text-base font-semibold">{busy ? "Reading your file…" : "Drop a CSV, JSON or Parquet file here"}</p>
+      <p className="mt-1 text-sm text-muted">Tabular data with a classification or regression target. For CSV, encoding, delimiter and decimal comma are detected for you.</p>
+      <input ref={input} type="file" accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson,.parquet,.pq" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         <Button variant="primary" onClick={() => input.current?.click()} disabled={busy}>
-          <FileSpreadsheet className="h-4 w-4" /> Choose CSV file
+          <FileSpreadsheet className="h-4 w-4" /> Choose a file
         </Button>
       </div>
     </div>
@@ -107,15 +107,18 @@ export function Start() {
   const config = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: Infinity });
   const [ds, setDs] = useState<DatasetInfo | null>(null);
   const [target, setTarget] = useState<string>(NO_TARGET);
+  const [task, setTask] = useState<Task>("classification");
+  const [taskTouched, setTaskTouched] = useState(false);
   const [feat, setFeat] = useState(false);
   const [joint, setJoint] = useState(false);
   const [calibrate, setCalibrate] = useState(false);
+  const [panel, setPanel] = useState(true);
   const [seeds, setSeeds] = useState(3);
   const [maxRows, setMaxRows] = useState(30000);
   const [jobId, setJobId] = useState<string | null>(null);
 
   const load = useCallback((d: DatasetInfo) => {
-    setDs(d); setTarget(d.suggested_target ?? NO_TARGET); setCalibrate(false); setFeat(false); setJoint(false); setJobId(null);
+    setDs(d); setTarget(d.suggested_target ?? NO_TARGET); setTask("classification"); setTaskTouched(false); setCalibrate(false); setFeat(false); setJoint(false); setJobId(null);
   }, []);
   const upload = useMutation({ mutationFn: api.uploadDataset, onSuccess: load });
   const demo = useMutation({ mutationFn: api.demoDataset, onSuccess: load });
@@ -123,20 +126,25 @@ export function Start() {
 
   const maxClasses = config.data?.max_classes ?? 20;
   const col = ds?.columns.find((c) => c.name === target);
-  const targetProblem = !col ? null : col.n_unique < 2 ? `'${col.name}' has fewer than 2 distinct values: there is nothing to classify.`
-    : col.n_unique > maxClasses ? `'${col.name}' has ${int(col.n_unique)} distinct values. TaskClean supports classification only (up to ${maxClasses} classes); this looks like a regression target or an ID column.` : null;
+  const regression = task === "regression";
+  const targetProblem = !col ? null : col.n_unique < 2 ? `'${col.name}' has fewer than 2 distinct values: there is nothing to ${regression ? "predict" : "classify"}.`
+    : regression ? (col.kind !== "numeric" ? `'${col.name}' is not a numeric column: regression needs a number to predict. Choose classification for categories.` : null)
+    : col.n_unique > maxClasses ? `'${col.name}' has ${int(col.n_unique)} distinct values, more than the ${maxClasses} classes classification supports. If it is a number to predict, choose Regression; if it is an ID column, pick another target.` : null;
   const hasTarget = target !== NO_TARGET;
   // the stored baseline snapshot (never recomputed) plus, once a target is chosen, that column's profile
   const health = useQuery({
-    queryKey: ["health", ds?.id, hasTarget ? target : null],
-    queryFn: () => api.datasetHealth(ds!.id, hasTarget ? target : null),
+    queryKey: ["health", ds?.id, hasTarget ? target : null, task],
+    queryFn: () => api.datasetHealth(ds!.id, hasTarget ? target : null, task),
     enabled: !!ds, placeholderData: (prev) => prev, staleTime: Infinity,
   });
+  // follow the automatic suggestion until the user picks a task themselves
+  const suggested = health.data?.suggested_task?.task;
+  useEffect(() => { if (hasTarget && suggested && !taskTouched && suggested !== task) setTask(suggested); }, [suggested, hasTarget, taskTouched, task]);
   const error = (upload.error ?? demo.error ?? start.error) as Error | null;
 
   const run = () => ds && start.mutate({
-    dataset_id: ds.id, target: hasTarget ? target : null, include_feature_anomalies: feat, include_joint_outliers: joint,
-    calibrate: calibrate && hasTarget, seeds, max_model_rows: maxRows,
+    dataset_id: ds.id, target: hasTarget ? target : null, task, include_feature_anomalies: feat, include_joint_outliers: joint,
+    calibrate: calibrate && hasTarget, model_panel: panel && hasTarget, seeds, max_model_rows: maxRows,
   });
 
   if (!ds)
@@ -173,7 +181,7 @@ export function Start() {
   return (
     <Page
       title={ds.name}
-      subtitle={<>{int(ds.rows)} rows · {ds.n_columns} columns · {ds.input_format.encoding}, “{ds.input_format.delimiter}” delimiter</>}
+      subtitle={<>{int(ds.rows)} rows · {ds.n_columns} columns · {ds.input_format.format && ds.input_format.format !== "csv" ? `${ds.input_format.format.toUpperCase()} file` : `${ds.input_format.encoding}, “${ds.input_format.delimiter}” delimiter`}</>}
       actions={<Button variant="ghost" onClick={() => { setDs(null); setJobId(null); }} disabled={start.isPending}>Choose another file</Button>}
     >
       {error && <Alert tone="bad" title="Something went wrong">{error.message}</Alert>}
@@ -189,16 +197,19 @@ export function Start() {
           </Card>
           <Card title="Columns" description={`${ds.columns.length} columns. Click a candidate to use it as the target.`}>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {ds.columns.map((c) => (
-                <button key={c.name} type="button" onClick={() => c.target_candidate && setTarget(c.name)} disabled={!c.target_candidate}
-                  className={clsx("rounded-lg border px-3 py-2 text-left transition", target === c.name ? "border-accent bg-accent-soft" : "border-line", c.target_candidate ? "hover:border-accent" : "cursor-default")}>
+              {ds.columns.map((c) => {
+                const candidate = regression ? c.kind === "numeric" && c.n_unique >= 2 : c.target_candidate;
+                return (
+                <button key={c.name} type="button" onClick={() => candidate && setTarget(c.name)} disabled={!candidate}
+                  className={clsx("rounded-lg border px-3 py-2 text-left transition", target === c.name ? "border-accent bg-accent-soft" : "border-line", candidate ? "hover:border-accent" : "cursor-default")}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium">{c.name}</span>
                     <Badge tone={target === c.name ? "accent" : "neutral"}>{target === c.name ? "target" : c.kind}</Badge>
                   </div>
                   <div className="mt-0.5 text-xs text-muted">{int(c.n_unique)} distinct · {c.n_missing ? `${int(c.n_missing)} missing` : "none missing"}</div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -211,7 +222,7 @@ export function Start() {
               <div className="space-y-5">
                 <label className="block">
                   <span className="text-xs font-medium uppercase tracking-wide text-muted">Target column</span>
-                  <select value={target} onChange={(e) => setTarget(e.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm">
+                  <select value={target} onChange={(e) => { setTarget(e.target.value); setTaskTouched(false); }} className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm">
                     <option value={NO_TARGET}>(no target: unlabeled dataset)</option>
                     {ds.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                   </select>
@@ -221,7 +232,19 @@ export function Start() {
 
                 <div>
                   <span className="text-xs font-medium uppercase tracking-wide text-muted">ML task</span>
-                  <div className="mt-1.5 flex items-center gap-2 text-sm"><Badge tone="accent">Classification</Badge><span className="text-xs text-muted">Regression is not supported.</span></div>
+                  <div className="mt-1.5 inline-flex rounded-lg border border-line p-0.5 text-sm" role="radiogroup" aria-label="ML task">
+                    {(["classification", "regression"] as Task[]).map((t) => (
+                      <button key={t} type="button" role="radio" aria-checked={task === t} onClick={() => { setTask(t); setTaskTouched(true); }}
+                        className={clsx("rounded-md px-3 py-1.5 capitalize transition", task === t ? "bg-accent text-white" : "text-muted hover:text-text")}>{t}</button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted">
+                    {regression ? "Predict a number (price, score, amount). Impact is measured as R-squared; the wrong-labels check becomes a wrong-target-values check."
+                      : "Predict a category. Impact is measured as macro-F1."}
+                  </p>
+                  {hasTarget && health.data?.suggested_task && health.data.suggested_task.task !== task && (
+                    <p className="mt-1 text-xs text-warn">This target looks like <b>{health.data.suggested_task.task}</b> ({health.data.suggested_task.reason}). <button type="button" className="underline" onClick={() => { setTask(health.data!.suggested_task!.task); setTaskTouched(true); }}>Switch</button></p>
+                  )}
                 </div>
 
                 <div className="flex items-start justify-between gap-4">
@@ -237,6 +260,14 @@ export function Start() {
                     <Segmented label="Calibration seeds" value={seeds} onChange={setSeeds} options={[{ value: 3, label: "3 (quick)" }, { value: 5, label: "5 (thorough)" }]} />
                   </div>
                 )}
+
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Model panel: train four models before and after cleaning</div>
+                    <p className="text-xs text-muted">Logistic regression, random forest, gradient boosting and a small neural net are trained on your raw rows and on the repaired rows, scored on the same untouched held-out rows. Runs in the background after the audit (about a minute).</p>
+                  </div>
+                  <Switch label="Model panel" checked={panel && hasTarget} onChange={setPanel} disabled={!hasTarget} />
+                </div>
 
                 <div className="flex items-start justify-between gap-4">
                   <div>

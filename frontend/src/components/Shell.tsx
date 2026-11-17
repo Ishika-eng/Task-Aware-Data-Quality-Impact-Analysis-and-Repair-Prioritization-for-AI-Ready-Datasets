@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { ClipboardCheck, Columns3, FileDown, FlaskConical, Gauge, HeartPulse, LayoutDashboard, Menu, Moon, SearchCheck, ShieldCheck, Sun, TrendingDown, UploadCloud, Wrench, X } from "lucide-react";
+import { BadgeCheck, BrainCircuit, ClipboardCheck, Columns3, FileDown, FlaskConical, Gauge, HeartPulse, LayoutDashboard, Menu, Moon, SearchCheck, ShieldCheck, Sun, TrendingDown, UploadCloud, Wrench, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -52,7 +52,7 @@ function SidebarBody({ auditId, onNavigate }: { auditId: string | null; onNaviga
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-5">
       <Brand />
-      <NavGroup title="Workspace">{item("/", "New audit", UploadCloud, true)}</NavGroup>
+      <NavGroup title="Workspace">{item("/", "New audit", UploadCloud, true)}{item("/proof", "Controlled proof", BadgeCheck)}</NavGroup>
       {base && (
         <NavGroup title="Current audit">
           {item(base, "Overview", LayoutDashboard, true)}
@@ -62,6 +62,7 @@ function SidebarBody({ auditId, onNavigate }: { auditId: string | null; onNaviga
           {item(`${base}/calibration`, "Calibration", Gauge)}
           {item(`${base}/readiness`, "Readiness", ShieldCheck)}
           {item(`${base}/impact`, "Task impact", TrendingDown)}
+          {item(`${base}/panel`, "Model panel", BrainCircuit)}
           {item(`${base}/repair`, "Repair plan", Wrench)}
           {item(`${base}/review`, "Review queue", ClipboardCheck, false, pending)}
           {item(`${base}/outputs`, "Outputs", FileDown)}

@@ -34,9 +34,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from health_snapshot import build_snapshot, snapshot_rows, target_profile  # noqa: E402
+from intake import SUPPORTED, load_table  # noqa: E402
+from controlled_proof import SEEDS as PROOF_SEEDS, run_controlled_proof
+from controlled_proof_regression import run_controlled_proof_regression  # noqa: E402
+from model_panel import DEFAULT_SEEDS, panel_rows, run_model_panel  # noqa: E402
+from model_panel_regression import panel_rows_regression, run_model_panel_regression  # noqa: E402
+from regression import TASKS, suggest_task, target_profile_regression  # noqa: E402
+from selfbench_regression import run_self_benchmark_regression  # noqa: E402
 from selfbench import IMBALANCE_WARNING_SHARE, NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
 from taskclean import (ISSUES, MAX_CAT_LEVELS, MAX_CERTIFIABLE_NOISE_FLOOR, MAX_CLASSES, MAX_MODEL_ROWS,  # noqa: E402
-                       NEVER_AUTO_APPLY, PROBLEM_TEXT, SAFE_REPAIR_MIN_PRECISION, TASKCLEAN_VERSION, _sanitize,
+                       NEVER_AUTO_APPLY, PROBLEM_TEXT, PROBLEM_TEXT_REGRESSION, SAFE_REPAIR_MIN_PRECISION, TASKCLEAN_VERSION, _sanitize,
                        apply_repairs, attach_self_benchmark, audit_dataset, default_apply_issues, load_csv,
                        outputs_as_bytes)
 
@@ -133,7 +140,8 @@ def health():
 
 @app.get("/api/config")
 def config():
-    return {"issues": ISSUES, "problem_text": PROBLEM_TEXT, "never_auto_apply": sorted(NEVER_AUTO_APPLY),
+    return {"issues": ISSUES, "problem_text": PROBLEM_TEXT, "problem_text_regression": PROBLEM_TEXT_REGRESSION,
+            "tasks": list(TASKS), "never_auto_apply": sorted(NEVER_AUTO_APPLY),
             "safe_repair_min_precision": SAFE_REPAIR_MIN_PRECISION,
             "max_certifiable_noise_floor": MAX_CERTIFIABLE_NOISE_FLOOR, "max_model_rows": MAX_MODEL_ROWS,
             "max_classes": MAX_CLASSES, "max_cat_levels": MAX_CAT_LEVELS,
@@ -143,11 +151,12 @@ def config():
 @app.post("/api/datasets/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     raw = await file.read()
+    name = file.filename or "upload.csv"
     try:
-        df, info = load_csv(raw)
-    except Exception as e:                      # a malformed CSV is user input, not a server bug
-        raise HTTPException(400, f"Could not read that file as CSV: {e}")
-    return dataset_payload(store_dataset(df, info, file.filename or "upload.csv", raw=raw))
+        df, info = load_table(raw, name)
+    except Exception as e:                      # a malformed file is user input, not a server bug
+        raise HTTPException(400, f"Could not read that file ({', '.join(SUPPORTED)} are supported): {e}")
+    return dataset_payload(store_dataset(df, info, name, raw=raw))
 
 
 @app.post("/api/datasets/demo")
@@ -166,7 +175,7 @@ def read_dataset(dataset_id: str):
 
 
 @app.get("/api/datasets/{dataset_id}/health")
-def read_health(dataset_id: str, target: str | None = None):
+def read_health(dataset_id: str, target: str | None = None, task: str = "classification"):
     """The baseline health report captured at upload (never recomputed), plus, if a target is given, its profile."""
     ds = get_dataset(dataset_id)
     if ds.get("snapshot") is None:
@@ -175,7 +184,11 @@ def read_health(dataset_id: str, target: str | None = None):
     if target is not None:
         if target not in ds["df"].columns:
             raise HTTPException(400, f"target column '{target}' not found in the dataset")
-        out["target"] = safe(target_profile(ds["df"], target))
+        if task not in TASKS:
+            raise HTTPException(400, f"task must be one of {list(TASKS)}")
+        out["target"] = safe(target_profile_regression(ds["df"], target) if task == "regression"
+                             else target_profile(ds["df"], target))
+        out["suggested_task"] = suggest_task(ds["df"][target])
     return out
 
 
@@ -183,9 +196,11 @@ def read_health(dataset_id: str, target: str | None = None):
 class AuditRequest(BaseModel):
     dataset_id: str
     target: str | None = None
+    task: str = "classification"              # Phase 21: "classification" or "regression" (a numeric target)
     include_feature_anomalies: bool = False
     include_joint_outliers: bool = False      # Phase 15: flag-only, off by default
     calibrate: bool = False
+    model_panel: bool = True                  # Phase 19: 4-model before/after on the user's own data (background, report-only)
     seeds: int = Field(3, ge=2, le=5)
     max_model_rows: int = Field(MAX_MODEL_ROWS, ge=2000, le=500_000)
 
@@ -202,12 +217,14 @@ def run_audit_job(job_id: str, req: AuditRequest):
             job.update(progress=min(f, 1.0) * share, message=m, stage="audit")
 
         state = audit_dataset(df, req.target, include_feature_anomalies=req.include_feature_anomalies,
-                              include_joint_outliers=req.include_joint_outliers, max_model_rows=req.max_model_rows, progress=on_audit, input_info=ds["info"])
+                              include_joint_outliers=req.include_joint_outliers, max_model_rows=req.max_model_rows, progress=on_audit,
+                              input_info=ds["info"], task=req.task)
         if req.calibrate and req.target:
             def on_cal(f: float, m: str):
                 job.update(progress=0.4 + 0.6 * min(f, 1.0), message=f"Calibrating: {m}", stage="calibration")
 
-            sb = run_self_benchmark(state, n_seeds=req.seeds, progress=on_cal)
+            sb = (run_self_benchmark_regression if req.task == "regression" else run_self_benchmark)(
+                state, n_seeds=req.seeds, progress=on_cal)
             attach_self_benchmark(state, sb)
         job.update(message="Applying the evidence-based policy", progress=0.99, stage="finalising")
         result = apply_repairs(state)
@@ -216,13 +233,55 @@ def run_audit_job(job_id: str, req: AuditRequest):
         AUDITS[audit_id] = {"id": audit_id, "dataset_id": req.dataset_id, "dataset_name": ds["name"], "state": state,
                             "result": result, "applied": applied, "label": "policy default", "request": req.model_dump(),
                             "created": time.time(), "baseline": ds.get("snapshot"),
-                            "baseline_target": safe(target_profile(df, req.target)) if req.target else None}
+                            "baseline_target": (safe(target_profile_regression(df, req.target) if req.task == "regression"
+                                                 else target_profile(df, req.target)) if req.target else None)}
         job.update(status="done", progress=1.0, message="Audit complete", audit_id=audit_id, finished=time.time())
+        if req.model_panel and req.target:
+            queue_panel(audit_id, req.seeds)
     except ValueError as e:                    # data the tool does not support: tell the user why
         job.update(status="error", error=str(e), message="Audit could not run", finished=time.time())
     except Exception as e:                     # noqa: BLE001
         traceback.print_exc()
         job.update(status="error", error=f"{type(e).__name__}: {e}", message="Audit failed", finished=time.time())
+
+
+def run_panel_job(audit_id: str, n_seeds: int):                # noqa: C901
+    audit = AUDITS.get(audit_id)
+    if audit is None:
+        return
+    panel = audit["panel"]
+
+    def put(**kw):
+        with LOCK:
+            panel.update(**kw)
+
+    def on(f: float, m: str):
+        put(progress=round(f, 3), message=m)
+
+    try:
+        put(status="running", message="Starting", progress=0.0, started=time.time())
+        seeds = tuple(range(42, 42 + max(2, min(5, n_seeds)))) if n_seeds != 3 else DEFAULT_SEEDS
+        run = run_model_panel_regression if audit["state"].task == "regression" else run_model_panel
+        result = run(audit["state"], seeds=seeds, progress=on)
+        with LOCK:
+            panel.clear()
+            panel.update(result, progress=1.0, finished=time.time())
+    except Exception as e:                     # noqa: BLE001
+        traceback.print_exc()
+        with LOCK:
+            panel.clear()
+            panel.update(status="error", reason=f"{type(e).__name__}: {e}", finished=time.time())
+
+
+def panel_snapshot(audit: dict) -> dict:
+    with LOCK:
+        return dict(audit.get("panel") or {"status": "none"})
+
+
+def queue_panel(audit_id: str, n_seeds: int):
+    audit = AUDITS[audit_id]
+    audit["panel"] = {"status": "queued", "progress": 0.0, "message": "Waiting for the audit to finish", "started": time.time()}
+    EXECUTOR.submit(run_panel_job, audit_id, n_seeds)
 
 
 class JobDict(dict):
@@ -238,6 +297,8 @@ def start_audit(req: AuditRequest):
         raise HTTPException(400, f"target column '{req.target}' not found in the dataset")
     if req.calibrate and req.target is None:
         raise HTTPException(400, "calibration needs a target column")
+    if req.task not in TASKS:
+        raise HTTPException(400, f"task must be one of {list(TASKS)}")
     job_id = uuid.uuid4().hex[:10]
     JOBS[job_id] = JobDict(id=job_id, status="queued", progress=0.0, message="Queued", stage="queued", error=None,
                            audit_id=None, started=time.time(), finished=None, calibrate=req.calibrate)
@@ -269,7 +330,7 @@ def calibration_payload(state) -> dict:
         "status": "ok", "metric": sb.metric, "n_seeds": sb.n_seeds, "rates": list(sb.rates),
         "n_estimators": sb.n_estimators, "seconds": round(sb.seconds, 1), "reference": ref,
         "noise_floor": float(sb.noise_floor), "noise_floor_auc": float(sb.noise_floor_auc) if sb.has_auc else None,
-        "has_auc": bool(sb.has_auc), "clean_macro_f1": float(np.mean(list(sb.baseline_f1.values()))),
+        "task": sb.task, "has_auc": bool(sb.has_auc), "clean_macro_f1": float(np.mean(list(sb.baseline_f1.values()))),
         "chance_f1": float(sb.chance_f1), "minority_share": share,
         "imbalance_warning": bool(share is not None and share < IMBALANCE_WARNING_SHARE),
         "underpowered": bool(sb.evidence["underpowered"].any()),
@@ -286,7 +347,7 @@ REVIEW_ACTIONS = ("flagged_for_review", "flagged_only")
 def review_summary(result) -> dict:
     """What a human still has to look at in the evidence-based file: proposed-but-not-applied repairs and flag-only rows."""
     log = result.repair_log
-    by_problem = {v: k for k, v in PROBLEM_TEXT.items()}
+    by_problem = {v: k for k, v in {**PROBLEM_TEXT_REGRESSION, **PROBLEM_TEXT}.items()}
     rows = []
     for problem, g in log[log.action.isin(REVIEW_ACTIONS)].groupby("problem"):
         rows.append({"issue_key": by_problem.get(problem, problem), "problem": problem,
@@ -329,6 +390,27 @@ def read_audit(audit_id: str):
     return dashboard_payload(get_audit(audit_id))
 
 
+@app.get("/api/audits/{audit_id}/panel")
+def read_panel(audit_id: str):
+    """The model panel: {status: none|queued|running|ok|declined|error, ...}. `ok` carries the full result."""
+    return safe(panel_snapshot(get_audit(audit_id)))
+
+
+class PanelRequest(BaseModel):
+    seeds: int = Field(3, ge=2, le=5)
+
+
+@app.post("/api/audits/{audit_id}/panel")
+def start_panel(audit_id: str, req: PanelRequest):
+    audit = get_audit(audit_id)
+    if audit["state"].target is None:
+        raise HTTPException(400, "the model panel needs a target column")
+    if panel_snapshot(audit).get("status") in ("queued", "running"):
+        raise HTTPException(409, "the model panel is already running")
+    queue_panel(audit_id, req.seeds)
+    return {"status": "queued"}
+
+
 class ApplyRequest(BaseModel):
     issues: list[str]
 
@@ -352,15 +434,17 @@ def apply_selection(audit_id: str, req: ApplyRequest):
 def repair_log(audit_id: str, variant: str = Query("evidence", pattern="^(evidence|aggressive)$"),
                action: str | None = None, issue: str | None = None, page: int = Query(1, ge=1),
                page_size: int = Query(50, ge=10, le=500)):
-    result = get_audit(audit_id)["result"]
+    audit = get_audit(audit_id)
+    result = audit["result"]
+    texts = PROBLEM_TEXT_REGRESSION if audit["state"].task == "regression" else PROBLEM_TEXT
     log = result.repair_log if variant == "evidence" else result.repair_log_aggressive
     view = log
     if action:
         view = view[view.action.isin(action.split(","))]
     if issue:
-        if issue not in PROBLEM_TEXT:
+        if issue not in texts:
             raise HTTPException(400, "unknown issue")
-        view = view[view.problem == PROBLEM_TEXT[issue]]
+        view = view[view.problem == texts[issue]]
     total = int(len(view))
     chunk = view.iloc[(page - 1) * page_size: page * page_size]
     return {"total": total, "page": page, "page_size": page_size, "rows": records(chunk),
@@ -387,6 +471,10 @@ def audit_files(audit: dict) -> dict[str, bytes]:
         files["baseline_health_report.json"] = json.dumps(
             {"baseline": audit["baseline"], "target": audit.get("baseline_target")}, indent=2).encode("utf-8")
         files["baseline_health_report.csv"] = snapshot_rows(audit["baseline"]).to_csv(index=False).encode("utf-8")
+    panel = panel_snapshot(audit)
+    if panel.get("status") == "ok":
+        files["model_panel.json"] = json.dumps(safe(panel), indent=2).encode("utf-8")
+        files["model_panel.csv"] = (panel_rows_regression if panel.get("task") == "regression" else panel_rows)(panel).to_csv(index=False).encode("utf-8")
     return files
 
 
@@ -407,6 +495,68 @@ def download_zip(audit_id: str):
             z.writestr(name, data)
     return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="taskclean_output.zip"'})
+
+
+# ----------------------------------------------------------------------------------------------- controlled proof (Phase 20)
+PROOF: dict = {"live": None, "live_regression": None}
+
+
+def _proof_key(task: str) -> str:
+    return "live_regression" if task == "regression" else "live"
+
+
+def _saved_proof(task: str = "classification"):
+    p = RESULTS / ("phase21_proof.json" if task == "regression" else "phase20_proof.json")
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def run_proof_job(n_seeds: int, task: str = "classification"):
+    key = _proof_key(task)
+
+    def on(f: float, m: str):
+        with LOCK:
+            PROOF[key].update(progress=round(f, 3), message=m)
+
+    try:
+        run = run_controlled_proof_regression if task == "regression" else run_controlled_proof
+        result = run(PROOF_SEEDS[:n_seeds], progress=on)
+        with LOCK:
+            PROOF[key] = {**result, "source": "live re-run"}
+    except Exception as e:                      # noqa: BLE001
+        traceback.print_exc()
+        with LOCK:
+            PROOF[key] = {"status": "error", "reason": f"{type(e).__name__}: {e}"}
+
+
+@app.get("/api/proof")
+def read_proof(task: str = "classification"):
+    """The controlled proof (clean held-out set, known injected errors). A finished live re-run wins over the saved registered run."""
+    if task not in TASKS:
+        raise HTTPException(400, f"task must be one of {list(TASKS)}")
+    with LOCK:
+        live = dict(PROOF[_proof_key(task)]) if PROOF[_proof_key(task)] else None
+    if live and live.get("status") in ("running", "queued", "error", "ok"):
+        return safe(live)
+    saved = _saved_proof(task)
+    return safe({**saved, "source": "saved registered run"}) if saved else {"status": "none"}
+
+
+class ProofRequest(BaseModel):
+    seeds: int = Field(3, ge=2, le=5)
+    task: str = "classification"
+
+
+@app.post("/api/proof")
+def start_proof(req: ProofRequest):
+    if req.task not in TASKS:
+        raise HTTPException(400, f"task must be one of {list(TASKS)}")
+    key = _proof_key(req.task)
+    with LOCK:
+        if PROOF[key] and PROOF[key].get("status") in ("queued", "running"):
+            raise HTTPException(409, "the controlled proof is already running")
+        PROOF[key] = {"status": "queued", "progress": 0.0, "message": "Waiting for the previous job to finish"}
+    EXECUTOR.submit(lambda: (PROOF[key].update(status="running", message="Starting"), run_proof_job(req.seeds, req.task)))
+    return {"status": "queued"}
 
 
 # ----------------------------------------------------------------------------------------------- research results

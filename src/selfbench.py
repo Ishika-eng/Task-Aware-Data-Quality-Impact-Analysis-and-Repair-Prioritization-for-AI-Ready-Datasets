@@ -92,13 +92,15 @@ class SelfBench:
     baseline_floors: dict = field(default_factory=dict)
     skipped_issues: dict = field(default_factory=dict)
     seconds: float = 0.0
+    task: str = "classification"      # Phase 21: regression runs live in selfbench_regression.py and set task='regression'
 
     def summary(self) -> dict:
         if not self.ok:
             return {"ran": False, "reason": self.reason, "reference": self.reference}
         rec = lambda df: df.to_dict("records")          # noqa: E731
         return {
-            "ran": True, "metric": self.metric, "model": f"RandomForestClassifier (n_estimators={self.n_estimators})",
+            "ran": True, "metric": self.metric,
+            "model": f"{'RandomForestRegressor' if self.task == 'regression' else 'RandomForestClassifier'} (n_estimators={self.n_estimators})",
             "seeds": self.n_seeds, "rates": list(self.rates), "reference": self.reference,
             "noise_floor": self.noise_floor, "null_experiment_rms_f1_change": self.null_noise,
             "noise_floor_auc": self.noise_floor_auc, "null_experiment_rms_auc_change": self.null_noise_auc,
@@ -114,6 +116,8 @@ class SelfBench:
             "detector_tracking": rec(self.detector_tracking),
             "detector_false_positive_floors_on_reference": self.baseline_floors,
             "issues_not_measured": self.skipped_issues, "seconds": round(self.seconds, 1),
+            **({"task": "regression", "metric_note": "baseline_f1 and chance_level_f1 hold R-squared for a regression run"}
+               if self.task == "regression" else {}),
         }
 
 

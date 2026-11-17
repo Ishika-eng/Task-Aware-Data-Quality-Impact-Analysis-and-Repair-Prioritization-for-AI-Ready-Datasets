@@ -52,6 +52,7 @@ export function Calibration() {
     );
 
   const ref = cal.reference!;
+  const reg = cal.task === "regression";
   const floor = metric === "f1" ? cal.noise_floor! : (cal.noise_floor_auc ?? cal.noise_floor!);
   const funnel = [
     ["Labeled rows", ref.rows_labeled], ["Complete rows", ref.rows_complete], ["Without duplicates", ref.rows_after_dedup], ["Used as reference", ref.rows_used],
@@ -60,12 +61,12 @@ export function Calibration() {
   const cols: Col<EvidenceRow>[] = [
     { key: "e", header: "Error", cell: (r) => <span className="flex items-center gap-2 font-medium"><Dot color={ISSUE_COLOR[r.error_type]} />{ISSUE_NAME[r.error_type] ?? r.error_type}</span> },
     { key: "r", header: "Rate", align: "right", cell: (r) => pct(r.rate, 0) },
-    { key: "d1", header: "Damage (F1)", align: "right", cell: (r) => signed(r.mean_damage) },
+    { key: "d1", header: reg ? "Damage (R²)" : "Damage (F1)", align: "right", cell: (r) => signed(r.mean_damage) },
     { key: "d2", header: "Damage (AUC)", align: "right", cell: (r) => signed(r.mean_damage_auc) },
     { key: "p", header: "Repair precision", align: "right", cell: (r) => pct(r.repair_precision, 0) },
     { key: "c", header: "Repair recall", align: "right", cell: (r) => pct(r.repair_recall, 0) },
     { key: "rec", header: "Recovery", align: "right", cell: (r) => signed(r.mean_recovery) },
-    { key: "s", header: "Evidence F1 / AUC", cell: (r) => <span className="flex gap-1"><Status value={r.status_macrof1} /><Status value={r.status_auc} /></span> },
+    { key: "s", header: reg ? "Evidence (R²)" : "Evidence F1 / AUC", cell: (r) => <span className="flex gap-1"><Status value={r.status_macrof1} />{!reg && <Status value={r.status_auc} />}</span> },
     { key: "m", header: "Harm risk", align: "right", cell: (r) => num(r.material_risk) },
     { key: "ok", header: "Certifiable", cell: (r) => (r.underpowered ? <Badge tone="warn">no (noisy)</Badge> : <Badge tone="good">yes</Badge>) },
   ];
@@ -74,9 +75,9 @@ export function Calibration() {
     <Page title="Calibration" subtitle={`Measured on a clean-ish reference built from your own data: ${cal.n_seeds} seeds, ${cal.rates?.map((r) => `${Math.round(r * 100)}%`).join(" / ")} corruption, ${cal.metric}. Took ${seconds(cal.seconds ?? 0)}.`}>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Stat label="Reference rows" value={int(ref.rows_used)} hint={`${int(ref.rows_train)} train · ${int(ref.rows_test)} test`} />
-        <Stat label="Clean macro-F1" value={num(cal.clean_macro_f1, 3)} />
+        <Stat label={reg ? "Clean R²" : "Clean macro-F1"} value={num(cal.clean_macro_f1, 3)} />
         <Stat label="Chance level" value={num(cal.chance_f1, 3)} hint="same model, shuffled labels" />
-        <Stat label="Noise floor (F1)" value={num(cal.noise_floor)} tone={cal.noise_floor! > 0.01 ? "warn" : "neutral"} />
+        <Stat label={reg ? "Noise floor (R²)" : "Noise floor (F1)"} value={num(cal.noise_floor)} tone={cal.noise_floor! > 0.01 ? "warn" : "neutral"} />
         {cal.has_auc && <Stat label="Noise floor (AUC)" value={num(cal.noise_floor_auc)} tone={cal.noise_floor_auc! > 0.01 ? "warn" : "neutral"} />}
       </div>
 
