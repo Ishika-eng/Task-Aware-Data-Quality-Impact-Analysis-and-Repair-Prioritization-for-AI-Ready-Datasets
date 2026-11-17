@@ -177,3 +177,51 @@ What this does and does not show:
   is untested and is not claimed.
 - Nothing was changed in response: the evidence rule's "negative" status stands, so these repairs stay in the review
   queue rather than being applied automatically.
+
+---
+
+# Amendment A1 (2026-11-17, written before the code change): the abbreviation rule must not run backwards
+
+**Found by:** the first test of the Phase 18 health report on a real dataset it had not been built on (IBM Telco churn, 7,043
+rows, `data/telco_churn_original.csv`, SHA-256 `16320c9c1ec72448db59aa0a26a0b95401046bef5d02fd3aeb906448e3055e91`). The
+detector flagged 682 cells in `MultipleLines` and proposed rewriting `No phone service` to `No`. Those are two different
+categories (`No` = has a phone line but not multiple lines; `No phone service` = no line). Same pattern in
+`OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`, `StreamingMovies` (`No internet service`
+vs `No`); those escaped only because `No internet service` is 30.4%-35% of the pair, just above the 0.30 limit.
+
+**Cause (`_analyse_column` in `src/inconsistency.py`).** The rule says an abbreviation is a short key that is a prefix or the
+initials of exactly one other key, and that the *abbreviation* is the rare form (the minority-share test). The merge
+direction was `small, big = (a, b) if ta <= tb else (b, a)`, where `small`/`big` are by *count*. When the short key `a`
+(`no`) is the **more frequent** one, that line merges the longer key into the abbreviation, the opposite of what the rule
+defines. The Phase 14 validation never exercised this because the injected abbreviations are always the rare form.
+
+**Change.** Merge `a -> b` only when `a` is the less frequent of the two (`ta <= tb`). If the short key is the more frequent
+one, it is not an abbreviation of the longer value under this rule: nothing is flagged for the pair. (A short key being a
+prefix of a longer, rarer key is a common, legitimate pattern: `No` / `No phone service`, `Y` / `Yes please`.)
+
+**Criteria, fixed now (before any run):**
+* **A1-1.** Telco `MultipleLines` flags 0 cells (was 682); the other six service columns flag 0.
+* **A1-2.** A planted frame with a majority short key (`No` 900, `No phone service` 100) flags 0 cells, and the same frame with
+  the roles reversed (`Fem` 100, `Female` 900) still flags the 100 `Fem` cells and repairs them to `Female`.
+* **A1-3.** `src/test_phase14.py` passes unchanged.
+* **A1-4.** The 5-seed Phase 14 validation (`phase14_validation.py --full --only inconsistency`) shows the same abbreviation
+  flag recall, repair recall and precision as before, to the precision the saved summary reports. A difference is reported,
+  not explained away.
+* **A1-5.** On every real dataset in `data/`, flagged-cell counts under the new rule are <= the counts under the old rule,
+  and every removed flag is listed.
+* **Consequence rule.** If A1-4 shows lost recall or any new false repair, the change is reverted and the problem reported.
+
+## Amendment A1: results (2026-11-17)
+
+| Criterion | Verdict | Evidence |
+|---|---|---|
+| A1-1 Telco | **PASS** | `MultipleLines` flags 0 cells (was 682); all Telco columns flag 0 |
+| A1-2 planted reversal | **PASS** | `No` 900 / `No phone service` 100 (and 700/300, 3390/682, 95/5): 0 flags. `Fem` 100 / `Female` 900: exactly 100 `abbreviation` flags, repaired to `Female`. Boundary 30/70 still flagged. The new test fails on the old code (`('No phone service', 'No', 'abbreviation')`) |
+| A1-3 `test_phase14.py` | **PASS** | all existing invariants pass, plus `test_abbreviation_rule_does_not_run_backwards` |
+| A1-4 validation unchanged | **PASS, by identity of the cells, not by re-fitting** | for all 15 (rate x seed) injected Adult frames, the old and new detector return identical flagged-cell sets (row, column, original value, proposed value, rule, tier). Repairs, precision and recall are computed from those cells, so they are identical by construction; the random-forest F1 columns were **not** re-fitted and `results/phase14_inconsistency_*.csv` were not regenerated |
+| A1-5 real datasets | **PASS** | Adult 0 -> 0, Bank 0 -> 0, credit_g 0 -> 0, heart_c 0 -> 0, Telco 682 -> 0. The only removed flags are the 682 `No phone service -> No` cells |
+
+Scope of what this shows: it removes a rule that ran backwards. It does not show that the remaining `abbreviation` rule
+is right on data nobody has tried. A rare short key that is a prefix of a common longer one (`Un` / `Unknown`) is still
+repaired, so the product keeps reading it as "likely, verify" (the Phase 18 report says so). The Telco file was added to
+`data/` as `telco_churn_original.csv` so the real-data check covers it from now on.

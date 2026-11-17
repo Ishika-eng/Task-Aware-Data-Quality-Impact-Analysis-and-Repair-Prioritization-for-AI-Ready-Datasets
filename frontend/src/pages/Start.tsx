@@ -4,6 +4,7 @@ import { ArrowRight, FileSpreadsheet, Loader2, Play, Sparkles, UploadCloud } fro
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type DatasetInfo } from "../api";
+import { HealthReport } from "../components/HealthReport";
 import { Alert, Badge, Button, Card, Page, ProgressBar, Segmented, Switch } from "../components/ui";
 import { cellText, int, seconds } from "../lib";
 
@@ -125,6 +126,12 @@ export function Start() {
   const targetProblem = !col ? null : col.n_unique < 2 ? `'${col.name}' has fewer than 2 distinct values: there is nothing to classify.`
     : col.n_unique > maxClasses ? `'${col.name}' has ${int(col.n_unique)} distinct values. TaskClean supports classification only (up to ${maxClasses} classes); this looks like a regression target or an ID column.` : null;
   const hasTarget = target !== NO_TARGET;
+  // the stored baseline snapshot (never recomputed) plus, once a target is chosen, that column's profile
+  const health = useQuery({
+    queryKey: ["health", ds?.id, hasTarget ? target : null],
+    queryFn: () => api.datasetHealth(ds!.id, hasTarget ? target : null),
+    enabled: !!ds, placeholderData: (prev) => prev, staleTime: Infinity,
+  });
   const error = (upload.error ?? demo.error ?? start.error) as Error | null;
 
   const run = () => ds && start.mutate({
@@ -174,6 +181,11 @@ export function Start() {
         <div className="min-w-0 space-y-6">
           <Card title="Preview" description="First 10 rows exactly as read from the file.">
             <PreviewTable ds={ds} />
+          </Card>
+          <Card title="Baseline health report" description="A snapshot of your raw file, captured now, before any cleaning. It is saved with the dataset and never changes.">
+            {health.isLoading && <div className="flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" /> Profiling the file…</div>}
+            {health.isError && <Alert tone="warn" title="The baseline report could not be built">{(health.error as Error).message}. You can still run the audit.</Alert>}
+            {health.data && <HealthReport snapshot={health.data.snapshot} target={health.data.target} />}
           </Card>
           <Card title="Columns" description={`${ds.columns.length} columns. Click a candidate to use it as the target.`}>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">

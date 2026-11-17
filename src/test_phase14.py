@@ -61,6 +61,25 @@ def test_inconsistency_guards():
     print("OK inconsistency guards: no false positives on the traps they exist for")
 
 
+def test_abbreviation_rule_does_not_run_backwards():
+    # Amendment A1: a FREQUENT short key next to a rarer long key is two real categories (found on Telco churn, where
+    # "No phone service" was rewritten to "No"). Several mixes, including shares well under the 0.30 limit.
+    for n_short, n_long in [(900, 100), (700, 300), (3390, 682), (95, 5)]:
+        _, _, got = cells_of(["No"] * n_short + ["No phone service"] * n_long + ["Yes"] * 800)
+        assert got == set(), f"majority short key must not be merged, {n_short}/{n_long}: {got}"
+    # the same words with the roles reversed: the rare short form IS the abbreviation and is still repaired
+    r, _, got = cells_of(["Female"] * 900 + ["Fem"] * 100 + ["Male"] * 800)
+    assert got == {("Fem", "Female", "abbreviation")}, got
+    assert r.extra["cells"].shape[0] == 100
+    # a short key that is the rarer one of an equal-sized pair stays unflagged (share 0.5 > limit)
+    _, _, got = cells_of(["No"] * 50 + ["No phone service"] * 50)
+    assert got == set(), got
+    # a tie at the limit goes to the short key as the minority: 30 / (30 + 70) = 0.30
+    _, _, got = cells_of(["Female"] * 70 + ["Fem"] * 30)
+    assert got == {("Fem", "Female", "abbreviation")}, got
+    print("OK abbreviation direction: frequent short key untouched, rare short key repaired")
+
+
 def test_vocabulary_guard_counts_keys_not_spellings():
     # a genuine identifier column (every value distinct) must still be skipped, and must produce nothing
     ids = pd.DataFrame({"occ": pd.Series([f"user-{i:06d}" for i in range(3000)], dtype=object)})
@@ -198,6 +217,7 @@ if __name__ == "__main__":
     test_injectors_are_honest()
     test_inconsistency_found()
     test_inconsistency_guards()
+    test_abbreviation_rule_does_not_run_backwards()
     test_vocabulary_guard_counts_keys_not_spellings()
     test_inconsistency_invariants()
     test_relevance_planted()

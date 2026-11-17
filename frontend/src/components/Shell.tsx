@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { ClipboardCheck, Columns3, FileDown, FlaskConical, Gauge, LayoutDashboard, Menu, Moon, SearchCheck, ShieldCheck, Sun, TrendingDown, UploadCloud, Wrench, X } from "lucide-react";
+import { ClipboardCheck, Columns3, FileDown, FlaskConical, Gauge, HeartPulse, LayoutDashboard, Menu, Moon, SearchCheck, ShieldCheck, Sun, TrendingDown, UploadCloud, Wrench, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -56,6 +56,7 @@ function SidebarBody({ auditId, onNavigate }: { auditId: string | null; onNaviga
       {base && (
         <NavGroup title="Current audit">
           {item(base, "Overview", LayoutDashboard, true)}
+          {item(`${base}/baseline`, "Baseline health", HeartPulse)}
           {item(`${base}/quality`, "Quality audit", SearchCheck)}
           {item(`${base}/features`, "Features", Columns3, false, dropCandidates)}
           {item(`${base}/calibration`, "Calibration", Gauge)}

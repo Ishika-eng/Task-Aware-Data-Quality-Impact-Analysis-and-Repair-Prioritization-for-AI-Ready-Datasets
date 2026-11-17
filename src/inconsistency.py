@@ -118,9 +118,11 @@ def _analyse_column(counts: pd.Series) -> dict[str, dict]:
         if len(cands) == 1:
             b = cands[0]
             tb = ent[b]["total"]
-            if min(ta, tb) / (ta + tb) <= ABBREV_MAX_MINORITY_SHARE:
-                small, big = (a, b) if ta <= tb else (b, a)
-                merge_to[small] = big
+            # Amendment A1 (docs/PHASE14_SPEC.md): only the short key may be merged into the long one, and only when
+            # the short key is the rarer. A frequent short key ("No") next to a rarer long one ("No phone service") is
+            # two real categories, not an abbreviation; merging the long one into the short one ran the rule backwards.
+            if ta <= tb and ta / (ta + tb) <= ABBREV_MAX_MINORITY_SHARE:
+                merge_to[a] = b
         else:
             tmax = max(ent[b]["total"] for b in cands)
             if ta / (ta + tmax) <= ABBREV_MAX_MINORITY_SHARE:

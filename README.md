@@ -155,6 +155,33 @@ model-based audit again.
 | `impact_report.csv` | benchmark-based task-impact estimate, repair evidence, and the decision per issue |
 | `readiness_report.json` / `.csv` | the multidimensional readiness report with evidence status, after-cleaning rates, and limitations |
 | `selfbenchmark_evidence.csv` / `selfbenchmark_runs.csv` | (only when calibrated) the evidence table and every individual calibration run |
+| `baseline_health_report.json` / `.csv` | the **baseline health report** captured when the file was uploaded (see below), as nested JSON and as a flat `section,item,metric,value` table |
+
+### The baseline health report (Phase 18)
+
+Right after upload, before you choose a target or run anything, TaskClean takes a **diagnostic snapshot of the raw file**
+and stores it with the dataset. It is shown on the Start page, kept as the **Baseline health** page of the dashboard,
+and downloadable (`baseline_health_report.csv` / `.json`). It never changes afterwards: cleaning the data does not touch it,
+so it always describes the file as it arrived. It records the file's SHA-256 and capture time.
+
+| Section | What it reports |
+|---|---|
+| What the file is | file size, SHA-256, rows, columns, memory, how it was read; column type breakdown (numeric, categorical, boolean, datetime, text, numbers stored as text, including currency/percent-formatted numbers such as `"$1,200"`); per column: distinct values, missing, min/median/max or most common values |
+| Completeness | missing cells overall and per column (real blanks and placeholders like `?`, `N/A`, `-`), rows with a missing cell, entirely empty columns |
+| Duplicates | exact duplicate rows; near-duplicates (equal after trimming, collapsing spaces and lower-casing text) |
+| Anomalies | outlier rows by 1.5 x IQR and by \|Z\| > 3; heavily skewed columns (\|skew\| > 1.5); constant columns; possible identifier columns |
+| Inconsistent spellings | cells holding a non-canonical spelling of a value (`NYC` / `nyc`), broken down by rule (case/spacing variants: certain; likely abbreviations: verify; ambiguous abbreviations and typos: flagged only), with examples |
+| Target (once chosen) | rows without a target, classes and shares, imbalance, classes with fewer than 20 rows |
+
+Each row of the problems table says whether it uses **the audit's own definition** (missing cells, exact duplicates, IQR
+outliers, inconsistent spellings: the audit later reports the same numbers, which a test checks) or is **report-only** (near-duplicates,
+\|Z\| outliers, skew, constant and identifier columns, formatted numbers: new, not validated, never repaired).
+**There is no health score**: the project's own test found an aggregate of detected rates unsupported, and a score would
+reward repairs the evidence says can hurt a model. Wrong labels and anomalous feature values need a trained model and stay with
+the audit; how much each problem costs a model stays with the Impact page. Spec: [`docs/PHASE18_SPEC.md`](docs/PHASE18_SPEC.md).
+Skew is not reported for two-valued (0/1) columns. It was tested on a second real file, IBM Telco churn (`data/telco_churn_original.csv`), which found and fixed three problems, including an abbreviation rule that ran backwards and proposed rewriting `No phone service` to `No` ([Phase 14 Amendment A1](docs/PHASE14_SPEC.md), [Phase 18 notes](docs/PHASE18_SPEC.md)).
+One thing it surfaces that the audit does not handle: numbers with currency symbols or thousands separators are read by the audit
+as categories, not numbers.
 
 `row_id` in the log is the 0-based row position in the **uploaded** file. A sample set is in
 [`taskclean_output_demo/`](taskclean_output_demo/).
@@ -390,33 +417,6 @@ re-tuned for Bank Marketing; Logistic Regression was not part of this phase; the
 were not tested: that gradient boosting's smaller Adult damage reflects its higher clean accuracy, and why imputed values
 hurt it.
 
-## Reproducing the experiments
-
-Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`).
-
-| Phase | Command | Notes |
-|---|---|---|
-| 2 | `python3 baseline.py` | clean baselines |
-| 3-4 | `python3 phase3_4_test.py` | writes `results/corruption_log.csv` |
-| 5 | `python3 phase5_test.py` | several minutes (cross-feature detector) |
-| 6 | `python3 quality_report.py` | several minutes |
-| 7 | `python3 phase7_impact.py --full` | omit `--full` for a quick single-seed run |
-| 8 | `python3 phase8_oracle_repair.py --full` | |
-| 9 | `python3 phase9_repair_engine.py --full` | long-running (tens of minutes) |
-| 10 | `python3 phase10_prioritization.py` | aggregation only, seconds |
-| 11 | `python3 phase11_readiness.py` | validation, several minutes |
-| 11 | `python3 phase11c_report_demo.py` | renders the readiness report |
-| product | `python3 test_taskclean.py` | end-to-end invariants |
-| calibration | `python3 test_selfbench.py` | about a minute |
-| 13 | `python3 phase13_transfer.py data` then `groundtruth` (about 8 min), `calibration`, `regimes`, `report` | second-dataset validation |
-| 16 | `python3 phase16_gb.py --stage N` for N = 0..7 (stage 4 about 90 min, stage 6 about 13 min, stage 7 about 15 min); `python3 test_phase16.py` | gradient-boosting check |
-
-Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
-hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
-The `*_full.csv` files in `results/` are the authoritative 5-seed results; `*_single_seed.csv` are validation runs.
-
-## Project structure
-
 ## Why does KNN imputation hurt gradient boosting? (Phase 17)
 
 Phase 16 found that the missing-values repair lowers gradient-boosting F1 by about 0.02 *below* leaving the cells blank
@@ -445,6 +445,35 @@ where. Every arm shares one corruption draw and one KNN run and changes only whi
 
 Run: `.venv/bin/python src/phase17_knn.py --stage a|b|c|d` (about 13, 5, 5 and 11 minutes); tests: `src/test_phase17.py`.
 
+## Reproducing the experiments
+
+Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`).
+
+| Phase | Command | Notes |
+|---|---|---|
+| 2 | `python3 baseline.py` | clean baselines |
+| 3-4 | `python3 phase3_4_test.py` | writes `results/corruption_log.csv` |
+| 5 | `python3 phase5_test.py` | several minutes (cross-feature detector) |
+| 6 | `python3 quality_report.py` | several minutes |
+| 7 | `python3 phase7_impact.py --full` | omit `--full` for a quick single-seed run |
+| 8 | `python3 phase8_oracle_repair.py --full` | |
+| 9 | `python3 phase9_repair_engine.py --full` | long-running (tens of minutes) |
+| 10 | `python3 phase10_prioritization.py` | aggregation only, seconds |
+| 11 | `python3 phase11_readiness.py` | validation, several minutes |
+| 11 | `python3 phase11c_report_demo.py` | renders the readiness report |
+| product | `python3 test_taskclean.py` | end-to-end invariants |
+| calibration | `python3 test_selfbench.py` | about a minute |
+| 13 | `python3 phase13_transfer.py data` then `groundtruth` (about 8 min), `calibration`, `regimes`, `report` | second-dataset validation |
+| 16 | `python3 phase16_gb.py --stage N` for N = 0..7 (stage 4 about 90 min, stage 6 about 13 min, stage 7 about 15 min); `python3 test_phase16.py` | gradient-boosting check |
+| 17 | `python3 phase17_knn.py --stage a`, `b`, `c`, `d`; `python3 test_phase17.py` | why KNN imputation hurts gradient boosting, and the fix |
+| 18 | `python3 test_phase18.py` | baseline health report (a product feature, not an experiment: no results files) |
+
+Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
+hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
+The `*_full.csv` files in `results/` are the authoritative 5-seed results; `*_single_seed.csv` are validation runs.
+
+## Project structure
+
 ```
 app.py                         Streamlit front end
 src/
@@ -465,7 +494,6 @@ src/
   training_log.py              provenance log of every model fit
   make_demo_dataset.py         builds data/demo_dirty_adult.csv
   errors.py train.py impact.py repair.py readiness.py pipeline.py
-| 17 | `python3 phase17_knn.py --stage a`, `b`, `c`, `d`; `python3 test_phase17.py` | why KNN imputation hurts gradient boosting, and the fix |
                                superseded v1 prototype (breast-cancer data); not used by the current pipeline
 data/                          Adult (original + clean) and the demo dataset with its corruption log
 results/                       raw and summary CSVs for every experiment

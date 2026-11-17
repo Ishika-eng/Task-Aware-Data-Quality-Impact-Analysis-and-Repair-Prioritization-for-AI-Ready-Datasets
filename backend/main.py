@@ -12,12 +12,14 @@ State is kept in memory (single local user): uploaded datasets, audit jobs, and 
 """
 from __future__ import annotations
 
+import io
 import json
 import sys
 import threading
 import time
 import traceback
 import uuid
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -31,11 +33,12 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from health_snapshot import build_snapshot, snapshot_rows, target_profile  # noqa: E402
 from selfbench import IMBALANCE_WARNING_SHARE, NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
 from taskclean import (ISSUES, MAX_CAT_LEVELS, MAX_CERTIFIABLE_NOISE_FLOOR, MAX_CLASSES, MAX_MODEL_ROWS,  # noqa: E402
                        NEVER_AUTO_APPLY, PROBLEM_TEXT, SAFE_REPAIR_MIN_PRECISION, TASKCLEAN_VERSION, _sanitize,
                        apply_repairs, attach_self_benchmark, audit_dataset, default_apply_issues, load_csv,
-                       outputs_as_bytes, outputs_zip)
+                       outputs_as_bytes)
 
 DEMO_PATH = ROOT / "data" / "demo_dirty_adult.csv"
 RESULTS = ROOT / "results"
@@ -107,9 +110,18 @@ def dataset_payload(dataset_id: str) -> dict:
             "preview": json.loads(head.to_json(orient="records")), "demo": bool(ds.get("demo"))}
 
 
-def store_dataset(df: pd.DataFrame, info: dict, name: str, demo: bool = False) -> str:
+def store_dataset(df: pd.DataFrame, info: dict, name: str, demo: bool = False, raw: bytes | None = None) -> str:
+    """Store the upload and capture the baseline health report NOW, before anything touches the data. The snapshot is
+    stored with the dataset and never recomputed. A failure to build it must never block the upload."""
     dataset_id = uuid.uuid4().hex[:10]
-    DATASETS[dataset_id] = {"df": df, "info": info, "name": name, "demo": demo}
+    snapshot, error = None, None
+    try:
+        snapshot = safe(build_snapshot(df, info, name, raw))
+    except Exception as e:                      # noqa: BLE001
+        traceback.print_exc()
+        error = f"{type(e).__name__}: {e}"
+    DATASETS[dataset_id] = {"df": df, "info": info, "name": name, "demo": demo, "snapshot": snapshot,
+                            "snapshot_error": error}
     return dataset_id
 
 
@@ -135,21 +147,36 @@ async def upload_dataset(file: UploadFile = File(...)):
         df, info = load_csv(raw)
     except Exception as e:                      # a malformed CSV is user input, not a server bug
         raise HTTPException(400, f"Could not read that file as CSV: {e}")
-    return dataset_payload(store_dataset(df, info, file.filename or "upload.csv"))
+    return dataset_payload(store_dataset(df, info, file.filename or "upload.csv", raw=raw))
 
 
 @app.post("/api/datasets/demo")
 def demo_dataset():
     if not DEMO_PATH.exists():
         raise HTTPException(404, "demo dataset missing (run src/make_demo_dataset.py)")
-    df, info = load_csv(str(DEMO_PATH))
-    return dataset_payload(store_dataset(df, info, "demo_dirty_adult.csv", demo=True))
+    raw = DEMO_PATH.read_bytes()
+    df, info = load_csv(raw)
+    return dataset_payload(store_dataset(df, info, "demo_dirty_adult.csv", demo=True, raw=raw))
 
 
 @app.get("/api/datasets/{dataset_id}")
 def read_dataset(dataset_id: str):
     get_dataset(dataset_id)
     return dataset_payload(dataset_id)
+
+
+@app.get("/api/datasets/{dataset_id}/health")
+def read_health(dataset_id: str, target: str | None = None):
+    """The baseline health report captured at upload (never recomputed), plus, if a target is given, its profile."""
+    ds = get_dataset(dataset_id)
+    if ds.get("snapshot") is None:
+        raise HTTPException(500, f"the baseline health report could not be built: {ds.get('snapshot_error')}")
+    out = {"snapshot": ds["snapshot"], "target": None}
+    if target is not None:
+        if target not in ds["df"].columns:
+            raise HTTPException(400, f"target column '{target}' not found in the dataset")
+        out["target"] = safe(target_profile(ds["df"], target))
+    return out
 
 
 # ----------------------------------------------------------------------------------------------- audit jobs
@@ -188,7 +215,8 @@ def run_audit_job(job_id: str, req: AuditRequest):
         applied = default_apply_issues(state)
         AUDITS[audit_id] = {"id": audit_id, "dataset_id": req.dataset_id, "dataset_name": ds["name"], "state": state,
                             "result": result, "applied": applied, "label": "policy default", "request": req.model_dump(),
-                            "created": time.time()}
+                            "created": time.time(), "baseline": ds.get("snapshot"),
+                            "baseline_target": safe(target_profile(df, req.target)) if req.target else None}
         job.update(status="done", progress=1.0, message="Audit complete", audit_id=audit_id, finished=time.time())
     except ValueError as e:                    # data the tool does not support: tell the user why
         job.update(status="error", error=str(e), message="Audit could not run", finished=time.time())
@@ -271,7 +299,7 @@ def review_summary(result) -> dict:
 def dashboard_payload(audit: dict) -> dict:
     state, result = audit["state"], audit["result"]
     rd = result.readiness
-    files = outputs_as_bytes(result)
+    files = audit_files(audit)
     default = default_apply_issues(state)
     return safe({
         "id": audit["id"], "dataset_id": audit["dataset_id"], "dataset_name": audit["dataset_name"],
@@ -286,6 +314,7 @@ def dashboard_payload(audit: dict) -> dict:
         "readiness": rd["dimensions"],
         "limitations": rd["limitations"],
         "calibration": calibration_payload(state),
+        "baseline": audit.get("baseline"), "baseline_target": audit.get("baseline_target"),
         "selection": {"applied": sorted(audit["applied"]), "default": sorted(default), "label": audit["label"]},
         "summary": {"evidence_based": result.summary, "aggressive": result.summary_aggressive},
         "review": review_summary(result),
@@ -351,9 +380,19 @@ def review_csv(audit_id: str, variant: str = Query("evidence", pattern="^(eviden
 MEDIA = {"csv": "text/csv", "json": "application/json"}
 
 
+def audit_files(audit: dict) -> dict[str, bytes]:
+    """Every output file of an audit, plus the baseline health report captured at upload (JSON and flat CSV)."""
+    files = outputs_as_bytes(audit["result"])
+    if audit.get("baseline") is not None:
+        files["baseline_health_report.json"] = json.dumps(
+            {"baseline": audit["baseline"], "target": audit.get("baseline_target")}, indent=2).encode("utf-8")
+        files["baseline_health_report.csv"] = snapshot_rows(audit["baseline"]).to_csv(index=False).encode("utf-8")
+    return files
+
+
 @app.get("/api/audits/{audit_id}/download/{name}")
 def download_file(audit_id: str, name: str):
-    files = outputs_as_bytes(get_audit(audit_id)["result"])
+    files = audit_files(get_audit(audit_id))
     if name not in files:
         raise HTTPException(404, "unknown output file")
     return Response(files[name], media_type=MEDIA[name.rsplit(".", 1)[1]],
@@ -362,7 +401,11 @@ def download_file(audit_id: str, name: str):
 
 @app.get("/api/audits/{audit_id}/download.zip")
 def download_zip(audit_id: str):
-    return Response(outputs_zip(get_audit(audit_id)["result"]), media_type="application/zip",
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in audit_files(get_audit(audit_id)).items():
+            z.writestr(name, data)
+    return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="taskclean_output.zip"'})
 
 

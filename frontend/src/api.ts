@@ -200,6 +200,108 @@ export interface Calibration {
   metric_disagreement?: { error_type: string; disagree: boolean; note: string }[];
 }
 
+export interface HealthColumn {
+  name: string;
+  kind: string;
+  n_unique: number;
+  missing: number;
+  blank_cells: number;
+  placeholder_cells: number;
+  missing_pct: number;
+  examples: string[];
+  flags: string[];
+  min?: number | null;
+  max?: number | null;
+  mean?: number | null;
+  median?: number | null;
+  std?: number | null;
+  skew?: number | null;
+  top_values?: { value: string; share: number }[];
+}
+
+export interface OutlierBlock {
+  outlier_rows: number;
+  outlier_pct: number;
+  per_column: Record<string, number>;
+  rule: string;
+  percentile_rule_columns?: string[];
+}
+
+/** The baseline health report: a snapshot of the raw upload, captured before any cleaning (docs/PHASE18_SPEC.md). */
+export interface HealthSnapshot {
+  version: number;
+  captured_at_utc: string;
+  overview: {
+    file_name: string;
+    file_bytes: number | null;
+    file_mb: number | null;
+    sha256: string | null;
+    rows: number;
+    columns: number;
+    memory_mb: number;
+    input_format: Record<string, unknown>;
+    type_counts: Record<string, number>;
+  };
+  columns: HealthColumn[];
+  completeness: {
+    total_cells: number;
+    missing_cells: number;
+    blank_cells: number;
+    placeholder_cells: number;
+    missing_pct: number;
+    rows_with_missing: number;
+    rows_with_missing_pct: number;
+    columns_entirely_missing: string[];
+    placeholder_tokens: string[];
+  };
+  duplicates: {
+    exact_rows: number;
+    exact_pct: number;
+    exact_examples: number[];
+    near_extra_rows: number;
+    near_extra_pct: number;
+    near_examples: number[];
+    near_definition: string;
+  } | null;
+  anomalies: {
+    iqr: OutlierBlock | null;
+    zscore: OutlierBlock | null;
+    skewed_columns: { column: string; skew: number }[];
+    constant_columns: string[];
+    possible_identifier_columns: string[];
+  };
+  inconsistencies: {
+    rows: number;
+    rows_pct: number;
+    cells: number;
+    by_column: {
+      column: string;
+      cells: number;
+      by_rule: Record<string, number>;
+      examples: { value: string; canonical: string | null; rule: string }[];
+    }[];
+    by_rule: Record<string, number>;
+    rule_labels: Record<string, string>;
+    skipped_columns: Record<string, string>;
+  } | null;
+  notes: string[];
+  not_covered: string[];
+}
+
+export interface TargetProfile {
+  target: string;
+  rows: number;
+  rows_without_target: number;
+  rows_without_target_pct: number;
+  n_classes: number;
+  classes: { value: string; rows: number; share: number }[];
+  usable: boolean;
+  warnings: string[];
+  imbalance_ratio?: number;
+  minority_share?: number;
+  rare_classes?: string[];
+}
+
 export interface Audit {
   id: string;
   dataset_id: string;
@@ -220,6 +322,8 @@ export interface Audit {
   features: FeatureRow[] | null;
   files: { name: string; bytes: number }[];
   never_auto_apply: string[];
+  baseline: HealthSnapshot | null;
+  baseline_target: TargetProfile | null;
 }
 
 export interface FeatureRow {
@@ -325,6 +429,9 @@ export const api = {
     fd.append("file", file);
     return fetch("/api/datasets/upload", { method: "POST", body: fd }).then((r) => parse<DatasetInfo>(r));
   },
+  datasetHealth: (id: string, target: string | null) =>
+    fetch(`/api/datasets/${id}/health${target ? `?target=${encodeURIComponent(target)}` : ""}`).then((r) =>
+      parse<{ snapshot: HealthSnapshot; target: TargetProfile | null }>(r)),
   demoDataset: () => fetch("/api/datasets/demo", { method: "POST" }).then((r) => parse<DatasetInfo>(r)),
   startAudit: (req: AuditRequest) => fetch("/api/audits", json(req)).then((r) => parse<{ job_id: string }>(r)),
   job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => parse<Job>(r)),

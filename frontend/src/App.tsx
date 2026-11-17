@@ -5,6 +5,7 @@ import { api } from "./api";
 import { Shell } from "./components/Shell";
 import { Button, EmptyState, Skeleton } from "./components/ui";
 import { rememberAudit } from "./lib";
+import { Baseline } from "./pages/Baseline";
 import { Calibration } from "./pages/Calibration";
 import { Impact } from "./pages/Impact";
 import { Outputs } from "./pages/Outputs";
@@ -69,6 +70,7 @@ export default function App() {
         <Route index element={<Start />} />
         <Route path="audit/:id" element={<AuditLayout />}>
           <Route index element={<Overview />} />
+          <Route path="baseline" element={<Baseline />} />
           <Route path="quality" element={<Quality />} />
           <Route path="features" element={<Features />} />
           <Route path="calibration" element={<Calibration />} />
