@@ -362,6 +362,8 @@ export interface Audit {
   features: FeatureRow[] | null;
   files: { name: string; bytes: number }[];
   never_auto_apply: string[];
+  /** Phase 23 A1: proposals left in the review queue because the calibration did not cover their column, per issue type. */
+  held_back?: Record<string, { count: number; columns: Record<string, number> }>;
   baseline: HealthSnapshot | null;
   baseline_target: TargetProfile | null;
 }

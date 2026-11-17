@@ -506,6 +506,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 20 | `python3 test_phase20.py` (run: `python3 controlled_proof.py`) | controlled proof on a clean held-out set: tuned-selection leakage, summary logic, saved result endpoint |
 | 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
 | 22 | `python3 test_phase22.py` | Excel intake: round trip, sheets, layout, robustness, upload equals the same CSV ([spec](docs/PHASE22_SPEC.md)) |
+| 23 | `python3 test_phase23.py` (run: `python3 validate_new_datasets.py T`, `A`, `R`, `O`, `C`) | amendment A1 invariants; validation on five genuine files (data in `data/new/`, not committed) |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -541,6 +542,17 @@ docs/screenshots/              app screenshots
 notebooks/                     syllabus companion notebooks, one per unit (see notebooks/README.md); read-only on src/
 ```
 
+## Validation on genuine datasets it had never seen (Phase 23)
+
+The tool was run once on Titanic, Ames Housing, a UCI Real Estate `.xlsx`, a 1M-row UCI Online Retail II `.xlsx` and a legacy `.xls`, with
+the criteria written first ([docs/PHASE23_SPEC.md](docs/PHASE23_SPEC.md), results in `results/phase23_*.json`). It completed everywhere,
+refused the `.xls` with a clear message, read the half-million-row workbook in 11 s, and kept missing-value and duplicate detection exact
+(precision and recall 1.00 on injected errors). It also found a real defect: on Ames the calibrated default auto-applied 7,829 imputations,
+6,969 of them in columns the calibration never covered (mostly cells where `NA` means "feature absent"). That is fixed (Amendment A1: such
+repairs stay in the review queue; 860 are still applied, about 590 of them still structural). The outlier detector is the weakest part:
+precision 0.09-0.21 on injected errors and none of 60 sampled real flags was an error, so read outlier flags as "unusual values to
+look at". Cleaning did not improve any model on these files.
+
 ## Limitations
 
 - **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
@@ -558,7 +570,7 @@ notebooks/                     syllabus companion notebooks, one per unit (see n
 - **Before/after model metrics for uploads are indicative only.** The Model panel (Phase 19) compares models trained on raw and
   repaired rows, but an uploaded dataset has no clean held-out test set: the held-out rows are as dirty as the file, so a gain
   does not prove a repair correct. Changes below the measured noise floor are labelled as such.
-- **Placeholders.** A token such as `-` or `N/A` that is a genuine category in your data is over-counted as missing.
+- **Placeholders and blanks that mean "absent".** A token such as `-`, `N/A` or `None` that is a genuine category in your data is over-counted as missing, and a blank that means "no such feature" (Ames: no pool, no garage) looks like a missing value. Imputation of columns the calibration could not cover is held back (Phase 23 A1), but the rest is still imputed under calibration. Only you know which blanks are real.
 - **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
 - **Scope.** Classification targets (up to 20 classes), regression targets (a number; Phase 21), or no target at all. Duplicates are full-record duplicates (features +
   target). Inconsistent-value repair (Phase 14: case, spacing, punctuation, unique abbreviations) is exact

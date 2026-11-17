@@ -1,0 +1,19 @@
+O: wrote results/phase23_O.json in 44.2s 
+       45.57 real        42.27 user         0.46 sys
+          1675919360  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              156938  page reclaims
+                  45  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  36  voluntary context switches
+                4764  involuntary context switches
+        791033184527  instructions retired
+        155667736427  cycles elapsed
+          1584416832  peak memory footprint

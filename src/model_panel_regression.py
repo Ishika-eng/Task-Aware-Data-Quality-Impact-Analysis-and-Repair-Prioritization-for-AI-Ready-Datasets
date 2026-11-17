@@ -138,6 +138,7 @@ def run_model_panel_regression(state: AuditState, seeds=DEFAULT_SEEDS, max_rows:
         noleak = (~leak).to_numpy()
         say(min(0.99, done[0] / unit_total), f"Seed {seed}: finding repairs on the training rows")
         st = audit_dataset(tr_raw, target, detectors=PANEL_DETECTORS, seed=seed, max_model_rows=AUDIT_MODEL_ROWS, task="regression")
+        st.selfbench = state.selfbench           # Phase 23 A1: the default arm respects the calibration's column scope
         tick(3, f"Seed {seed}: repairs proposed")
         try:
             X_te, y_te = _typed(te_raw, target, drop_cols)
@@ -147,7 +148,7 @@ def run_model_panel_regression(state: AuditState, seeds=DEFAULT_SEEDS, max_rows:
         for arm, issues in arm_issues.items():
             if not issues:
                 continue
-            cleaned, log = _apply(st, issues, [])
+            cleaned, log = _apply(st, issues, [], respect_scope=(arm == "default"))
             applied = log[log.action == "applied"]
             m = arm_meta.setdefault(arm, {"rows_removed": [], "cells_changed": []})
             m["rows_removed"].append(len(tr_raw) - len(cleaned))

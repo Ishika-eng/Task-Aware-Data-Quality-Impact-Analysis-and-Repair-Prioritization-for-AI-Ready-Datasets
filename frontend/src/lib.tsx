@@ -33,6 +33,9 @@ export const ISSUE_NAME: Record<string, string> = {
   inconsistency: "Inconsistencies",
   joint_outliers: "Unusual combinations",
 };
+/** The "label" problem is a wrong target value when the target is a number (regression); every other name is task-independent. */
+export const issueName = (key: string, task?: string | null) =>
+  task === "regression" && (key === "label_errors" || key === "label_noise") ? "Wrong target values" : ISSUE_NAME[key] ?? key;
 export const ISSUE_ORDER = ["label_errors", "feature_corruption", "outliers", "missing_values", "duplicates"];
 
 export type Tone = "neutral" | "good" | "warn" | "bad" | "accent";

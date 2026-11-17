@@ -375,6 +375,26 @@ def review_summary(result) -> dict:
             "total": sum(r["proposed"] + r["flag_only"] for r in rows), "by_issue": rows}
 
 
+def held_back_summary(audit: dict) -> dict:
+    """Phase 23 A1, for the UI: per issue type, the proposals that stayed in the review queue only because the calibration did not
+    cover their column (so the Repair plan and Review queue can say why a type that is "auto-repair" was not fully applied)."""
+    state, result = audit["state"], audit["result"]
+    sb = state.selfbench
+    left = set(sb.reference.get("columns_left_out", {})) if (sb is not None and getattr(sb, "ok", False)) else set()
+    if not left:
+        return {}
+    texts = PROBLEM_TEXT_REGRESSION if state.task == "regression" else PROBLEM_TEXT
+    log = result.repair_log
+    out = {}
+    for issue in audit["applied"] & default_apply_issues(state):          # a human override of the whole type applies everything
+        if issue in ("label_errors", "duplicates") or issue not in texts:
+            continue
+        g = log[(log.problem == texts[issue]) & (log.action == "flagged_for_review") & log.column.isin(left)]
+        if len(g):
+            out[issue] = {"count": int(len(g)), "columns": {str(c): int(n) for c, n in g.column.value_counts().items()}}
+    return out
+
+
 def dashboard_payload(audit: dict) -> dict:
     state, result = audit["state"], audit["result"]
     rd = result.readiness
@@ -400,6 +420,7 @@ def dashboard_payload(audit: dict) -> dict:
         "features": records(result.feature_report) if result.feature_report is not None else None,
         "files": [{"name": n, "bytes": len(b)} for n, b in files.items()],
         "never_auto_apply": sorted(NEVER_AUTO_APPLY),
+        "held_back": held_back_summary(audit),
     })
 
 

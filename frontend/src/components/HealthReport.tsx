@@ -138,7 +138,7 @@ export function TargetBlock({ t }: { t: TargetProfile }) {
   );
 }
 
-export function HealthReport({ snapshot: s, target, actions }: { snapshot: HealthSnapshot; target?: TargetProfile | null; actions?: React.ReactNode }) {
+export function HealthReport({ snapshot: s, target, actions, auditTarget }: { snapshot: HealthSnapshot; target?: TargetProfile | null; actions?: React.ReactNode; auditTarget?: string | null }) {
   const ov = s.overview;
   const types = Object.entries(ov.type_counts).sort((a, b) => b[1] - a[1]);
   return (
@@ -169,6 +169,11 @@ export function HealthReport({ snapshot: s, target, actions }: { snapshot: Healt
 
       <Card title="What is wrong with it" description="Counts and rates, not a score. “Same as the audit” means the audit uses the same definition and will report the same number; “report-only” checks are not validated and nothing is repaired from them." pad={false}>
         <div className="p-2"><ProblemsTable s={s} /></div>
+        {auditTarget && (
+          <p className="border-t border-line px-5 py-3 text-xs leading-relaxed text-muted">
+            This snapshot is taken at upload, before a target is chosen, so it treats <b className="text-fg">{auditTarget}</b> like any other column. The audit leaves the target out of its outlier check, so “same as the audit” counts can differ slightly (for example outlier rows) when the target is numeric.
+          </p>
+        )}
       </Card>
 
       {target && <TargetBlock t={target} />}

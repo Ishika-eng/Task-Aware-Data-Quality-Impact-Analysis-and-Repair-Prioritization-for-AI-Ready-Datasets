@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { api, type RepairLogRow } from "../api";
 import { useAudit } from "../audit-context";
 import { Alert, Badge, Button, ButtonLink, Card, DataTable, Dot, EmptyState, Page, Segmented, Stat, Status, type Col } from "../components/ui";
-import { ISSUE_COLOR, ISSUE_NAME, cellText, int, num, pct } from "../lib";
+import { ISSUE_COLOR, issueName, cellText, int, num, pct } from "../lib";
 
 type Kind = "all" | "flagged_for_review" | "flagged_only";
 
@@ -90,11 +90,16 @@ export function Review() {
             return (
               <Card key={r.issue_key}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex items-center gap-2 font-semibold"><Dot color={ISSUE_COLOR[r.issue_key]} />{ISSUE_NAME[r.issue_key] ?? r.problem}</span>
+                  <span className="flex items-center gap-2 font-semibold"><Dot color={ISSUE_COLOR[r.issue_key]} />{issueName(r.issue_key, a.overview.task)}</span>
                   {p && <Status value={p.repairability_status} />}
                   {never && <Badge tone="neutral">never automatic</Badge>}
                 </div>
                 <p className="mt-1 text-sm text-muted"><b className="text-fg">{int(r.proposed)}</b> repair proposed · <b className="text-fg">{int(r.flag_only)}</b> detected only</p>
+                {a.held_back?.[r.issue_key] && (
+                  <p className="mt-2 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[13px] leading-relaxed text-fg">
+                    <b>{int(a.held_back[r.issue_key].count)}</b> of these are here only because the calibration did not cover their column ({Object.entries(a.held_back[r.issue_key].columns).map(([c, n]) => `${c} ${int(n)}`).join(", ")}). The rule below is met for the columns it did cover, which were applied. A blank in these columns may mean "not applicable" rather than "missing".
+                  </p>
+                )}
                 {p && <p className="mt-2 text-[13px] leading-relaxed text-muted">{p.reason}</p>}
                 {p && (
                   <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
@@ -123,7 +128,7 @@ export function Review() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <select aria-label="Filter by problem" value={issue} onChange={(e) => setIssue(e.target.value)} className={sel}>
               <option value="">All problems</option>
-              {rv.by_issue.map((r) => <option key={r.issue_key} value={r.issue_key}>{ISSUE_NAME[r.issue_key] ?? r.problem}{ev ? ` (${int(r.proposed + r.flag_only)})` : ""}</option>)}
+              {rv.by_issue.map((r) => <option key={r.issue_key} value={r.issue_key}>{issueName(r.issue_key, a.overview.task)}{ev ? ` (${int(r.proposed + r.flag_only)})` : ""}</option>)}
             </select>
             <select aria-label="Filter by type" value={kind} onChange={(e) => setKind(e.target.value as Kind)} className={sel}>
               <option value="all">All types</option>

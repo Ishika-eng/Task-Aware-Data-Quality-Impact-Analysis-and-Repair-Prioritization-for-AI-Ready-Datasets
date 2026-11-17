@@ -224,10 +224,11 @@ export function Start() {
           </Card>
         </div>
 
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto">
           {jobId ? (
             <RunProgress jobId={jobId} calibrate={calibrate && hasTarget} onBack={() => setJobId(null)} />
           ) : (
+            <>
             <Card title="Configure the audit">
               <div className="space-y-5">
                 <label className="block">
@@ -274,7 +275,7 @@ export function Start() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium">Model panel: train four models before and after cleaning</div>
-                    <p className="text-xs text-muted">Logistic regression, random forest, gradient boosting and a small neural net are trained on your raw rows and on the repaired rows, scored on the same untouched held-out rows. Runs in the background after the audit (about a minute).</p>
+                    <p className="text-xs text-muted">{regression ? "Ridge regression, random forest, gradient boosting and a small neural net are trained" : "Logistic regression, random forest, gradient boosting and a small neural net are trained"} on your raw rows and on the repaired rows, scored on the same untouched held-out rows. Runs in the background after the audit (about a minute).</p>
                   </div>
                   <Switch label="Model panel" checked={panel && hasTarget} onChange={setPanel} disabled={!hasTarget} />
                 </div>
@@ -304,11 +305,15 @@ export function Start() {
                 </details>
 
                 {ds.rows > 50000 && <Alert tone="warn">Large dataset: the model-based detectors may take several minutes.</Alert>}
-                <Button variant="primary" className="w-full" onClick={run} disabled={!!targetProblem || start.isPending}>
-                  {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Run audit <ArrowRight className="h-4 w-4" />
-                </Button>
               </div>
             </Card>
+            {/* outside the Card (which clips overflow) so it stays pinned to the bottom of the scrolling panel */}
+            <div className="sticky bottom-0 bg-bg pb-1 pt-3">
+              <Button variant="primary" className="w-full" onClick={run} disabled={!!targetProblem || start.isPending}>
+                {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Run audit <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+            </>
           )}
         </div>
       </div>

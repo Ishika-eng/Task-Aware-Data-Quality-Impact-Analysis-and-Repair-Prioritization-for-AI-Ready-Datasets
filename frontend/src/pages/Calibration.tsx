@@ -5,7 +5,7 @@ import type { EvidenceRow } from "../api";
 import { useAudit } from "../audit-context";
 import { axisLine, axisTick, ChartTip, gridProps } from "../components/charts";
 import { Alert, Badge, Button, Card, DataTable, Dot, EmptyState, Page, Segmented, Stat, Status, type Col } from "../components/ui";
-import { ISSUE_COLOR, ISSUE_NAME, int, num, pct, seconds, signed } from "../lib";
+import { ISSUE_COLOR, issueName, int, num, pct, seconds, signed } from "../lib";
 
 export function Calibration() {
   const a = useAudit();
@@ -59,7 +59,7 @@ export function Calibration() {
   ] as const;
   const ev = cal.evidence ?? [];
   const cols: Col<EvidenceRow>[] = [
-    { key: "e", header: "Error", cell: (r) => <span className="flex items-center gap-2 font-medium"><Dot color={ISSUE_COLOR[r.error_type]} />{ISSUE_NAME[r.error_type] ?? r.error_type}</span> },
+    { key: "e", header: "Error", cell: (r) => <span className="flex items-center gap-2 font-medium"><Dot color={ISSUE_COLOR[r.error_type]} />{issueName(r.error_type, cal.task)}</span> },
     { key: "r", header: "Rate", align: "right", cell: (r) => pct(r.rate, 0) },
     { key: "d1", header: reg ? "Damage (R²)" : "Damage (F1)", align: "right", cell: (r) => signed(r.mean_damage) },
     { key: "d2", header: "Damage (AUC)", align: "right", cell: (r) => signed(r.mean_damage_auc) },
@@ -83,7 +83,7 @@ export function Calibration() {
 
       <div className="space-y-3">
         {cal.imbalance_warning && <Alert tone="accent" title="Imbalanced target">The minority class is only {pct(cal.minority_share, 0)} of your reference. F1-type metrics depend on the decision threshold and can mislead on imbalanced targets, so ROC-AUC (which does not) is measured alongside macro-F1, and a repair counts as safe only if neither metric shows material harm.</Alert>}
-        {(cal.metric_disagreement ?? []).map((d) => <Alert key={d.error_type} tone="warn" title={`${ISSUE_NAME[d.error_type] ?? d.error_type}: macro-F1 and ROC-AUC disagree`}>{d.note}</Alert>)}
+        {(cal.metric_disagreement ?? []).map((d) => <Alert key={d.error_type} tone="warn" title={`${issueName(d.error_type, cal.task)}: macro-F1 and ROC-AUC disagree`}>{d.note}</Alert>)}
         {cal.underpowered && <Alert tone="warn" title="Too noisy to certify some repairs">The measurement noise on your data is above 0.01, so harm smaller than that would be invisible. Non-exact repairs (imputation, outlier clipping) cannot be certified safe from this calibration and stay in human review. Exact duplicate removal is unaffected. A larger clean-ish reference lowers the noise; more seeds help only modestly.</Alert>}
         {Object.keys(cal.skipped_issues ?? {}).length > 0 && <Alert tone="warn" title="Not measured">{Object.entries(cal.skipped_issues!).map(([k, v]) => `${k} (${v})`).join("; ")}. These keep using the UCI Adult evidence.</Alert>}
       </div>
@@ -101,7 +101,7 @@ export function Calibration() {
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <ReferenceLine y={floor} stroke="var(--muted)" strokeDasharray="4 4" />
                 <ReferenceLine y={0} stroke="var(--line)" />
-                {curve.kinds.map((k) => <Line isAnimationActive={false} key={k} type="monotone" dataKey={k} name={ISSUE_NAME[k] ?? k} stroke={ISSUE_COLOR[k]} strokeWidth={2} dot={{ r: 3 }} connectNulls />)}
+                {curve.kinds.map((k) => <Line isAnimationActive={false} key={k} type="monotone" dataKey={k} name={issueName(k, cal.task)} stroke={ISSUE_COLOR[k]} strokeWidth={2} dot={{ r: 3 }} connectNulls />)}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -130,7 +130,7 @@ export function Calibration() {
           <div className="space-y-3">
             {(cal.detector_tracking ?? []).map((t) => (
               <div key={t.error_type} className="rounded-lg border border-line p-3">
-                <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-medium"><Dot color={ISSUE_COLOR[t.error_type]} />{ISSUE_NAME[t.error_type] ?? t.error_type}</span><Status value={t.evidence_status} /></div>
+                <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-medium"><Dot color={ISSUE_COLOR[t.error_type]} />{issueName(t.error_type, cal.task)}</span><Status value={t.evidence_status} /></div>
                 <p className="mt-1.5 text-xs text-muted">{t.note}</p>
               </div>
             ))}
@@ -140,7 +140,7 @@ export function Calibration() {
           <div className="space-y-3">
             {Object.entries(cal.baseline_floors ?? {}).map(([k, v]) => (
               <div key={k}>
-                <div className="mb-1 flex justify-between text-xs"><span className="flex items-center gap-2"><Dot color={ISSUE_COLOR[k]} />{ISSUE_NAME[k] ?? k}</span><span className="tabular-nums text-muted">{pct(v)}</span></div>
+                <div className="mb-1 flex justify-between text-xs"><span className="flex items-center gap-2"><Dot color={ISSUE_COLOR[k]} />{issueName(k, cal.task)}</span><span className="tabular-nums text-muted">{pct(v)}</span></div>
                 <div className="h-2 rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.min(100, v * 100)}%`, background: ISSUE_COLOR[k] }} /></div>
               </div>
             ))}

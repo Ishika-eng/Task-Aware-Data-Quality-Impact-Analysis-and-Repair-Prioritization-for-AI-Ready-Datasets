@@ -19,6 +19,7 @@ export function Baseline() {
       <HealthReport
         snapshot={a.baseline}
         target={a.baseline_target}
+        auditTarget={a.overview.target}
         actions={<>
           <ButtonLink href={api.downloadUrl(a.id, "baseline_health_report.csv")} size="sm"><Download className="h-3.5 w-3.5" /> CSV</ButtonLink>
           <ButtonLink href={api.downloadUrl(a.id, "baseline_health_report.json")} size="sm"><Download className="h-3.5 w-3.5" /> JSON</ButtonLink>

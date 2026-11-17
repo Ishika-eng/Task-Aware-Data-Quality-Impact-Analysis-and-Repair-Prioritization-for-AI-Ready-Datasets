@@ -3,7 +3,7 @@ import type { ImpactRow } from "../api";
 import { useAudit } from "../audit-context";
 import { axisLine, axisTick, ChartTip, gridProps } from "../components/charts";
 import { Alert, Badge, Card, DataTable, Dot, Page, Status, type Col } from "../components/ui";
-import { ISSUE_COLOR, ISSUE_NAME, pct, signed } from "../lib";
+import { ISSUE_COLOR, issueName, pct, signed } from "../lib";
 
 export function Impact() {
   const a = useAudit();
@@ -11,7 +11,7 @@ export function Impact() {
   const hasAuc = rows.some((r) => r.impact_estimate_auc !== null);
   const unit = rows.find((r) => r.impact_unit !== "-")?.impact_unit ?? "F1";
   const data = rows.filter((r) => r.benchmark_impact_estimate !== null).map((r) => ({
-    key: r.issue_key, name: ISSUE_NAME[r.issue_key] ?? r.issue, F1: r.benchmark_impact_estimate, AUC: r.impact_estimate_auc, boundary: r.is_boundary_estimate,
+    key: r.issue_key, name: issueName(r.issue_key, a.overview.task), F1: r.benchmark_impact_estimate, AUC: r.impact_estimate_auc, boundary: r.is_boundary_estimate,
   }));
   const cols: Col<ImpactRow>[] = [
     { key: "i", header: "Issue", cell: (r) => <span className="flex items-center gap-2 font-medium"><Dot color={ISSUE_COLOR[r.issue_key] ?? "var(--muted)"} />{r.issue}</span> },
@@ -19,10 +19,12 @@ export function Impact() {
     { key: "e", header: `Impact (${unit.replace(" (positive class)", "")})`, align: "right", cell: (r) => r.benchmark_impact_estimate === null ? "–" : <span><b>{signed(r.benchmark_impact_estimate)}</b>{r.is_boundary_estimate && <Badge tone="warn" className="ml-1.5">boundary</Badge>}</span> },
     ...(hasAuc ? [{ key: "a", header: "Impact (ROC-AUC)", align: "right" as const, cell: (r: ImpactRow) => (r.impact_estimate_auc === null ? "–" : signed(r.impact_estimate_auc)) }] : []),
     { key: "d", header: "Metrics", cell: (r) => (r.metrics_disagree ? <Badge tone="warn" className="whitespace-normal">F1 and AUC disagree</Badge> : <span className="text-muted">–</span>) },
-    { key: "s", header: "Based on", cell: (r) => <span className="block max-w-[20rem] text-xs text-muted">{r.impact_source}{r.impact_model_note && <span className="mt-1 block">{r.impact_model_note}</span>}</span> },
+    { key: "s", header: "Based on", cell: (r) => <span className="block min-w-[12rem] max-w-[20rem] text-xs text-muted">{r.impact_source}{r.impact_model_note && <span className="mt-1 block">{r.impact_model_note}</span>}</span> },
     { key: "ev", header: "Repair evidence", cell: (r) => <Status value={r.repairability_status} /> },
     { key: "dec", header: "Decision", cell: (r) => <Badge tone={r.policy_decision.startsWith("applied") ? "good" : r.policy_decision.startsWith("flagged") ? "warn" : "neutral"}>{r.policy_decision.replace(" (not applied)", "")}</Badge> },
-    { key: "rec", header: "Recommendation", cell: (r) => <span className="block max-w-[24rem] text-xs text-muted">{r.recommendation}</span> },
+    { key: "rec", header: "Recommendation", cell: (r) => <span className="block min-w-[14rem] max-w-[24rem] text-xs text-muted">{r.policy_decision.startsWith("applied")
+      ? `Applied automatically: no harm was observed and repair precision met the bar. ${r.repairability_status === "positive" ? "The evidence also shows a net benefit." : "The evidence of a benefit is weak, so the gain is not guaranteed."}`
+      : r.recommendation}</span> },
   ];
   return (
     <Page title="Task impact" subtitle="How much each detected problem is estimated to cost a model. The detected rate is mapped onto a damage curve, then shown with the repair evidence.">

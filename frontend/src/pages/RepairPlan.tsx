@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAudit } from "../audit-context";
 import { Alert, Badge, Button, Card, Dot, Page, Status, Switch } from "../components/ui";
-import { ISSUE_COLOR, ISSUE_NAME, int, num, pct } from "../lib";
+import { ISSUE_COLOR, issueName, int, num, pct } from "../lib";
 
 export function RepairPlan() {
   const a = useAudit();
@@ -38,7 +38,7 @@ export function RepairPlan() {
                 <div className="pt-0.5"><Switch label={`Apply ${p.issue}`} checked={on} onChange={(v) => toggle(p.issue_key, v)} disabled={candidates === 0} /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-2 font-semibold"><Dot color={ISSUE_COLOR[p.issue_key]} />{ISSUE_NAME[p.issue_key] ?? p.issue}</span>
+                    <span className="flex items-center gap-2 font-semibold"><Dot color={ISSUE_COLOR[p.issue_key]} />{issueName(p.issue_key, a.overview.task)}</span>
                     <Status value={p.default_action} />
                     {a.never_auto_apply.includes(p.issue_key) && <Badge tone="neutral">never automatic</Badge>}
                   </div>
@@ -46,6 +46,11 @@ export function RepairPlan() {
                     <b className="text-fg">{int(candidates)}</b> repair candidate{candidates === 1 ? "" : "s"} · <b className="text-fg">{int(p.n_flag_only)}</b> flag-only
                     {p.detected_rate !== null && <> · detected rate <b className="text-fg">{pct(p.detected_rate)}</b></>}
                   </p>
+                  {a.held_back?.[p.issue_key] && (
+                    <div className="mt-2"><Alert tone="warn" title={`${int(a.held_back[p.issue_key].count)} of these ${int(candidates)} are held back for review`}>
+                      The calibration could not benchmark {Object.keys(a.held_back[p.issue_key].columns).length} column{Object.keys(a.held_back[p.issue_key].columns).length === 1 ? "" : "s"} (too empty to build a clean reference), so its evidence does not cover them: {Object.entries(a.held_back[p.issue_key].columns).map(([c, n]) => `${c} (${int(n)})`).join(", ")}. Only the other {int(candidates - a.held_back[p.issue_key].count)} are applied. A blank in those columns may mean "not applicable" rather than "missing". The held-back items are in the review queue; the aggressive file applies them.
+                    </Alert></div>
+                  )}
                   <p className="mt-2 text-[13px] leading-relaxed text-muted">{p.reason}</p>
                   <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
                     <span>Evidence: <Status value={p.repairability_status} /></span>

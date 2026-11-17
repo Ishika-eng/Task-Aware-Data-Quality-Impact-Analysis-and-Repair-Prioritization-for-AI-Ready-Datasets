@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type RepairLogRow } from "../api";
 import { useAudit } from "../audit-context";
 import { Alert, Badge, ButtonLink, Button, Card, DataTable, Page, Segmented, Stat, Status, type Col } from "../components/ui";
-import { ISSUE_NAME, bytes, cellText, int, num, prettyStatus, tone } from "../lib";
+import { issueName, bytes, cellText, int, num, prettyStatus, tone } from "../lib";
 
 const ISSUE_BY_PROBLEM: Record<string, string> = {
   "Missing value": "missing_values", "Duplicate row": "duplicates", "Potential outlier": "outliers",
@@ -72,7 +72,7 @@ export function Outputs() {
   const nameOf = (n: string) => n.replace(/_/g, " ").replace(".csv", "").replace(".json", "");
   return (
     <Page title="Outputs" subtitle="TaskClean produces two cleaned files. Pick the one that matches how much risk you accept.">
-      {s.human_overrides.length > 0 && <Alert tone="warn" title="Human overrides applied to the evidence-based file">{s.human_overrides.map((k) => ISSUE_NAME[k] ?? k).join(", ")}</Alert>}
+      {s.human_overrides.length > 0 && <Alert tone="warn" title="Human overrides applied to the evidence-based file">{s.human_overrides.map((k) => issueName(k, a.overview.task)).join(", ")}</Alert>}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Evidence-based" description={`dataset_cleaned.csv · repairs applied using: ${a.selection.label}. Only repairs that never showed harm in the evidence; everything else is logged, not changed.`}>
           <div className="grid grid-cols-3 gap-3">

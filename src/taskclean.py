@@ -982,8 +982,12 @@ def _assign(cleaned: pd.DataFrame, col: str, ids, values, label_map=None, decima
         cleaned.loc[ids, col] = values
 
 
-def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
-    """Apply `apply_issues` to a copy of the uploaded frame. Returns (cleaned, repair_log)."""
+def _apply(state: AuditState, apply_issues: set[str], overrides: list[str], respect_scope: bool = False):
+    """Apply `apply_issues` to a copy of the uploaded frame. Returns (cleaned, repair_log).
+
+    respect_scope (Phase 23 A1): the evidence-based file only applies column-level repairs in columns the calibration actually
+    covered. The self-benchmark's reference leaves out columns that are mostly empty, so its evidence says nothing about them;
+    repairs there stay proposals unless a human overrides the whole issue type. Off by default so every other caller is unchanged."""
     cleaned = state.df.copy()
     prop = state.proposals.copy()
     prop["action"] = np.where(prop.tier == "loose", "flagged_only", "flagged_for_review")
@@ -996,6 +1000,9 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
     # about to delete would make the log claim a change that does not exist in
     # the output file, so those repairs are skipped (and logged as such).
     drop_set: set[int] = set()
+    sb = getattr(state, "selfbench", None)
+    out_of_scope = set(sb.reference.get("columns_left_out", {})) if (respect_scope and sb is not None and sb.ok) else set()
+    held_back: dict[str, int] = {}
     if "duplicates" in apply_issues:
         dup_idx = prop.index[(prop.issue_key == "duplicates") & prop.tier.isin(["exact", "strict"])]
         drop_set = set(prop.loc[dup_idx, "row_id"])
@@ -1015,6 +1022,9 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
         is_label = issue == "label_errors"
         col_key = pd.Series(state.target, index=sub.index) if is_label else sub["column"]
         for col, g in sub.groupby(col_key):
+            if not is_label and col in out_of_scope and issue not in overrides:
+                held_back[col] = held_back.get(col, 0) + len(g)       # stays flagged_for_review
+                continue
             in_drop = g.row_id.isin(drop_set).values
             conflict = np.array([(r, col) in modified for r in g.row_id], dtype=bool)
             prop.loc[g.index[in_drop], "action"] = "skipped_row_dropped"
@@ -1031,6 +1041,16 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str]):
 
     if drop_ids:
         cleaned = cleaned.drop(index=drop_ids)
+
+    if respect_scope:                                       # idempotent: replace an earlier note from a previous apply
+        prefix = "Held back for review:"
+        notes = [n for n in state.meta.get("notes", []) if not str(n).startswith(prefix)]
+        if held_back:
+            cols = ", ".join(f"{c} ({n:,})" for c, n in sorted(held_back.items(), key=lambda kv: -kv[1])[:8])
+            notes.append(f"{prefix} {sum(held_back.values()):,} proposed repair(s) were not applied because the calibration did "
+                         f"not cover those columns (they are too empty to benchmark): {cols}. Check them in the review queue; "
+                         "a blank there may mean 'not applicable' rather than 'missing'.")
+        state.meta["notes"] = notes
 
     pol = state.policy.set_index("issue_key")
     prop["repair_evidence_status"] = prop.issue_key.map(pol["repairability_status"])
@@ -1055,7 +1075,7 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     policy_default = default_apply_issues(state)
     apply_issues = set(policy_default if apply_issues is None else apply_issues)
     overrides = sorted(apply_issues - policy_default)
-    cleaned, repair_log = _apply(state, apply_issues, overrides)
+    cleaned, repair_log = _apply(state, apply_issues, overrides, respect_scope=True)
 
     aggressive_issues = {i for i in ISSUES if i != "feature_corruption" and i not in FLAG_ONLY_ISSUES}
     aggressive_overrides = sorted(aggressive_issues - policy_default)

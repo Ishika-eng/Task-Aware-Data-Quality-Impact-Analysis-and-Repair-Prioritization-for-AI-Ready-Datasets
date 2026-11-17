@@ -1,0 +1,993 @@
+{
+ "id": "R",
+ "file": "realestate/Real estate valuation data set.xlsx",
+ "task": "regression",
+ "target": "Y house price of unit area",
+ "errors": [],
+ "file_bytes": 32717,
+ "load_seconds": 0.11,
+ "input_format": {
+  "format": "xlsx",
+  "sheet": "\u5de5\u4f5c\u88681",
+  "sheets": [
+   "\u5de5\u4f5c\u88681"
+  ],
+  "rows": 414,
+  "columns": 8,
+  "notes": []
+ },
+ "rows": 414,
+ "columns": 7,
+ "snapshot_ok": true,
+ "snapshot_error": null,
+ "audit_seconds": 3.0,
+ "job_status": "done",
+ "job_error": null,
+ "quality": [
+  {
+   "dimension": "Completeness",
+   "issue_key": "missing_values",
+   "detector_type": "exact check",
+   "detected_rate": 0.0,
+   "detected_count": 0.0,
+   "count_unit": "cells",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": ""
+  },
+  {
+   "dimension": "Uniqueness",
+   "issue_key": "duplicates",
+   "detector_type": "exact check",
+   "detected_rate": 0.0,
+   "detected_count": 0.0,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": ""
+  },
+  {
+   "dimension": "Anomaly burden",
+   "issue_key": "outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": 0.0966183575,
+   "detected_count": 40.0,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate"
+  },
+  {
+   "dimension": "Consistency",
+   "issue_key": "inconsistency",
+   "detector_type": "rule-based check",
+   "detected_rate": 0.0,
+   "detected_count": 0.0,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate. Case, spacing and unique-abbreviation variants are repair candidates; possible typos and ambiguous abbreviations are flag-only"
+  },
+  {
+   "dimension": "Target reliability",
+   "issue_key": "label_errors",
+   "detector_type": "statistical estimate",
+   "detected_rate": 0.0169082126,
+   "detected_count": 7.0,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate"
+  },
+  {
+   "dimension": "Feature reliability",
+   "issue_key": "feature_corruption",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "dimension": "Joint plausibility",
+   "issue_key": "joint_outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "policy": [
+  {
+   "issue_key": "missing_values",
+   "issue": "Missing value",
+   "detector_ran": true,
+   "detected_rate": 0.0,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "nothing to repair",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "duplicates",
+   "issue": "Duplicate row",
+   "detector_ran": true,
+   "detected_rate": 0.0,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "nothing to repair",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "outliers",
+   "issue": "Potential outlier",
+   "detector_ran": true,
+   "detected_rate": 0.0966183575,
+   "n_repair_candidates": 8,
+   "n_flag_only": 72,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "flag for human review",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "label_errors",
+   "issue": "Potential wrong target value",
+   "detector_ran": true,
+   "detected_rate": 0.0169082126,
+   "n_repair_candidates": 7,
+   "n_flag_only": 0,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "flag for human review",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "feature_corruption",
+   "issue": "Potential feature anomaly",
+   "detector_ran": false,
+   "detected_rate": null,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "not assessed",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "issue_key": "inconsistency",
+   "issue": "Inconsistent value",
+   "detector_ran": true,
+   "detected_rate": 0.0,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "nothing to repair",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "joint_outliers",
+   "issue": "Unusual combination of values",
+   "detector_ran": false,
+   "detected_rate": null,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "not assessed",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "impact": [
+  {
+   "issue": "Missing value",
+   "issue_key": "missing_values",
+   "detected_rate": 0.0,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "nothing to repair",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Duplicate row",
+   "issue_key": "duplicates",
+   "detected_rate": 0.0,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "nothing to repair",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Potential outlier",
+   "issue_key": "outliers",
+   "detected_rate": 0.0966183575,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "flagged for human review (not applied)",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Potential wrong target value",
+   "issue_key": "label_errors",
+   "detected_rate": 0.0169082126,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "flagged for human review (not applied)",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Potential feature anomaly",
+   "issue_key": "feature_corruption",
+   "detected_rate": null,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "-",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "",
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "policy_decision": "not assessed",
+   "recommendation": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "issue": "Inconsistent value",
+   "issue_key": "inconsistency",
+   "detected_rate": 0.0,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "nothing to repair",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Unusual combination of values",
+   "issue_key": "joint_outliers",
+   "detected_rate": null,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "-",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "",
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "policy_decision": "not assessed",
+   "recommendation": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "calibration": {
+  "status": "declined",
+  "reason": "only 407 clean-ish rows remain after removing incomplete rows, duplicates and wild target values (need at least 600)",
+  "reference": {
+   "rows_labeled": 414,
+   "rows_complete": 414,
+   "rows_after_dedup": 414,
+   "rows_removed_label_problems": 7,
+   "rare_classes_dropped": [],
+   "columns_left_out": {},
+   "columns_used": [
+    "X1 transaction date",
+    "X2 house age",
+    "X3 distance to the nearest MRT station",
+    "X4 number of convenience stores",
+    "X5 latitude",
+    "X6 longitude"
+   ]
+  }
+ },
+ "selection": {
+  "applied": [],
+  "default": [],
+  "label": "policy default"
+ },
+ "summary": {
+  "evidence_based": {
+   "rows_uploaded": 414,
+   "rows_after_cleaning": 414,
+   "rows_dropped": 0,
+   "cells_modified": 0,
+   "repairs_applied_by_issue": {},
+   "flagged_for_review": 15,
+   "flagged_only": 72,
+   "skipped_conflicts": 0,
+   "skipped_row_dropped": 0,
+   "issues_applied": [],
+   "human_overrides": []
+  },
+  "aggressive": {
+   "rows_uploaded": 414,
+   "rows_after_cleaning": 414,
+   "rows_dropped": 0,
+   "cells_modified": 15,
+   "repairs_applied_by_issue": {
+    "Potential outlier": 8,
+    "Potential wrong target value": 7
+   },
+   "flagged_for_review": 0,
+   "flagged_only": 72,
+   "skipped_conflicts": 0,
+   "skipped_row_dropped": 0,
+   "issues_applied": [
+    "duplicates",
+    "inconsistency",
+    "label_errors",
+    "missing_values",
+    "outliers"
+   ],
+   "human_overrides": [
+    "duplicates",
+    "inconsistency",
+    "label_errors",
+    "missing_values",
+    "outliers"
+   ]
+  }
+ },
+ "review": {
+  "proposed": 15,
+  "flag_only": 72,
+  "total": 87,
+  "by_issue": [
+   {
+    "issue_key": "outliers",
+    "problem": "Potential outlier",
+    "proposed": 8,
+    "flag_only": 72
+   },
+   {
+    "issue_key": "Potential wrong target value",
+    "problem": "Potential wrong target value",
+    "proposed": 7,
+    "flag_only": 0
+   }
+  ]
+ },
+ "notes": [],
+ "n_rows_analysed": 414,
+ "limitations": [
+  "The calibration did not run on this dataset (only 407 clean-ish rows remain after removing incomplete rows, duplicates and wild target values (need at least 600)).",
+  "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector with limited precision and recall. A flagged rate is not a confirmed error rate.",
+  "Regression (Phase 21): the wrong-target detector flags target values whose out-of-fold residual is more than 4 robust sigmas from the typical residual (scaled within bands of the predicted value). It finds gross errors, not subtle ones, and it can flag genuine extreme values. On a clean reference it flagged under 2% of rows; its precision and recall on injected errors are in docs/PHASE21_SPEC.md. Its replacement value is a model prediction, so it is never applied automatically without evidence from your own data.",
+  "There is no regression benchmark behind the default policy: unless the calibration is run on your data, no repair is applied automatically and no impact estimate is shown. The Adult evidence is classification-only and is not used.",
+  "No before/after model metrics are reported in the audit itself: an uploaded dataset has no clean held-out test set. The model panel compares models on held-out rows that are as dirty as your file, so a gain there does not prove a repair was right.",
+  "Duplicates are full-record duplicates (features + target). Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; a token that is a genuine category in your data will be over-counted as missing.",
+  "Files above the model-detector row limit are audited on a sample (stratified by target quintile) for the target and feature detectors; their findings and proposals then cover only the sampled rows.",
+  "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs; with no calibration no repair in it is certified safe."
+ ],
+ "v2_mechanical": {
+  "rows_raw": 414,
+  "rows_cleaned": 414,
+  "rows_removed": 0,
+  "duplicate_rows_logged_applied": 0,
+  "cells_changed": 0,
+  "cells_changed_not_in_log": 0,
+  "applied_log_rows": 0,
+  "actions": {
+   "flagged_only": 72,
+   "flagged_for_review": 15
+  },
+  "pass_a": true
+ },
+ "v2_wrong_metric_strings": [],
+ "spot_check": {
+  "Potential outlier": {
+   "n_flagged": 80,
+   "actions": {
+    "flagged_only": 72,
+    "flagged_for_review": 8
+   },
+   "sample": [
+    {
+     "row": "40",
+     "column": "X6 longitude",
+     "original": "121.50381",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "231",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4074.736",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "320",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4197.349",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "384",
+     "column": "X6 longitude",
+     "original": "121.50342",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "116",
+     "column": "X6 longitude",
+     "original": "121.47883",
+     "proposed": "121.505255",
+     "action": "flagged_for_review",
+     "method": "clip to [121.505, 121.566] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "255",
+     "column": "X6 longitude",
+     "original": "121.48458",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "187",
+     "column": "X6 longitude",
+     "original": "121.56627",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "226",
+     "column": "X6 longitude",
+     "original": "121.50381",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "8",
+     "column": "X6 longitude",
+     "original": "121.48458",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "231",
+     "column": "X6 longitude",
+     "original": "121.50357",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "194",
+     "column": "X5 latitude",
+     "original": "24.93363",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 24.93207,
+      "q1": 24.963,
+      "median": 24.9711,
+      "q3": 24.977455,
+      "max": 25.01459,
+      "fence_lo": 24.919635000000007,
+      "fence_hi": 25.020819999999993,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "176",
+     "column": "X6 longitude",
+     "original": "121.49507",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "249",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "6306.153",
+     "proposed": "3201.7103",
+     "action": "flagged_for_review",
+     "method": "clip to [-1458.11, 3201.71] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "298",
+     "column": "X6 longitude",
+     "original": "121.50381",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "48",
+     "column": "X6 longitude",
+     "original": "121.49578",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 121.47353,
+      "q1": 121.528085,
+      "median": 121.53863,
+      "q3": 121.543305,
+      "max": 121.56627,
+      "fence_lo": 121.482425,
+      "fence_hi": 121.588965,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "384",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4066.587",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "255",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "5512.038",
+     "proposed": "3201.7103",
+     "action": "flagged_for_review",
+     "method": "clip to [-1458.11, 3201.71] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "180",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4449.27",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "40",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4082.015",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "226",
+     "column": "X3 distance to the nearest MRT station",
+     "original": "4082.015",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 23.38284,
+      "q1": 289.3248,
+      "median": 492.2313,
+      "q3": 1454.279,
+      "max": 6488.021,
+      "fence_lo": -3205.5378000000005,
+      "fence_hi": 4949.141600000001,
+      "missing_share": 0.0
+     }
+    }
+   ]
+  },
+  "Potential wrong target value": {
+   "n_flagged": 7,
+   "actions": {
+    "flagged_for_review": 7
+   },
+   "sample": [
+    {
+     "row": "312",
+     "column": "Y house price of unit area",
+     "original": "78.0",
+     "proposed": "45.30458333333328",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "126",
+     "column": "Y house price of unit area",
+     "original": "62.9",
+     "proposed": "37.06450000000001",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "113",
+     "column": "Y house price of unit area",
+     "original": "7.6",
+     "proposed": "33.48216666666668",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "148",
+     "column": "Y house price of unit area",
+     "original": "45.1",
+     "proposed": "19.98899999999999",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "47",
+     "column": "Y house price of unit area",
+     "original": "61.5",
+     "proposed": "38.883450000000074",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "270",
+     "column": "Y house price of unit area",
+     "original": "117.5",
+     "proposed": "42.393766666666686",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "220",
+     "column": "Y house price of unit area",
+     "original": "78.3",
+     "proposed": "46.67199999999999",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 7.6,
+      "q1": 27.7,
+      "median": 38.45,
+      "q3": 46.6,
+      "max": 117.5,
+      "fence_lo": -29.000000000000004,
+      "fence_hi": 103.30000000000001,
+      "missing_share": 0.0
+     }
+    }
+   ]
+  },
+  "_mechanical": {
+   "rows_in_exact_duplicate_groups_in_raw_file": 0
+  }
+ },
+ "panel_seconds": 0.0,
+ "panel_status": "declined",
+ "panel": {
+  "status": "declined",
+  "reason": "the panel needs at least 600 rows with a numeric target; this file has 414",
+  "progress": 1.0,
+  "finished": 1794932839.6040242
+ },
+ "peak_rss_mb": 254.0,
+ "wall_seconds": 3.1
+}

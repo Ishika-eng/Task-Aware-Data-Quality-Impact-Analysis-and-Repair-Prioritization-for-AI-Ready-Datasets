@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 # local tooling config (contains absolute machine paths)
 .claude/
+
+# genuine datasets downloaded for the Phase 23 validation (re-download with the URLs in docs/PHASE23_SPEC.md)
+data/new/

@@ -1,0 +1,1080 @@
+{
+ "id": "O",
+ "file": "retail2/online_retail_II.xlsx",
+ "errors": [],
+ "file_bytes": 45622278,
+ "load_seconds": 10.9,
+ "peak_rss_mb_after_load": 655.5,
+ "input_format": {
+  "format": "xlsx",
+  "sheet": "Year 2009-2010",
+  "sheets": [
+   "Year 2009-2010",
+   "Year 2010-2011"
+  ],
+  "rows": 525461,
+  "columns": 8,
+  "notes": [
+   "the workbook has 2 sheets (Year 2009-2010, Year 2010-2011); 'Year 2009-2010' was read"
+  ]
+ },
+ "rows": 525461,
+ "columns": 8,
+ "dtypes": {
+  "Invoice": "object",
+  "StockCode": "object",
+  "Description": "object",
+  "Quantity": "int64",
+  "InvoiceDate": "datetime64[us]",
+  "Price": "float64",
+  "Customer ID": "float64",
+  "Country": "str"
+ },
+ "dates_are_dates": [
+  "InvoiceDate"
+ ],
+ "store_seconds": 4.0,
+ "snapshot_ok": true,
+ "snapshot_error": null,
+ "sheets": [
+  "Year 2009-2010",
+  "Year 2010-2011"
+ ],
+ "other_sheet": {
+  "sheet": "Year 2010-2011",
+  "rows": 541910,
+  "columns": [
+   "Invoice",
+   "StockCode",
+   "Description",
+   "Quantity",
+   "InvoiceDate",
+   "Price",
+   "Customer ID",
+   "Country"
+  ],
+  "same_columns_as_first": true,
+  "seconds": 19.5
+ },
+ "audit_seconds": 6.6,
+ "job_status": "done",
+ "job_error": null,
+ "quality": [
+  {
+   "dimension": "Completeness",
+   "issue_key": "missing_values",
+   "detector_type": "exact check",
+   "detected_rate": 0.0301503958,
+   "detected_count": 110900.0,
+   "count_unit": "cells",
+   "benchmark_precision": 1.0,
+   "benchmark_recall": 1.0,
+   "reliability_source": "UCI Adult benchmark",
+   "evidence_status": "weak",
+   "note": ""
+  },
+  {
+   "dimension": "Uniqueness",
+   "issue_key": "duplicates",
+   "detector_type": "exact check",
+   "detected_rate": 0.0130666215,
+   "detected_count": 6866.0,
+   "count_unit": "rows",
+   "benchmark_precision": 0.9924741298,
+   "benchmark_recall": 1.0,
+   "reliability_source": "UCI Adult benchmark",
+   "evidence_status": "weak",
+   "note": ""
+  },
+  {
+   "dimension": "Anomaly burden",
+   "issue_key": "outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": 0.1766334704,
+   "detected_count": 92814.0,
+   "count_unit": "rows",
+   "benchmark_precision": 0.1831772489,
+   "benchmark_recall": 0.6736176935,
+   "reliability_source": "UCI Adult benchmark",
+   "evidence_status": "weak",
+   "note": "flagged rate, not a confirmed error rate"
+  },
+  {
+   "dimension": "Consistency",
+   "issue_key": "inconsistency",
+   "detector_type": "rule-based check",
+   "detected_rate": 0.0,
+   "detected_count": 0.0,
+   "count_unit": "rows",
+   "benchmark_precision": 1.0,
+   "benchmark_recall": 0.7590315229,
+   "reliability_source": "UCI Adult benchmark (Phase 14)",
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate. Case, spacing and unique-abbreviation variants are repair candidates; possible typos and ambiguous abbreviations are flag-only"
+  },
+  {
+   "dimension": "Label reliability",
+   "issue_key": "label_errors",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "no target column selected"
+  },
+  {
+   "dimension": "Feature reliability",
+   "issue_key": "feature_corruption",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "dimension": "Joint plausibility",
+   "issue_key": "joint_outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "notes": [
+  "45 placeholder cell(s) such as '?', 'N/A' or empty text are treated as missing: Description (45)",
+  "525,461 rows exceed the 30,000-row limit for the model-based detectors: they ran on a stratified random sample of 30,000 rows, so label/feature findings and proposals cover only those rows (the cheap checks use every row)",
+  "3 column(s) were not checked for inconsistent spellings because they look like free text or identifiers: Invoice, StockCode, Description"
+ ],
+ "n_rows_analysed": 525461,
+ "raw_duplicate_rows": 6865,
+ "raw_missing_by_column": {
+  "Description": 2928,
+  "Customer ID": 107927
+ },
+ "spot_check": {
+  "Duplicate row": {
+   "n_flagged": 6866,
+   "actions": {
+    "flagged_for_review": 6866
+   },
+   "sample": [
+    {
+     "row": "486144",
+     "column": NaN,
+     "original": "exact copy of row 486122",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "354132",
+     "column": NaN,
+     "original": "exact copy of row 354103",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "439083",
+     "column": NaN,
+     "original": "exact copy of row 439028",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "349354",
+     "column": NaN,
+     "original": "exact copy of row 349249",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "21567",
+     "column": NaN,
+     "original": "exact copy of row 21565",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "138583",
+     "column": NaN,
+     "original": "exact copy of row 138582",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "202195",
+     "column": NaN,
+     "original": "exact copy of row 202169",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "476341",
+     "column": NaN,
+     "original": "exact copy of row 476193",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "369533",
+     "column": NaN,
+     "original": "exact copy of row 369460",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "207674",
+     "column": NaN,
+     "original": "exact copy of row 207670",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "91950",
+     "column": NaN,
+     "original": "exact copy of row 91949",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "206898",
+     "column": NaN,
+     "original": "exact copy of row 206891",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "26672",
+     "column": NaN,
+     "original": "exact copy of row 26649",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "282529",
+     "column": NaN,
+     "original": "exact copy of row 282510",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "487161",
+     "column": NaN,
+     "original": "exact copy of row 487107",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "467074",
+     "column": NaN,
+     "original": "exact copy of row 467073",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "143852",
+     "column": NaN,
+     "original": "exact copy of row 143843",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "17804",
+     "column": NaN,
+     "original": "exact copy of row 17799",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "127914",
+     "column": NaN,
+     "original": "exact copy of row 127911",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    },
+    {
+     "row": "132033",
+     "column": NaN,
+     "original": "exact copy of row 132032",
+     "proposed": "drop row",
+     "action": "flagged_for_review",
+     "method": "exact full-record duplicate removal"
+    }
+   ]
+  },
+  "Missing value": {
+   "n_flagged": 110900,
+   "actions": {
+    "flagged_for_review": 110900
+   },
+   "sample": [
+    {
+     "row": "236743",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "371775",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "285523",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "54714",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "96536",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "399412",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "42820",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "205806",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "66603",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "523938",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "118247",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "221592",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "518193",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "400948",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "98952",
+     "column": "Description",
+     "original": null,
+     "proposed": "WHITE HANGING HEART T-LIGHT HOLDER",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.006,
+      "n_unique": 4681,
+      "top_values": {
+       "WHITE HANGING HEART T-LIGHT HOLDER": 3549,
+       "REGENCY CAKESTAND 3 TIER": 2212,
+       "STRAWBERRY CERAMIC TRINKET BOX": 1843,
+       "PACK OF 72 RETRO SPOT CAKE CASES": 1466,
+       "ASSORTED COLOUR BIRD ORNAMENT": 1457
+      }
+     }
+    },
+    {
+     "row": "104848",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "311875",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "43782",
+     "column": "Description",
+     "original": null,
+     "proposed": "WHITE HANGING HEART T-LIGHT HOLDER",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.006,
+      "n_unique": 4681,
+      "top_values": {
+       "WHITE HANGING HEART T-LIGHT HOLDER": 3549,
+       "REGENCY CAKESTAND 3 TIER": 2212,
+       "STRAWBERRY CERAMIC TRINKET BOX": 1843,
+       "PACK OF 72 RETRO SPOT CAKE CASES": 1466,
+       "ASSORTED COLOUR BIRD ORNAMENT": 1457
+      }
+     }
+    },
+    {
+     "row": "254051",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    },
+    {
+     "row": "247385",
+     "column": "Customer ID",
+     "original": null,
+     "proposed": "15311.0",
+     "action": "flagged_for_review",
+     "method": "median imputation (KNN skipped: dataset too large)",
+     "column_stats": {
+      "min": 12346.0,
+      "q1": 13983.0,
+      "median": 15311.0,
+      "q3": 16799.0,
+      "max": 18287.0,
+      "fence_lo": 5535.0,
+      "fence_hi": 25247.0,
+      "missing_share": 0.205
+     }
+    }
+   ]
+  },
+  "Potential outlier": {
+   "n_flagged": 93143,
+   "actions": {
+    "flagged_only": 57772,
+    "flagged_for_review": 35371
+   },
+   "sample": [
+    {
+     "row": "14481",
+     "column": "Price",
+     "original": "50.0",
+     "proposed": "8.649999999999999",
+     "action": "flagged_for_review",
+     "method": "clip to [-3.19, 8.65] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "264823",
+     "column": "Quantity",
+     "original": "25.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "370300",
+     "column": "Quantity",
+     "original": "96.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "168344",
+     "column": "Quantity",
+     "original": "48.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "293120",
+     "column": "Price",
+     "original": "295.0",
+     "proposed": "8.649999999999999",
+     "action": "flagged_for_review",
+     "method": "clip to [-3.19, 8.65] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "157801",
+     "column": "Quantity",
+     "original": "96.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "106304",
+     "column": "Quantity",
+     "original": "48.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "231422",
+     "column": "Quantity",
+     "original": "30.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "64617",
+     "column": "Price",
+     "original": "10.95",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "355734",
+     "column": "Quantity",
+     "original": "24.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "295051",
+     "column": "Price",
+     "original": "14.43",
+     "proposed": "8.649999999999999",
+     "action": "flagged_for_review",
+     "method": "clip to [-3.19, 8.65] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "299242",
+     "column": "Quantity",
+     "original": "100.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "196495",
+     "column": "Price",
+     "original": "10.95",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "339133",
+     "column": "Price",
+     "original": "9.95",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "92486",
+     "column": "Quantity",
+     "original": "24.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "344939",
+     "column": "Quantity",
+     "original": "24.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "234661",
+     "column": "Price",
+     "original": "10.75",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -53594.36,
+      "q1": 1.25,
+      "median": 2.1,
+      "q3": 4.21,
+      "max": 25111.09,
+      "fence_lo": -7.629999999999999,
+      "fence_hi": 13.09,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "47950",
+     "column": "Quantity",
+     "original": "42.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "6817",
+     "column": "Quantity",
+     "original": "64.0",
+     "proposed": "24.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-12.5, 23.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "81034",
+     "column": "Quantity",
+     "original": "24.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": -9600.0,
+      "q1": 1.0,
+      "median": 3.0,
+      "q3": 10.0,
+      "max": 19152.0,
+      "fence_lo": -26.0,
+      "fence_hi": 37.0,
+      "missing_share": 0.0
+     }
+    }
+   ]
+  },
+  "_mechanical": {
+   "rows_in_exact_duplicate_groups_in_raw_file": 13283
+  }
+ },
+ "peak_rss_mb": 1675.9,
+ "wall_seconds": 44.2
+}

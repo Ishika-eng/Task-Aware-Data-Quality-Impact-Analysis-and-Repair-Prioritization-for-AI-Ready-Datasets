@@ -1,0 +1,7 @@
+{
+ "id": "C",
+ "file_bytes": 124928,
+ "refused": true,
+ "message": "legacy .xls workbooks are not supported: open the file in Excel and save it as .xlsx or CSV",
+ "wall_seconds": 0.0
+}

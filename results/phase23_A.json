@@ -1,0 +1,2834 @@
+{
+ "id": "A",
+ "file": "ames_housing.csv",
+ "task": "regression",
+ "target": "SalePrice",
+ "errors": [],
+ "file_bytes": 455726,
+ "load_seconds": 0.01,
+ "input_format": {
+  "format": "csv",
+  "encoding": "utf-8-sig",
+  "delimiter": ",",
+  "decimal": ".",
+  "rows": 1460,
+  "columns": 81
+ },
+ "rows": 1460,
+ "columns": 80,
+ "snapshot_ok": true,
+ "snapshot_error": null,
+ "audit_seconds": 54.2,
+ "job_status": "done",
+ "job_error": null,
+ "quality": [
+  {
+   "dimension": "Completeness",
+   "issue_key": "missing_values",
+   "detector_type": "exact check",
+   "detected_rate": 0.0678775793,
+   "detected_count": 7829.0,
+   "count_unit": "cells",
+   "benchmark_precision": 1.0,
+   "benchmark_recall": 1.0,
+   "reliability_source": "this dataset (self-benchmark)",
+   "evidence_status": "weak",
+   "note": ""
+  },
+  {
+   "dimension": "Uniqueness",
+   "issue_key": "duplicates",
+   "detector_type": "exact check",
+   "detected_rate": 0.0,
+   "detected_count": 0.0,
+   "count_unit": "rows",
+   "benchmark_precision": 1.0,
+   "benchmark_recall": 1.0,
+   "reliability_source": "this dataset (self-benchmark)",
+   "evidence_status": "not_estimable",
+   "note": ""
+  },
+  {
+   "dimension": "Anomaly burden",
+   "issue_key": "outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": 0.3828767123,
+   "detected_count": 559.0,
+   "count_unit": "rows",
+   "benchmark_precision": 0.1777516827,
+   "benchmark_recall": 0.9264264264,
+   "reliability_source": "this dataset (self-benchmark)",
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate"
+  },
+  {
+   "dimension": "Consistency",
+   "issue_key": "inconsistency",
+   "detector_type": "rule-based check",
+   "detected_rate": 0.001369863,
+   "detected_count": 2.0,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_estimable",
+   "note": "flagged rate, not a confirmed error rate. Case, spacing and unique-abbreviation variants are repair candidates; possible typos and ambiguous abbreviations are flag-only"
+  },
+  {
+   "dimension": "Target reliability",
+   "issue_key": "label_errors",
+   "detector_type": "statistical estimate",
+   "detected_rate": 0.0191780822,
+   "detected_count": 28.0,
+   "count_unit": "rows",
+   "benchmark_precision": 0.9474950187,
+   "benchmark_recall": 0.7685685686,
+   "reliability_source": "this dataset (self-benchmark)",
+   "evidence_status": "weak",
+   "note": "flagged rate, not a confirmed error rate"
+  },
+  {
+   "dimension": "Feature reliability",
+   "issue_key": "feature_corruption",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "dimension": "Joint plausibility",
+   "issue_key": "joint_outliers",
+   "detector_type": "statistical estimate",
+   "detected_rate": null,
+   "detected_count": null,
+   "count_unit": "rows",
+   "benchmark_precision": null,
+   "benchmark_recall": null,
+   "reliability_source": null,
+   "evidence_status": "not_run",
+   "note": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "policy": [
+  {
+   "issue_key": "missing_values",
+   "issue": "Missing value",
+   "detector_ran": true,
+   "detected_rate": 0.0678775793,
+   "n_repair_candidates": 7829,
+   "n_flag_only": 0,
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "benchmark_repair_precision": 1.0,
+   "safe_auto": true,
+   "default_action": "auto-repair",
+   "evidence_source": "this dataset (self-benchmark)",
+   "model_check": "not tested",
+   "model_check_detail": "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.",
+   "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 1.00, harm beyond the noise floor risk 0.0000, status 'weak' -- meets the bar for safe automatic repair. Model check: Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.."
+  },
+  {
+   "issue_key": "duplicates",
+   "issue": "Duplicate row",
+   "detector_ran": true,
+   "detected_rate": 0.0,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "benchmark_repair_precision": 1.0,
+   "safe_auto": true,
+   "default_action": "nothing to repair",
+   "evidence_source": "this dataset (self-benchmark)",
+   "model_check": "not tested",
+   "model_check_detail": "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.",
+   "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 1.00, harm beyond the noise floor risk 0.0000, status 'weak' -- meets the bar for safe automatic repair. Model check: Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.."
+  },
+  {
+   "issue_key": "outliers",
+   "issue": "Potential outlier",
+   "detector_ran": true,
+   "detected_rate": 0.3828767123,
+   "n_repair_candidates": 130,
+   "n_flag_only": 775,
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "benchmark_repair_precision": 0.6962294542,
+   "safe_auto": false,
+   "default_action": "flag for human review",
+   "evidence_source": "this dataset (self-benchmark)",
+   "model_check": "not tested",
+   "model_check_detail": "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.",
+   "reason": "this dataset (self-benchmark), nearest evaluated rate (20%): repair precision 0.70, harm beyond the noise floor risk 0.0000, status 'weak' -- does not meet the safe-auto bar (risk must be 0 and precision >= 0.95, status not 'negative', and, on Adult evidence, no harm under gradient boosting either). Model check: Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.."
+  },
+  {
+   "issue_key": "label_errors",
+   "issue": "Potential wrong target value",
+   "detector_ran": true,
+   "detected_rate": 0.0191780822,
+   "n_repair_candidates": 28,
+   "n_flag_only": 0,
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0041283327,
+   "benchmark_repair_precision": 0.887962963,
+   "safe_auto": false,
+   "default_action": "flag for human review",
+   "evidence_source": "this dataset (self-benchmark)",
+   "model_check": "not tested",
+   "model_check_detail": "Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.",
+   "reason": "this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 0.89, harm beyond the noise floor risk 0.0041, status 'weak' -- always human review: this repair type is never applied automatically (it rewrites the target or was harmful in testing). Model check: Dataset-calibrated evidence is Random Forest only; not tested under gradient boosting.."
+  },
+  {
+   "issue_key": "feature_corruption",
+   "issue": "Potential feature anomaly",
+   "detector_ran": false,
+   "detected_rate": null,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "not assessed",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "issue_key": "inconsistency",
+   "issue": "Inconsistent value",
+   "detector_ran": true,
+   "detected_rate": 0.001369863,
+   "n_repair_candidates": 0,
+   "n_flag_only": 2,
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "flag for human review",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "no repair evidence for regression yet: run the calibration (self-benchmark) on your data to measure this repair; until then it is proposed for review and not applied automatically"
+  },
+  {
+   "issue_key": "joint_outliers",
+   "issue": "Unusual combination of values",
+   "detector_ran": false,
+   "detected_rate": null,
+   "n_repair_candidates": 0,
+   "n_flag_only": 0,
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "benchmark_repair_precision": null,
+   "safe_auto": false,
+   "default_action": "not assessed",
+   "evidence_source": "-",
+   "model_check": "not tested",
+   "model_check_detail": "",
+   "reason": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "impact": [
+  {
+   "issue": "Missing value",
+   "issue_key": "missing_values",
+   "detected_rate": 0.0678775793,
+   "benchmark_impact_estimate": -0.0003572704,
+   "is_boundary_estimate": false,
+   "impact_source": "this dataset (self-benchmark)",
+   "impact_unit": "R-squared",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "Random Forest on this dataset's reference. Not tested under gradient boosting.",
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "policy_decision": "applied",
+   "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+  },
+  {
+   "issue": "Duplicate row",
+   "issue_key": "duplicates",
+   "detected_rate": 0.0,
+   "benchmark_impact_estimate": 0.0,
+   "is_boundary_estimate": false,
+   "impact_source": "this dataset (self-benchmark)",
+   "impact_unit": "R-squared",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "Random Forest on this dataset's reference. Not tested under gradient boosting.",
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "policy_decision": "nothing to repair",
+   "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+  },
+  {
+   "issue": "Potential outlier",
+   "issue_key": "outliers",
+   "detected_rate": 0.3828767123,
+   "benchmark_impact_estimate": -0.0020209584,
+   "is_boundary_estimate": true,
+   "impact_source": "this dataset (self-benchmark)",
+   "impact_unit": "R-squared",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "Random Forest on this dataset's reference. Not tested under gradient boosting.",
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0,
+   "policy_decision": "flagged for human review (not applied)",
+   "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+  },
+  {
+   "issue": "Potential wrong target value",
+   "issue_key": "label_errors",
+   "detected_rate": 0.0191780822,
+   "benchmark_impact_estimate": 0.0033511423,
+   "is_boundary_estimate": false,
+   "impact_source": "this dataset (self-benchmark)",
+   "impact_unit": "R-squared",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "Random Forest on this dataset's reference. Not tested under gradient boosting.",
+   "repairability_status": "weak",
+   "benchmark_risk": 0.0041283327,
+   "policy_decision": "flagged for human review (not applied)",
+   "recommendation": "Repair evidence is inconclusive at this severity; review before repairing automatically."
+  },
+  {
+   "issue": "Potential feature anomaly",
+   "issue_key": "feature_corruption",
+   "detected_rate": null,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "-",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "",
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "policy_decision": "not assessed",
+   "recommendation": "not run (disabled: slow, low benchmark precision, and its automatic repair was found harmful)"
+  },
+  {
+   "issue": "Inconsistent value",
+   "issue_key": "inconsistency",
+   "detected_rate": 0.001369863,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "not measured: run the calibration on this regression dataset",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "No regression benchmark exists; impact on a model is only measured by the calibration.",
+   "repairability_status": "unknown",
+   "benchmark_risk": null,
+   "policy_decision": "flagged for human review (not applied)",
+   "recommendation": "No repair evidence available for this error type/rate."
+  },
+  {
+   "issue": "Unusual combination of values",
+   "issue_key": "joint_outliers",
+   "detected_rate": null,
+   "benchmark_impact_estimate": null,
+   "is_boundary_estimate": false,
+   "impact_source": "-",
+   "impact_unit": "-",
+   "impact_estimate_auc": null,
+   "metrics_disagree": false,
+   "metric_note": "",
+   "impact_model_note": "",
+   "repairability_status": "not_assessed",
+   "benchmark_risk": null,
+   "policy_decision": "not assessed",
+   "recommendation": "not run (off by default: its validation failed on real data, and it is flag-only; enable it explicitly to get unusual-combination flags)"
+  }
+ ],
+ "calibration": {
+  "status": "ok",
+  "metric": "R-squared",
+  "n_seeds": 3,
+  "rates": [
+   0.05,
+   0.1,
+   0.2
+  ],
+  "n_estimators": 100,
+  "seconds": 37.6,
+  "reference": {
+   "rows_labeled": 1460,
+   "rows_complete": 1094,
+   "rows_after_dedup": 1094,
+   "rows_removed_label_problems": 20,
+   "rare_classes_dropped": [],
+   "columns_left_out": {
+    "Alley": "94% missing",
+    "MasVnrType": "60% missing",
+    "FireplaceQu": "47% missing",
+    "PoolQC": "100% missing",
+    "Fence": "81% missing",
+    "MiscFeature": "96% missing"
+   },
+   "columns_used": [
+    "MSSubClass",
+    "MSZoning",
+    "LotFrontage",
+    "LotArea",
+    "Street",
+    "LotShape",
+    "LandContour",
+    "Utilities",
+    "LotConfig",
+    "LandSlope",
+    "Neighborhood",
+    "Condition1",
+    "Condition2",
+    "BldgType",
+    "HouseStyle",
+    "OverallQual",
+    "OverallCond",
+    "YearBuilt",
+    "YearRemodAdd",
+    "RoofStyle",
+    "RoofMatl",
+    "Exterior1st",
+    "Exterior2nd",
+    "MasVnrArea",
+    "ExterQual",
+    "ExterCond",
+    "Foundation",
+    "BsmtQual",
+    "BsmtCond",
+    "BsmtExposure",
+    "BsmtFinType1",
+    "BsmtFinSF1",
+    "BsmtFinType2",
+    "BsmtFinSF2",
+    "BsmtUnfSF",
+    "TotalBsmtSF",
+    "Heating",
+    "HeatingQC",
+    "CentralAir",
+    "Electrical",
+    "1stFlrSF",
+    "2ndFlrSF",
+    "LowQualFinSF",
+    "GrLivArea",
+    "BsmtFullBath",
+    "BsmtHalfBath",
+    "FullBath",
+    "HalfBath",
+    "BedroomAbvGr",
+    "KitchenAbvGr",
+    "KitchenQual",
+    "TotRmsAbvGrd",
+    "Functional",
+    "Fireplaces",
+    "GarageType",
+    "GarageYrBlt",
+    "GarageFinish",
+    "GarageCars",
+    "GarageArea",
+    "GarageQual",
+    "GarageCond",
+    "PavedDrive",
+    "WoodDeckSF",
+    "OpenPorchSF",
+    "EnclosedPorch",
+    "3SsnPorch",
+    "ScreenPorch",
+    "PoolArea",
+    "MiscVal",
+    "MoSold",
+    "YrSold",
+    "SaleType",
+    "SaleCondition"
+   ],
+   "rows_used": 1074,
+   "rows_train": 751,
+   "rows_test": 323,
+   "minority_class_share": null
+  },
+  "noise_floor": 0.006569538630408013,
+  "noise_floor_auc": null,
+  "task": "regression",
+  "has_auc": false,
+  "clean_macro_f1": 0.8489127350431405,
+  "chance_f1": 0.0,
+  "minority_share": null,
+  "imbalance_warning": false,
+  "underpowered": false,
+  "evidence": [
+   {
+    "error_type": "duplicates",
+    "rate": 0.05,
+    "mean_damage": 0.0002537793,
+    "damage_std": 0.0045455683,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": 0.0002537793,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 1,
+    "n_neg_seeds": 2,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.6666666667,
+    "harm_magnitude": 0.0023618788,
+    "risk": 0.0015745859,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": true,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "label_errors",
+    "rate": 0.05,
+    "mean_damage": 0.0087369068,
+    "damage_std": 0.0202206149,
+    "repair_precision": 0.887962963,
+    "repair_recall": 0.9279279279,
+    "mean_recovery": 0.0030690446,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 1,
+    "n_neg_seeds": 2,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.6666666667,
+    "harm_magnitude": 0.0093307382,
+    "risk": 0.0062204921,
+    "p_material_harm": 0.3333333333,
+    "material_risk": 0.0041283327,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0041283327,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "missing_values",
+    "rate": 0.05,
+    "mean_damage": -0.0006240064,
+    "damage_std": 0.0065040624,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": -0.0028125421,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 1,
+    "n_neg_seeds": 2,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.6666666667,
+    "harm_magnitude": 0.0050868713,
+    "risk": 0.0033912476,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "outliers",
+    "rate": 0.05,
+    "mean_damage": 0.0019416407,
+    "damage_std": 0.0037864433,
+    "repair_precision": 0.4057828929,
+    "repair_recall": 0.7387387387,
+    "mean_recovery": -0.0009883155,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 1,
+    "n_neg_seeds": 2,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.6666666667,
+    "harm_magnitude": 0.0022721324,
+    "risk": 0.0015147549,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "duplicates",
+    "rate": 0.1,
+    "mean_damage": -0.0004356601,
+    "damage_std": 0.0025543157,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": -0.0004356601,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 2,
+    "n_neg_seeds": 1,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.3333333333,
+    "harm_magnitude": 0.0032630393,
+    "risk": 0.0010876798,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": true,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "label_errors",
+    "rate": 0.1,
+    "mean_damage": 0.0244044183,
+    "damage_std": 0.0271611978,
+    "repair_precision": 0.9583535109,
+    "repair_recall": 0.8,
+    "mean_recovery": 0.0219706549,
+    "sign_agreement": 1.0,
+    "n_pos_seeds": 3,
+    "n_neg_seeds": 0,
+    "repairability_status": "positive",
+    "evidence_status": "complete",
+    "p_harm": 0.0,
+    "harm_magnitude": 0.0,
+    "risk": 0.0,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "positive",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "positive",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "missing_values",
+    "rate": 0.1,
+    "mean_damage": 0.0001220007,
+    "damage_std": 0.0054436665,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": 0.0008361298,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 2,
+    "n_neg_seeds": 1,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.3333333333,
+    "harm_magnitude": 0.0067627517,
+    "risk": 0.0022542506,
+    "p_material_harm": 0.3333333333,
+    "material_risk": 0.0022542506,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0022542506,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "outliers",
+    "rate": 0.1,
+    "mean_damage": -0.0036844722,
+    "damage_std": 0.0018548822,
+    "repair_precision": 0.5399251132,
+    "repair_recall": 0.6311111111,
+    "mean_recovery": -0.0006006823,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 1,
+    "n_neg_seeds": 2,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.6666666667,
+    "harm_magnitude": 0.0019791973,
+    "risk": 0.0013194649,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "duplicates",
+    "rate": 0.2,
+    "mean_damage": 0.0042345148,
+    "damage_std": 0.005841383,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": 0.0042345148,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 2,
+    "n_neg_seeds": 1,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.3333333333,
+    "harm_magnitude": 0.0012665203,
+    "risk": 0.0004221734,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": true,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "label_errors",
+    "rate": 0.2,
+    "mean_damage": 0.0261943663,
+    "damage_std": 0.008518837,
+    "repair_precision": 0.9961685824,
+    "repair_recall": 0.5777777778,
+    "mean_recovery": 0.017187278,
+    "sign_agreement": 1.0,
+    "n_pos_seeds": 3,
+    "n_neg_seeds": 0,
+    "repairability_status": "positive",
+    "evidence_status": "complete",
+    "p_harm": 0.0,
+    "harm_magnitude": 0.0,
+    "risk": 0.0,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "positive",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "positive",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "missing_values",
+    "rate": 0.2,
+    "mean_damage": 0.0066467604,
+    "damage_std": 0.0027832774,
+    "repair_precision": 1.0,
+    "repair_recall": 1.0,
+    "mean_recovery": 0.0128387851,
+    "sign_agreement": 1.0,
+    "n_pos_seeds": 3,
+    "n_neg_seeds": 0,
+    "repairability_status": "positive",
+    "evidence_status": "complete",
+    "p_harm": 0.0,
+    "harm_magnitude": 0.0,
+    "risk": 0.0,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "positive",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "positive",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   },
+   {
+    "error_type": "outliers",
+    "rate": 0.2,
+    "mean_damage": -0.0020209584,
+    "damage_std": 0.0027195124,
+    "repair_precision": 0.6962294542,
+    "repair_recall": 0.6022222222,
+    "mean_recovery": 0.0009674369,
+    "sign_agreement": 0.6666666667,
+    "n_pos_seeds": 2,
+    "n_neg_seeds": 1,
+    "repairability_status": "weak",
+    "evidence_status": "partial",
+    "p_harm": 0.3333333333,
+    "harm_magnitude": 0.0003023854,
+    "risk": 0.0001007951,
+    "p_material_harm": 0.0,
+    "material_risk": 0.0,
+    "restored_exactly": false,
+    "status_macrof1": "weak",
+    "material_risk_f1": 0.0,
+    "mean_damage_auc": null,
+    "mean_recovery_auc": null,
+    "material_risk_auc": null,
+    "status_auc": "weak",
+    "noise_floor_auc": null,
+    "noise_floor": 0.0065695386,
+    "underpowered": false
+   }
+  ],
+  "detector_reliability": [
+   {
+    "error_type": "duplicates",
+    "unit": "rows",
+    "precision": 1.0,
+    "recall": 1.0
+   },
+   {
+    "error_type": "label_errors",
+    "unit": "rows",
+    "precision": 0.9474950187,
+    "recall": 0.7685685686
+   },
+   {
+    "error_type": "missing_values",
+    "unit": "cells",
+    "precision": 1.0,
+    "recall": 1.0
+   },
+   {
+    "error_type": "outliers",
+    "unit": "cells",
+    "precision": 0.1777516827,
+    "recall": 0.9264264264
+   }
+  ],
+  "detector_tracking": [
+   {
+    "error_type": "duplicates",
+    "pearson_r": null,
+    "spearman_r": null,
+    "n_points": 3,
+    "evidence_status": "not_estimable",
+    "note": "On this dataset the R-squared damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+    "metric": "R-squared",
+    "pearson_r_macrof1": null,
+    "pearson_r_auc": null
+   },
+   {
+    "error_type": "label_errors",
+    "pearson_r": 0.9071821119,
+    "spearman_r": 1.0,
+    "n_points": 3,
+    "evidence_status": "weak",
+    "note": "The detected rate rose with measured R-squared damage on this dataset (r = 0.91, 3 rates: directional only, not statistically significant).",
+    "metric": "R-squared",
+    "pearson_r_macrof1": 0.9071821119,
+    "pearson_r_auc": null
+   },
+   {
+    "error_type": "missing_values",
+    "pearson_r": 0.9713181878,
+    "spearman_r": 1.0,
+    "n_points": 3,
+    "evidence_status": "weak",
+    "note": "The detected rate rose with measured R-squared damage on this dataset (r = 0.97, 3 rates: directional only, not statistically significant).",
+    "metric": "R-squared",
+    "pearson_r_macrof1": 0.9713181878,
+    "pearson_r_auc": null
+   },
+   {
+    "error_type": "outliers",
+    "pearson_r": null,
+    "spearman_r": null,
+    "n_points": 3,
+    "evidence_status": "not_estimable",
+    "note": "On this dataset the R-squared damage from this error stays below the noise floor (or too few rates were measured), so the detected rate cannot be checked against real damage.",
+    "metric": "R-squared",
+    "pearson_r_macrof1": null,
+    "pearson_r_auc": null
+   }
+  ],
+  "baseline_floors": {
+   "missing_values": 0.0,
+   "duplicates": 0.0,
+   "outliers": 0.34823091247672255,
+   "label_errors": 0.00931098696461825
+  },
+  "skipped_issues": {},
+  "metric_disagreement": []
+ },
+ "selection": {
+  "applied": [
+   "missing_values"
+  ],
+  "default": [
+   "missing_values"
+  ],
+  "label": "policy default"
+ },
+ "summary": {
+  "evidence_based": {
+   "rows_uploaded": 1460,
+   "rows_after_cleaning": 1460,
+   "rows_dropped": 0,
+   "cells_modified": 860,
+   "repairs_applied_by_issue": {
+    "Missing value": 860
+   },
+   "flagged_for_review": 7127,
+   "flagged_only": 777,
+   "skipped_conflicts": 0,
+   "skipped_row_dropped": 0,
+   "issues_applied": [
+    "missing_values"
+   ],
+   "human_overrides": []
+  },
+  "aggressive": {
+   "rows_uploaded": 1460,
+   "rows_after_cleaning": 1460,
+   "rows_dropped": 0,
+   "cells_modified": 7987,
+   "repairs_applied_by_issue": {
+    "Missing value": 7829,
+    "Potential outlier": 130,
+    "Potential wrong target value": 28
+   },
+   "flagged_for_review": 0,
+   "flagged_only": 777,
+   "skipped_conflicts": 0,
+   "skipped_row_dropped": 0,
+   "issues_applied": [
+    "duplicates",
+    "inconsistency",
+    "label_errors",
+    "missing_values",
+    "outliers"
+   ],
+   "human_overrides": [
+    "duplicates",
+    "inconsistency",
+    "label_errors",
+    "outliers"
+   ]
+  }
+ },
+ "review": {
+  "proposed": 7127,
+  "flag_only": 777,
+  "total": 7904,
+  "by_issue": [
+   {
+    "issue_key": "inconsistency",
+    "problem": "Inconsistent value",
+    "proposed": 0,
+    "flag_only": 2
+   },
+   {
+    "issue_key": "missing_values",
+    "problem": "Missing value",
+    "proposed": 6969,
+    "flag_only": 0
+   },
+   {
+    "issue_key": "outliers",
+    "problem": "Potential outlier",
+    "proposed": 130,
+    "flag_only": 775
+   },
+   {
+    "issue_key": "Potential wrong target value",
+    "problem": "Potential wrong target value",
+    "proposed": 28,
+    "flag_only": 0
+   }
+  ]
+ },
+ "notes": [
+  "Held back for review: 6,969 proposed repair(s) were not applied because the calibration did not cover those columns (they are too empty to benchmark): PoolQC (1,453), MiscFeature (1,406), Alley (1,369), Fence (1,179), MasVnrType (872), FireplaceQu (690). Check them in the review queue; a blank there may mean 'not applicable' rather than 'missing'."
+ ],
+ "n_rows_analysed": 1460,
+ "limitations": [
+  "Calibration evidence comes from a CLEAN-ISH reference built from your own data (complete rows, no duplicates, wild target values removed), random injected errors, a Random Forest regressor and R-squared: 'no harm observed' means none in those runs, not a guarantee.",
+  "Estimate-based audit: for an uploaded dataset the true error locations are unknown, so every rate comes from a detector with limited precision and recall. A flagged rate is not a confirmed error rate.",
+  "Regression (Phase 21): the wrong-target detector flags target values whose out-of-fold residual is more than 4 robust sigmas from the typical residual (scaled within bands of the predicted value). It finds gross errors, not subtle ones, and it can flag genuine extreme values. On a clean reference it flagged under 2% of rows; its precision and recall on injected errors are in docs/PHASE21_SPEC.md. Its replacement value is a model prediction, so it is never applied automatically without evidence from your own data.",
+  "There is no regression benchmark behind the default policy: unless the calibration is run on your data, no repair is applied automatically and no impact estimate is shown. The Adult evidence is classification-only and is not used.",
+  "No before/after model metrics are reported in the audit itself: an uploaded dataset has no clean held-out test set. The model panel compares models on held-out rows that are as dirty as your file, so a gain there does not prove a repair was right.",
+  "Duplicates are full-record duplicates (features + target). Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; a token that is a genuine category in your data will be over-counted as missing.",
+  "Files above the model-detector row limit are audited on a sample (stratified by target quintile) for the target and feature detectors; their findings and proposals then cover only the sampled rows.",
+  "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs; with no calibration no repair in it is certified safe."
+ ],
+ "v2_mechanical": {
+  "rows_raw": 1460,
+  "rows_cleaned": 1460,
+  "rows_removed": 0,
+  "duplicate_rows_logged_applied": 0,
+  "cells_changed": 860,
+  "cells_changed_not_in_log": 0,
+  "applied_log_rows": 860,
+  "actions": {
+   "flagged_for_review": 7127,
+   "applied": 860,
+   "flagged_only": 777
+  },
+  "pass_a": true
+ },
+ "v2_wrong_metric_strings": [
+  "BsmtFinSF1",
+  "BsmtFinSF1",
+  "BsmtFinSF1",
+  "BsmtFinSF1"
+ ],
+ "spot_check": {
+  "Inconsistent value": {
+   "n_flagged": 2,
+   "actions": {
+    "flagged_only": 2
+   },
+   "sample": [
+    {
+     "row": "762",
+     "column": "SaleType",
+     "original": "Con",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "could abbreviate more than one value ('ConLD', 'ConLI', 'ConLw'); not repaired",
+     "column_stats": {
+      "missing_share": 0.0,
+      "n_unique": 9,
+      "top_values": {
+       "WD": 1267,
+       "New": 122,
+       "COD": 43,
+       "ConLD": 9,
+       "ConLI": 5
+      }
+     }
+    },
+    {
+     "row": "326",
+     "column": "SaleType",
+     "original": "Con",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "could abbreviate more than one value ('ConLD', 'ConLI', 'ConLw'); not repaired",
+     "column_stats": {
+      "missing_share": 0.0,
+      "n_unique": 9,
+      "top_values": {
+       "WD": 1267,
+       "New": 122,
+       "COD": 43,
+       "ConLD": 9,
+       "ConLI": 5
+      }
+     }
+    }
+   ]
+  },
+  "Missing value": {
+   "n_flagged": 7829,
+   "actions": {
+    "flagged_for_review": 6969,
+    "applied": 860
+   },
+   "sample": [
+    {
+     "row": "1384",
+     "column": "MiscFeature",
+     "original": null,
+     "proposed": "Shed",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.963,
+      "n_unique": 4,
+      "top_values": {
+       "Shed": 49,
+       "Gar2": 2,
+       "Othr": 2,
+       "TenC": 1
+      }
+     }
+    },
+    {
+     "row": "908",
+     "column": "PoolQC",
+     "original": null,
+     "proposed": "Gd",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.995,
+      "n_unique": 3,
+      "top_values": {
+       "Gd": 3,
+       "Ex": 2,
+       "Fa": 2
+      }
+     }
+    },
+    {
+     "row": "692",
+     "column": "Fence",
+     "original": null,
+     "proposed": "MnPrv",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.808,
+      "n_unique": 4,
+      "top_values": {
+       "MnPrv": 157,
+       "GdPrv": 59,
+       "GdWo": 54,
+       "MnWw": 11
+      }
+     }
+    },
+    {
+     "row": "1395",
+     "column": "PoolQC",
+     "original": null,
+     "proposed": "Gd",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.995,
+      "n_unique": 3,
+      "top_values": {
+       "Gd": 3,
+       "Ex": 2,
+       "Fa": 2
+      }
+     }
+    },
+    {
+     "row": "200",
+     "column": "MasVnrType",
+     "original": null,
+     "proposed": "BrkFace",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.597,
+      "n_unique": 3,
+      "top_values": {
+       "BrkFace": 445,
+       "Stone": 128,
+       "BrkCmn": 15
+      }
+     }
+    },
+    {
+     "row": "166",
+     "column": "PoolQC",
+     "original": null,
+     "proposed": "Gd",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.995,
+      "n_unique": 3,
+      "top_values": {
+       "Gd": 3,
+       "Ex": 2,
+       "Fa": 2
+      }
+     }
+    },
+    {
+     "row": "555",
+     "column": "MasVnrType",
+     "original": null,
+     "proposed": "BrkFace",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.597,
+      "n_unique": 3,
+      "top_values": {
+       "BrkFace": 445,
+       "Stone": 128,
+       "BrkCmn": 15
+      }
+     }
+    },
+    {
+     "row": "1238",
+     "column": "MiscFeature",
+     "original": null,
+     "proposed": "Shed",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.963,
+      "n_unique": 4,
+      "top_values": {
+       "Shed": 49,
+       "Gar2": 2,
+       "Othr": 2,
+       "TenC": 1
+      }
+     }
+    },
+    {
+     "row": "672",
+     "column": "Alley",
+     "original": null,
+     "proposed": "Grvl",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.938,
+      "n_unique": 2,
+      "top_values": {
+       "Grvl": 50,
+       "Pave": 41
+      }
+     }
+    },
+    {
+     "row": "165",
+     "column": "GarageType",
+     "original": null,
+     "proposed": "Attchd",
+     "action": "applied",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.055,
+      "n_unique": 6,
+      "top_values": {
+       "Attchd": 870,
+       "Detchd": 387,
+       "BuiltIn": 88,
+       "Basment": 19,
+       "CarPort": 9
+      }
+     }
+    },
+    {
+     "row": "1174",
+     "column": "MasVnrType",
+     "original": null,
+     "proposed": "BrkFace",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.597,
+      "n_unique": 3,
+      "top_values": {
+       "BrkFace": 445,
+       "Stone": 128,
+       "BrkCmn": 15
+      }
+     }
+    },
+    {
+     "row": "1011",
+     "column": "GarageType",
+     "original": null,
+     "proposed": "Attchd",
+     "action": "applied",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.055,
+      "n_unique": 6,
+      "top_values": {
+       "Attchd": 870,
+       "Detchd": 387,
+       "BuiltIn": 88,
+       "Basment": 19,
+       "CarPort": 9
+      }
+     }
+    },
+    {
+     "row": "160",
+     "column": "Fence",
+     "original": null,
+     "proposed": "MnPrv",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.808,
+      "n_unique": 4,
+      "top_values": {
+       "MnPrv": 157,
+       "GdPrv": 59,
+       "GdWo": 54,
+       "MnWw": 11
+      }
+     }
+    },
+    {
+     "row": "712",
+     "column": "PoolQC",
+     "original": null,
+     "proposed": "Gd",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.995,
+      "n_unique": 3,
+      "top_values": {
+       "Gd": 3,
+       "Ex": 2,
+       "Fa": 2
+      }
+     }
+    },
+    {
+     "row": "1376",
+     "column": "Alley",
+     "original": null,
+     "proposed": "Grvl",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.938,
+      "n_unique": 2,
+      "top_values": {
+       "Grvl": 50,
+       "Pave": 41
+      }
+     }
+    },
+    {
+     "row": "404",
+     "column": "LotFrontage",
+     "original": null,
+     "proposed": "70.0",
+     "action": "applied",
+     "method": "KNN imputation (k=5, standardised numeric columns)",
+     "column_stats": {
+      "min": 21.0,
+      "q1": 59.0,
+      "median": 69.0,
+      "q3": 80.0,
+      "max": 313.0,
+      "fence_lo": -4.0,
+      "fence_hi": 143.0,
+      "missing_share": 0.177
+     }
+    },
+    {
+     "row": "550",
+     "column": "Alley",
+     "original": null,
+     "proposed": "Grvl",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.938,
+      "n_unique": 2,
+      "top_values": {
+       "Grvl": 50,
+       "Pave": 41
+      }
+     }
+    },
+    {
+     "row": "1008",
+     "column": "PoolQC",
+     "original": null,
+     "proposed": "Gd",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.995,
+      "n_unique": 3,
+      "top_values": {
+       "Gd": 3,
+       "Ex": 2,
+       "Fa": 2
+      }
+     }
+    },
+    {
+     "row": "155",
+     "column": "MiscFeature",
+     "original": null,
+     "proposed": "Shed",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.963,
+      "n_unique": 4,
+      "top_values": {
+       "Shed": 49,
+       "Gar2": 2,
+       "Othr": 2,
+       "TenC": 1
+      }
+     }
+    },
+    {
+     "row": "564",
+     "column": "Alley",
+     "original": null,
+     "proposed": "Grvl",
+     "action": "flagged_for_review",
+     "method": "most-frequent value",
+     "column_stats": {
+      "missing_share": 0.938,
+      "n_unique": 2,
+      "top_values": {
+       "Grvl": 50,
+       "Pave": 41
+      }
+     }
+    }
+   ]
+  },
+  "Potential outlier": {
+   "n_flagged": 905,
+   "actions": {
+    "flagged_only": 775,
+    "flagged_for_review": 130
+   },
+   "sample": [
+    {
+     "row": "1151",
+     "column": "LotArea",
+     "original": "17755.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1300.0,
+      "q1": 7553.5,
+      "median": 9478.5,
+      "q3": 11601.5,
+      "max": 215245.0,
+      "fence_lo": -4590.5,
+      "fence_hi": 23745.5,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "718",
+     "column": "MasVnrArea",
+     "original": "651.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 166.0,
+      "max": 1600.0,
+      "fence_lo": -498.0,
+      "fence_hi": 664.0,
+      "missing_share": 0.005
+     }
+    },
+    {
+     "row": "1182",
+     "column": "BsmtFinSF1",
+     "original": "2096.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 383.5,
+      "q3": 712.25,
+      "max": 5644.0,
+      "fence_lo": -2136.75,
+      "fence_hi": 2849.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1353",
+     "column": "MasVnrArea",
+     "original": "579.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 166.0,
+      "max": 1600.0,
+      "fence_lo": -498.0,
+      "fence_hi": 664.0,
+      "missing_share": 0.005
+     }
+    },
+    {
+     "row": "500",
+     "column": "LotFrontage",
+     "original": "21.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 21.0,
+      "q1": 59.0,
+      "median": 69.0,
+      "q3": 80.0,
+      "max": 313.0,
+      "fence_lo": -4.0,
+      "fence_hi": 143.0,
+      "missing_share": 0.177
+     }
+    },
+    {
+     "row": "88",
+     "column": "OverallCond",
+     "original": "2.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1.0,
+      "q1": 5.0,
+      "median": 5.0,
+      "q3": 6.0,
+      "max": 9.0,
+      "fence_lo": 2.0,
+      "fence_hi": 9.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "755",
+     "column": "MSSubClass",
+     "original": "160.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 20.0,
+      "q1": 20.0,
+      "median": 50.0,
+      "q3": 70.0,
+      "max": 190.0,
+      "fence_lo": -130.0,
+      "fence_hi": 220.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1423",
+     "column": "PoolArea",
+     "original": "738.0",
+     "proposed": "0.0",
+     "action": "flagged_for_review",
+     "method": "clip to [0, 0] (0.5-99.5 percentile bounds)",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "max": 738.0,
+      "fence_lo": 0.0,
+      "fence_hi": 0.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1367",
+     "column": "MSSubClass",
+     "original": "160.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 20.0,
+      "q1": 20.0,
+      "median": 50.0,
+      "q3": 70.0,
+      "max": 190.0,
+      "fence_lo": -130.0,
+      "fence_hi": 220.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "225",
+     "column": "MSSubClass",
+     "original": "160.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 20.0,
+      "q1": 20.0,
+      "median": 50.0,
+      "q3": 70.0,
+      "max": 190.0,
+      "fence_lo": -130.0,
+      "fence_hi": 220.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1153",
+     "column": "OverallCond",
+     "original": "8.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1.0,
+      "q1": 5.0,
+      "median": 5.0,
+      "q3": 6.0,
+      "max": 9.0,
+      "fence_lo": 2.0,
+      "fence_hi": 9.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "981",
+     "column": "MasVnrArea",
+     "original": "975.0",
+     "proposed": "415.0",
+     "action": "flagged_for_review",
+     "method": "clip to [-249, 415] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 166.0,
+      "max": 1600.0,
+      "fence_lo": -498.0,
+      "fence_hi": 664.0,
+      "missing_share": 0.005
+     }
+    },
+    {
+     "row": "1030",
+     "column": "OverallCond",
+     "original": "8.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1.0,
+      "q1": 5.0,
+      "median": 5.0,
+      "q3": 6.0,
+      "max": 9.0,
+      "fence_lo": 2.0,
+      "fence_hi": 9.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "346",
+     "column": "MiscVal",
+     "original": "15500.0",
+     "proposed": "1823.0",
+     "action": "flagged_for_review",
+     "method": "clip to [0, 1823] (0.5-99.5 percentile bounds)",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "max": 15500.0,
+      "fence_lo": 0.0,
+      "fence_hi": 0.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1184",
+     "column": "OpenPorchSF",
+     "original": "263.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 25.0,
+      "q3": 68.0,
+      "max": 547.0,
+      "fence_lo": -204.0,
+      "fence_hi": 272.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "197",
+     "column": "LotArea",
+     "original": "25419.0",
+     "proposed": "17674.0",
+     "action": "flagged_for_review",
+     "method": "clip to [1481.5, 17673.5] (1.5xIQR bounds)",
+     "column_stats": {
+      "min": 1300.0,
+      "q1": 7553.5,
+      "median": 9478.5,
+      "q3": 11601.5,
+      "max": 215245.0,
+      "fence_lo": -4590.5,
+      "fence_hi": 23745.5,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "422",
+     "column": "LotArea",
+     "original": "21750.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1300.0,
+      "q1": 7553.5,
+      "median": 9478.5,
+      "q3": 11601.5,
+      "max": 215245.0,
+      "fence_lo": -4590.5,
+      "fence_hi": 23745.5,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "928",
+     "column": "BsmtUnfSF",
+     "original": "1753.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 223.0,
+      "median": 477.5,
+      "q3": 808.0,
+      "max": 2336.0,
+      "fence_lo": -1532.0,
+      "fence_hi": 2563.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1287",
+     "column": "MasVnrArea",
+     "original": "621.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 0.0,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 166.0,
+      "max": 1600.0,
+      "fence_lo": -498.0,
+      "fence_hi": 664.0,
+      "missing_share": 0.005
+     }
+    },
+    {
+     "row": "991",
+     "column": "OverallCond",
+     "original": "9.0",
+     "proposed": null,
+     "action": "flagged_only",
+     "method": "flag only: outside 1.5xIQR bounds, below the high-confidence threshold",
+     "column_stats": {
+      "min": 1.0,
+      "q1": 5.0,
+      "median": 5.0,
+      "q3": 6.0,
+      "max": 9.0,
+      "fence_lo": 2.0,
+      "fence_hi": 9.0,
+      "missing_share": 0.0
+     }
+    }
+   ]
+  },
+  "Potential wrong target value": {
+   "n_flagged": 28,
+   "actions": {
+    "flagged_for_review": 28
+   },
+   "sample": [
+    {
+     "row": "218",
+     "column": "SalePrice",
+     "original": "311500.0",
+     "proposed": "209761.745",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1266",
+     "column": "SalePrice",
+     "original": "122000.0",
+     "proposed": "177891.615",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "691",
+     "column": "SalePrice",
+     "original": "755000.0",
+     "proposed": "569947.505",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "898",
+     "column": "SalePrice",
+     "original": "611657.0",
+     "proposed": "443898.39",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "454",
+     "column": "SalePrice",
+     "original": "188000.0",
+     "proposed": "143240.39",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "658",
+     "column": "SalePrice",
+     "original": "97500.0",
+     "proposed": "142902.155",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1324",
+     "column": "SalePrice",
+     "original": "147000.0",
+     "proposed": "285789.425",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "688",
+     "column": "SalePrice",
+     "original": "392000.0",
+     "proposed": "221711.585",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1182",
+     "column": "SalePrice",
+     "original": "745000.0",
+     "proposed": "519311.935",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1349",
+     "column": "SalePrice",
+     "original": "122000.0",
+     "proposed": "274081.665",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "803",
+     "column": "SalePrice",
+     "original": "582933.0",
+     "proposed": "420548.675",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "153",
+     "column": "SalePrice",
+     "original": "235000.0",
+     "proposed": "155989.495",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "632",
+     "column": "SalePrice",
+     "original": "82500.0",
+     "proposed": "185279.385",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1453",
+     "column": "SalePrice",
+     "original": "84500.0",
+     "proposed": "145370.16",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1423",
+     "column": "SalePrice",
+     "original": "274970.0",
+     "proposed": "181426.96",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "523",
+     "column": "SalePrice",
+     "original": "184750.0",
+     "proposed": "596596.87",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "462",
+     "column": "SalePrice",
+     "original": "62383.0",
+     "proposed": "123900.25",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "410",
+     "column": "SalePrice",
+     "original": "60000.0",
+     "proposed": "126023.72",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1046",
+     "column": "SalePrice",
+     "original": "556581.0",
+     "proposed": "420493.01",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    },
+    {
+     "row": "1062",
+     "column": "SalePrice",
+     "original": "90000.0",
+     "proposed": "134178.965",
+     "action": "flagged_for_review",
+     "method": "replace the target with the cross-validated model prediction",
+     "column_stats": {
+      "min": 34900.0,
+      "q1": 129975.0,
+      "median": 163000.0,
+      "q3": 214000.0,
+      "max": 755000.0,
+      "fence_lo": -122100.0,
+      "fence_hi": 466075.0,
+      "missing_share": 0.0
+     }
+    }
+   ]
+  },
+  "_mechanical": {
+   "rows_in_exact_duplicate_groups_in_raw_file": 0
+  }
+ },
+ "v3_detection_at_5pct": [
+  {
+   "issue": "duplicates",
+   "detector_precision": 1.0,
+   "detector_recall": 1.0,
+   "damage": 0.000253779323972451,
+   "recovery": 0.000253779323972451
+  },
+  {
+   "issue": "label_errors",
+   "detector_precision": 0.887962962962963,
+   "detector_recall": 0.9279279279279279,
+   "damage": 0.008736906823408441,
+   "recovery": 0.0030690446139367187
+  },
+  {
+   "issue": "missing_values",
+   "detector_precision": 1.0,
+   "detector_recall": 1.0,
+   "damage": -0.000624006368432628,
+   "recovery": -0.00281254208021664
+  },
+  {
+   "issue": "outliers",
+   "detector_precision": 0.08868508249686528,
+   "detector_recall": 0.9459459459459459,
+   "damage": 0.0019416406647858597,
+   "recovery": -0.0009883155365139802
+  }
+ ],
+ "v3_detector_false_positive_floor_on_reference": {
+  "missing_values": 0.0,
+  "duplicates": 0.0,
+  "outliers": 0.34823091247672255,
+  "label_errors": 0.00931098696461825
+ },
+ "v3_noise_floor": 0.006569538630408013,
+ "panel_seconds": 70.1,
+ "panel_status": "ok",
+ "panel": {
+  "status": "ok",
+  "task": "regression",
+  "metric": "R-squared on held-out rows",
+  "seeds": [
+   42,
+   43,
+   44
+  ],
+  "n_seeds": 3,
+  "rows_used": 1460,
+  "train_rows": 1168,
+  "test_rows": 292,
+  "models": [
+   {
+    "key": "ridge",
+    "label": "Ridge regression",
+    "role": "linear: the most sensitive to outliers and wild targets",
+    "noise_floor": 0.0335346838108367
+   },
+   {
+    "key": "random_forest",
+    "label": "Random forest",
+    "role": "bagged trees: steady, resists a few wild targets",
+    "noise_floor": 0.01656647490661357
+   },
+   {
+    "key": "gradient_boosting",
+    "label": "Gradient boosting",
+    "role": "boosted trees: strong on tabular data, can chase noisy targets",
+    "noise_floor": 0.01737366722484199
+   },
+   {
+    "key": "neural_net",
+    "label": "Neural net (MLP)",
+    "role": "small neural network: sensitive to skew and scale",
+    "noise_floor": 0.18691250508115473
+   }
+  ],
+  "arms": [
+   {
+    "key": "before",
+    "label": "Before (raw)",
+    "text": "Raw training rows. Blanks are filled and categories encoded, nothing is cleaned.",
+    "rows_removed": 0.0,
+    "cells_changed": 0.0
+   },
+   {
+    "key": "default",
+    "label": "Default file",
+    "text": "The repairs the evidence says are safe to apply without review.",
+    "rows_removed": 0.0,
+    "cells_changed": 689.3333333333334
+   },
+   {
+    "key": "aggressive",
+    "label": "Aggressive file",
+    "text": "Every proposed repair except feature-anomaly repairs.",
+    "rows_removed": 0.0,
+    "cells_changed": 6415.666666666667
+   },
+   {
+    "key": "duplicates",
+    "label": "Duplicates only",
+    "text": "Exact duplicate rows removed from the training rows.",
+    "rows_removed": 0.0,
+    "cells_changed": 0.0
+   },
+   {
+    "key": "missing_values",
+    "label": "Missing values only",
+    "text": "Missing cells filled (KNN or median) using the training rows only.",
+    "rows_removed": 0.0,
+    "cells_changed": 6280.333333333333
+   },
+   {
+    "key": "outliers",
+    "label": "Outliers only",
+    "text": "Extreme values replaced by the fence value, fences from the training rows.",
+    "rows_removed": 0.0,
+    "cells_changed": 114.0
+   },
+   {
+    "key": "inconsistency",
+    "label": "Spellings only",
+    "text": "Spelling variants merged into one canonical spelling.",
+    "rows_removed": 0.0,
+    "cells_changed": 0.0
+   },
+   {
+    "key": "label_errors",
+    "label": "Target fixes only",
+    "text": "Suspected wrong target values replaced by the cross-validated model prediction.",
+    "rows_removed": 0.0,
+    "cells_changed": 21.333333333333332
+   }
+  ],
+  "results": [
+   {
+    "model": "ridge",
+    "arm": "before",
+    "n_seeds": 3,
+    "score_mean": 0.7648461120672332,
+    "score_std": 0.13008028589606777,
+    "rmse_mean": 35266.172480928915,
+    "score_noleak_mean": 0.7648461120672332,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "baseline",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "ridge",
+    "arm": "default",
+    "n_seeds": 3,
+    "score_mean": 0.7654306253303064,
+    "score_std": 0.12826858621779566,
+    "rmse_mean": 35262.34612509873,
+    "score_noleak_mean": 0.7654306253303064,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.0005845132630731461,
+    "delta_rmse": -3.826355830181759,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "ridge",
+    "arm": "aggressive",
+    "n_seeds": 3,
+    "score_mean": 0.7293685558143966,
+    "score_std": 0.18294354465534815,
+    "rmse_mean": 36892.03656061646,
+    "score_noleak_mean": 0.7293685558143966,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": -0.03547755625283655,
+    "delta_rmse": 1625.864079687548,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "ridge",
+    "arm": "duplicates",
+    "n_seeds": 3,
+    "score_mean": 0.7648461120672332,
+    "score_std": 0.13008028589606777,
+    "rmse_mean": 35266.172480928915,
+    "score_noleak_mean": 0.7648461120672332,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "ridge",
+    "arm": "missing_values",
+    "n_seeds": 3,
+    "score_mean": 0.7654306253303064,
+    "score_std": 0.12826858621779566,
+    "rmse_mean": 35262.34612509873,
+    "score_noleak_mean": 0.7654306253303064,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.0005845132630731461,
+    "delta_rmse": -3.826355830181759,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "ridge",
+    "arm": "outliers",
+    "n_seeds": 3,
+    "score_mean": 0.705689979232904,
+    "score_std": 0.20084408300785753,
+    "rmse_mean": 38439.725695479436,
+    "score_noleak_mean": 0.705689979232904,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": -0.059156132834329224,
+    "delta_rmse": 3173.553214550529,
+    "verdict": "worse",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "ridge",
+    "arm": "inconsistency",
+    "n_seeds": 3,
+    "score_mean": 0.7648461120672332,
+    "score_std": 0.13008028589606777,
+    "rmse_mean": 35266.172480928915,
+    "score_noleak_mean": 0.7648461120672332,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "ridge",
+    "arm": "label_errors",
+    "n_seeds": 3,
+    "score_mean": 0.7748922212998526,
+    "score_std": 0.1389463148258464,
+    "rmse_mean": 34079.95252355613,
+    "score_noleak_mean": 0.7748922212998526,
+    "learnable": true,
+    "noise_floor": 0.0335346838108367,
+    "delta_score": 0.010046109232619282,
+    "delta_rmse": -1186.2199573727823,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "random_forest",
+    "arm": "before",
+    "n_seeds": 3,
+    "score_mean": 0.8462299228034414,
+    "score_std": 0.031543175294823866,
+    "rmse_mean": 29911.6639100501,
+    "score_noleak_mean": 0.8462299228034414,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "baseline",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "random_forest",
+    "arm": "default",
+    "n_seeds": 3,
+    "score_mean": 0.845258277972786,
+    "score_std": 0.02780345965156713,
+    "rmse_mean": 30065.32136190605,
+    "score_noleak_mean": 0.845258277972786,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": -0.0009716448306554826,
+    "delta_rmse": 153.65745185595128,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "random_forest",
+    "arm": "aggressive",
+    "n_seeds": 3,
+    "score_mean": 0.8162494335151971,
+    "score_std": 0.0277631359554493,
+    "rmse_mean": 32886.09098420357,
+    "score_noleak_mean": 0.8162494335151971,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": -0.0299804892882443,
+    "delta_rmse": 2974.4270741534688,
+    "verdict": "worse",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "random_forest",
+    "arm": "duplicates",
+    "n_seeds": 3,
+    "score_mean": 0.8462299228034414,
+    "score_std": 0.031543175294823866,
+    "rmse_mean": 29911.6639100501,
+    "score_noleak_mean": 0.8462299228034414,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "random_forest",
+    "arm": "missing_values",
+    "n_seeds": 3,
+    "score_mean": 0.845258277972786,
+    "score_std": 0.02780345965156713,
+    "rmse_mean": 30065.32136190605,
+    "score_noleak_mean": 0.845258277972786,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": -0.0009716448306554826,
+    "delta_rmse": 153.65745185595128,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "random_forest",
+    "arm": "outliers",
+    "n_seeds": 3,
+    "score_mean": 0.8424476547769221,
+    "score_std": 0.04469126293822533,
+    "rmse_mean": 30017.42845517832,
+    "score_noleak_mean": 0.8424476547769221,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": -0.0037822680265192274,
+    "delta_rmse": 105.76454512822117,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "random_forest",
+    "arm": "inconsistency",
+    "n_seeds": 3,
+    "score_mean": 0.8462299228034414,
+    "score_std": 0.031543175294823866,
+    "rmse_mean": 29911.6639100501,
+    "score_noleak_mean": 0.8462299228034414,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "random_forest",
+    "arm": "label_errors",
+    "n_seeds": 3,
+    "score_mean": 0.8086877130581636,
+    "score_std": 0.034519337629020895,
+    "rmse_mean": 33442.71392163232,
+    "score_noleak_mean": 0.8086877130581636,
+    "learnable": true,
+    "noise_floor": 0.01656647490661357,
+    "delta_score": -0.03754220974527785,
+    "delta_rmse": 3531.0500115822238,
+    "verdict": "worse",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "before",
+    "n_seeds": 3,
+    "score_mean": 0.8372110698611266,
+    "score_std": 0.027388507216569245,
+    "rmse_mean": 30868.120492545928,
+    "score_noleak_mean": 0.8372110698611266,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "baseline",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "default",
+    "n_seeds": 3,
+    "score_mean": 0.8422192160502929,
+    "score_std": 0.026302218601372447,
+    "rmse_mean": 30388.894581637374,
+    "score_noleak_mean": 0.8422192160502929,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.00500814618916634,
+    "delta_rmse": -479.2259109085535,
+    "verdict": "within noise",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "aggressive",
+    "n_seeds": 3,
+    "score_mean": 0.8343732871111916,
+    "score_std": 0.026725338067323818,
+    "rmse_mean": 31189.193378814758,
+    "score_noleak_mean": 0.8343732871111916,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": -0.0028377827499349584,
+    "delta_rmse": 321.0728862688314,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "duplicates",
+    "n_seeds": 3,
+    "score_mean": 0.8372110698611266,
+    "score_std": 0.027388507216569245,
+    "rmse_mean": 30868.120492545928,
+    "score_noleak_mean": 0.8372110698611266,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "missing_values",
+    "n_seeds": 3,
+    "score_mean": 0.8422192160502929,
+    "score_std": 0.026302218601372447,
+    "rmse_mean": 30388.894581637374,
+    "score_noleak_mean": 0.8422192160502929,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.00500814618916634,
+    "delta_rmse": -479.2259109085535,
+    "verdict": "within noise",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "outliers",
+    "n_seeds": 3,
+    "score_mean": 0.8416618347117567,
+    "score_std": 0.03116936325336831,
+    "rmse_mean": 30383.36923197278,
+    "score_noleak_mean": 0.8416618347117567,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.004450764850630044,
+    "delta_rmse": -484.7512605731475,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "inconsistency",
+    "n_seeds": 3,
+    "score_mean": 0.8372110698611266,
+    "score_std": 0.027388507216569245,
+    "rmse_mean": 30868.120492545928,
+    "score_noleak_mean": 0.8372110698611266,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "gradient_boosting",
+    "arm": "label_errors",
+    "n_seeds": 3,
+    "score_mean": 0.8357106571970528,
+    "score_std": 0.02456558604247862,
+    "rmse_mean": 31084.94352958402,
+    "score_noleak_mean": 0.8357106571970528,
+    "learnable": true,
+    "noise_floor": 0.01737366722484199,
+    "delta_score": -0.001500412664073784,
+    "delta_rmse": 216.82303703808915,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "neural_net",
+    "arm": "before",
+    "n_seeds": 3,
+    "score_mean": 0.7607976747347345,
+    "score_std": 0.03268199116574125,
+    "rmse_mean": 37504.33457991198,
+    "score_noleak_mean": 0.7607976747347345,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "baseline",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "neural_net",
+    "arm": "default",
+    "n_seeds": 3,
+    "score_mean": 0.7622492628530392,
+    "score_std": 0.033219489097667025,
+    "rmse_mean": 37383.39023233083,
+    "score_noleak_mean": 0.7622492628530392,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.001451588118304703,
+    "delta_rmse": -120.94434758114949,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "neural_net",
+    "arm": "aggressive",
+    "n_seeds": 3,
+    "score_mean": 0.7137353759606219,
+    "score_std": 0.16883247462561132,
+    "rmse_mean": 38646.31612337948,
+    "score_noleak_mean": 0.7137353759606219,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": -0.04706229877411261,
+    "delta_rmse": 1141.9815434675063,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "neural_net",
+    "arm": "duplicates",
+    "n_seeds": 3,
+    "score_mean": 0.7607976747347345,
+    "score_std": 0.03268199116574125,
+    "rmse_mean": 37504.33457991198,
+    "score_noleak_mean": 0.7607976747347345,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "neural_net",
+    "arm": "missing_values",
+    "n_seeds": 3,
+    "score_mean": 0.7622492628530392,
+    "score_std": 0.033219489097667025,
+    "rmse_mean": 37383.39023233083,
+    "score_noleak_mean": 0.7622492628530392,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.001451588118304703,
+    "delta_rmse": -120.94434758114949,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "neural_net",
+    "arm": "outliers",
+    "n_seeds": 3,
+    "score_mean": 0.6633092156621146,
+    "score_std": 0.14765206237836834,
+    "rmse_mean": 42999.37378269031,
+    "score_noleak_mean": 0.6633092156621146,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": -0.09748845907261994,
+    "delta_rmse": 5495.039202778334,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   },
+   {
+    "model": "neural_net",
+    "arm": "inconsistency",
+    "n_seeds": 3,
+    "score_mean": 0.7607976747347345,
+    "score_std": 0.03268199116574125,
+    "rmse_mean": 37504.33457991198,
+    "score_noleak_mean": 0.7607976747347345,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.0,
+    "delta_rmse": 0.0,
+    "verdict": "no change",
+    "seeds_agree": 1.0
+   },
+   {
+    "model": "neural_net",
+    "arm": "label_errors",
+    "n_seeds": 3,
+    "score_mean": 0.770464875494978,
+    "score_std": 0.07416048593534455,
+    "rmse_mean": 36058.18039821355,
+    "score_noleak_mean": 0.770464875494978,
+    "learnable": true,
+    "noise_floor": 0.18691250508115473,
+    "delta_score": 0.00966720076024341,
+    "delta_rmse": -1446.154181698427,
+    "verdict": "within noise",
+    "seeds_agree": 0.6666666666666666
+   }
+  ],
+  "interaction": [
+   {
+    "model": "gradient_boosting",
+    "aggressive": -0.0028377827499349584,
+    "sum_of_singles": 0.0079584983757226
+   },
+   {
+    "model": "neural_net",
+    "aggressive": -0.04706229877411261,
+    "sum_of_singles": -0.08636967019407182
+   },
+   {
+    "model": "random_forest",
+    "aggressive": -0.0299804892882443,
+    "sum_of_singles": -0.042296122602452565
+   },
+   {
+    "model": "ridge",
+    "aggressive": -0.03547755625283655,
+    "sum_of_singles": -0.04852551033863679
+   }
+  ],
+  "leakage": {
+   "test_rows_with_exact_copy_in_train_pct": 0.0,
+   "note": "Test rows that also appear (all columns identical) in the training rows. They inflate the 'before' score; 'score_noleak_mean' scores only the rows with no copy."
+  },
+  "default_issues": [
+   "missing_values"
+  ],
+  "notes": [],
+  "seconds": 68.6,
+  "settings": {
+   "test_size": 0.2,
+   "rf_trees": 100,
+   "gb_iterations": 150,
+   "mlp_hidden": 64,
+   "null_draws_per_seed": 3,
+   "null_drop_fraction": 0.1,
+   "sign_agreement": 0.8,
+   "noise_floor_min": 0.003
+  },
+  "caveat": "This compares models trained on your raw rows with models trained on the repaired rows, scored on the same untouched held-out rows, which are as dirty as your file. A gain means the repaired training rows predicted the real rows better; it does not prove each repair was correct, and a loss can mean the held-out targets are noisy. Changes smaller than the noise floor are labelled 'within noise'.",
+  "progress": 1.0,
+  "finished": 1794933558.50366
+ },
+ "peak_rss_mb": 392.1,
+ "wall_seconds": 124.9
+}

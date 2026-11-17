@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { api } from "../api";
 import { useAudit } from "../audit-context";
 import { Badge, Card, Dot, Page, RateBar, Stat, Status, Disclosure } from "../components/ui";
-import { ISSUE_COLOR, ISSUE_NAME, ISSUE_ORDER, int, num, pct, seconds, signed, tone } from "../lib";
+import { ISSUE_COLOR, ISSUE_ORDER, issueName, int, num, pct, seconds, signed, tone } from "../lib";
 
 export function Overview() {
   const a = useAudit();
@@ -12,7 +12,7 @@ export function Overview() {
   const sum = a.summary.evidence_based;
   const by = <T extends { issue_key: string }>(rows: T[]) => Object.fromEntries(rows.map((r) => [r.issue_key, r])) as Record<string, T>;
   const quality = by(a.quality), policy = by(a.policy), ready = by(a.readiness), impact = by(a.impact);
-  const applied = a.selection.applied.map((k) => ISSUE_NAME[k] ?? k);
+  const applied = a.selection.applied.map((k) => issueName(k, ov.task));
   const cal = a.calibration;
   const panelQ = useQuery({
     queryKey: ["panel", a.id], queryFn: () => api.panel(a.id), enabled: !!ov.target,
@@ -20,6 +20,8 @@ export function Overview() {
   });
   const panel = panelQ.data;
   const agg = (panel?.results ?? []).filter((c) => c.arm === "aggressive");
+  const dflt = (panel?.results ?? []).filter((c) => c.arm === "default");
+  const dfltOf = (m: string) => dflt.find((c) => c.model === m);
   const labelOf = (k: string) => panel?.models?.find((m) => m.key === k)?.label ?? k;
 
   return (
@@ -59,11 +61,20 @@ export function Overview() {
           {(panel.status === "queued" || panel.status === "running") && <p className="text-sm text-muted">Training in the background… {pct(panel.progress ?? 0, 0)}. Results appear here when it finishes.</p>}
           {panel.status === "ok" && (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {agg.map((c) => (
-                <Stat key={c.model} label={labelOf(c.model)} value={signed(c.delta_f1)}
-                  tone={c.verdict === "improved" ? "good" : c.verdict === "worse" ? "bad" : "neutral"}
-                  hint={`${c.verdict} (noise ±${c.noise_floor.toFixed(3)}) · all repairs vs raw`} />
-              ))}
+              {agg.map((c) => {
+                // headline = the file you would actually use (evidence-based); the aggressive file is shown second
+                const d = dfltOf(c.model);
+                const none = !d && (panel.default_issues ?? []).length === 0;           // nothing was applied automatically
+                const head = d ?? (none ? undefined : c);
+                return (
+                  <Stat key={c.model} label={labelOf(c.model)}
+                    value={none || d?.verdict === "no change" ? "no change" : signed(head!.delta_f1)}
+                    tone={head?.verdict === "improved" ? "good" : head?.verdict === "worse" ? "bad" : "neutral"}
+                    hint={d || none
+                      ? <>evidence-based file: {none ? "nothing applied automatically" : `${d!.verdict} (noise ±${d!.noise_floor.toFixed(3)})`}<br />aggressive file: {signed(c.delta_f1)}, {c.verdict}</>
+                      : `${c.verdict} (noise ±${c.noise_floor.toFixed(3)}) · all repairs vs raw`} />
+                );
+              })}
             </div>
           )}
           {(panel.status === "declined" || panel.status === "error") && <p className="text-sm text-muted">{panel.reason}</p>}
@@ -82,7 +93,7 @@ export function Overview() {
             return (
               <Card key={k}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2"><Dot color={ISSUE_COLOR[k]} /><span className="font-semibold">{ISSUE_NAME[k]}</span></div>
+                  <div className="flex items-center gap-2"><Dot color={ISSUE_COLOR[k]} /><span className="font-semibold">{issueName(k, ov.task)}</span></div>
                   {p ? <Status value={p.default_action} /> : <Badge>Report only</Badge>}
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">

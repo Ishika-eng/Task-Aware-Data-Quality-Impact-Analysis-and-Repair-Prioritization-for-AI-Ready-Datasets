@@ -78,7 +78,7 @@ export function Features() {
 
       <Card
         title="Columns"
-        description="Importance is the drop in balanced accuracy when the column is shuffled on held-out rows; probe is the largest value among 12 random probe columns. A column is flagged only if both its importance and its mutual information with the target are at or below the probes."
+        description={`Importance is the drop in ${a.overview.task === "regression" ? "R-squared" : "balanced accuracy"} when the column is shuffled on held-out rows; probe is the largest value among 12 random probe columns. A column is flagged only if both its importance and its mutual information with the target are at or below the probes.`}
         actions={<Segmented label="Show" value={view} onChange={setView} options={[{ value: "flagged", label: "Needs attention" }, { value: "all", label: "All columns" }]} />}
       >
         <DataTable columns={cols} rows={shown} rowKey={(r) => r.column} dense empty="Every column looks relevant." />
