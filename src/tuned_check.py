@@ -91,7 +91,7 @@ def run(path: str, target: str, task: str | None, seeds: int, rows: int, drop: l
     res = {"file": os.path.basename(path), "target": target, "task": task, "metric": metric, "rows_used": len(df), "seeds": seed_list,
            "default_file_applies": sorted(default_seen), "summary": summary, "per_seed": out_rows, "seconds": round(time.time() - t0, 1)}
     os.makedirs(os.path.join(ROOT, "results"), exist_ok=True)
-    json.dump(res, open(os.path.join(ROOT, "results", f"tuned_check_{os.path.splitext(os.path.basename(path))[0]}.json"), "w"), indent=1)
+    json.dump(res, open(os.path.join(ROOT, "results", f"tuned_check_{os.path.splitext(os.path.basename(path))[0]}__{target}.json"), "w"), indent=1)
     return res
 
 

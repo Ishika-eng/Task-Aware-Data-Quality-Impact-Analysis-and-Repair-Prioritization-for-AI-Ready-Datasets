@@ -593,6 +593,17 @@ applies nothing there: the gain comes from the validation-based selection.
 `src/tuned_check.py FILE TARGET` runs the same check on any file you supply (5 fresh splits, repair chosen per model from training rows only, scored on untouched raw held-out rows, noise floor and 80% seed agreement, "no change" reported when the raw rows are kept).
 Re-run on Bank with a different split it again improved logistic regression (+0.036, 5 of 5 splits) and left the other three models within noise; on German credit and California housing (2 splits each, smoke test) nothing improved. It does not promise a gain on an arbitrary file.
 
+Independent files tried with it (exploratory, not pre-registered; the user supplied the first, the other two were searched for and downloaded from UCI; every file run is listed, none dropped):
+
+| File | Target | Rows | Result |
+|---|---|---|---|
+| Messy Employee dataset (user-supplied) | Performance_Score, Status; also Salary, Age, Remote_Work | 1,020 | No gain on any of 5 targets. No column carries signal about the labels (models score at chance, chi-square/ANOVA p mostly 0.3-0.98), so there is no performance for cleaning to protect. |
+| UCI Credit Approval | class | 690 | No gain, all four models within noise. Learnable target (macro-F1 0.83-0.87) but only 5% of rows have a missing value and no other errors found. |
+| UCI Horse Colic | outcome (hospital number dropped; train and test files merged) | 368 | No gain, all four models within noise. 19% of cells missing, but the repair chosen on a ~74-row validation slice changed from split to split, which is selection noise; gradient boosting was worse in 3 of 3 cleaned splits. |
+
+So the confirmed improvement remains one dataset and one model (Bank Marketing, logistic regression). Result files: `results/tuned_check_<file>__<target>.json` (the two earliest files, Bank, German credit and California, were written under the older `tuned_check_<file>.json` name).
+A noise-aware selection rule (several validation splits, margin scaled to the measured noise) is a proposed change that has not been built.
+
 ## Limitations
 
 - **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
