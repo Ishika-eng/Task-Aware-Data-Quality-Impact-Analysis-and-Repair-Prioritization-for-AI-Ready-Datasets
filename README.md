@@ -510,7 +510,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
 | 22 | `python3 test_phase22.py` | Excel intake: round trip, sheets, layout, robustness, upload equals the same CSV ([spec](docs/PHASE22_SPEC.md)) |
 | 23 | `python3 test_phase23.py` (run: `python3 validate_new_datasets.py T`, `A`, `R`, `O`, `C`) | amendment A1 invariants; validation on five genuine files (data in `data/new/`, not committed) |
-| 27 | `python3 explore_phase27.py select`, `confirm 0.4`, `gated`; `real_file_search.py`; `real_confirm_bank.py` | exploratory (not pre-registered): noisy-label filter; real-file search and confirmation of cleaning improving a model |
+| 27 | `python3 explore_phase27.py select`, `confirm 0.4`, `gated`; `real_file_search.py`; `real_confirm_bank.py`; `tuned_check.py FILE TARGET` (any file) | exploratory (not pre-registered): noisy-label filter; real-file search and confirmation of cleaning improving a model |
 | 26 | `python3 test_phase26.py` (run: `python3 validate_phase26.py D`, `S0 T`/`A`/`R`/`O`, `S0files`, `S0demo`, `S2`, `B`, `Boff`) | word placeholders, declared values and the keep switch, two report-only diagnostics: planted truth, policy, targets, no change elsewhere ([spec](docs/PHASE26_SPEC.md)) |
 | 25 | `python3 test_phase25.py` (run: `python3 validate_sentinels.py D`, `S0 T`/`A`/`R`/`O`/`C`, `S0demo`, `S2`) | placeholder codes read as missing: planted truth, policy, target, no change elsewhere; DS-jobs file in `data/new/` (not committed) |
 
@@ -589,6 +589,9 @@ A stronger noisy-label filter helps when label noise is high (Adult, 10-20% flip
 Searching all real files with the Model panel (217 comparisons) found 3 improvements and 11 harms; the strongest, Bank Marketing logistic regression, was confirmed on a fresh sample and fresh seeds with the claim fixed in advance:
 the tool's per-model tuned cleaning improved it in 5 of 5 seeds (mean +0.030 macro-F1, about five times the noise floor) while random forest and gradient boosting did not gain. One dataset, held-out rows as dirty as the file, and the default file
 applies nothing there: the gain comes from the validation-based selection.
+
+`src/tuned_check.py FILE TARGET` runs the same check on any file you supply (5 fresh splits, repair chosen per model from training rows only, scored on untouched raw held-out rows, noise floor and 80% seed agreement, "no change" reported when the raw rows are kept).
+Re-run on Bank with a different split it again improved logistic regression (+0.036, 5 of 5 splits) and left the other three models within noise; on German credit and California housing (2 splits each, smoke test) nothing improved. It does not promise a gain on an arbitrary file.
 
 ## Limitations
 

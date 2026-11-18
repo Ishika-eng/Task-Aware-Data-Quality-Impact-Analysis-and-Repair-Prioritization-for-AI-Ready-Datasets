@@ -1,0 +1,133 @@
+{
+ "file": "california_housing.csv",
+ "target": "MedHouseVal",
+ "task": "regression",
+ "metric": "R-squared",
+ "rows_used": 2000,
+ "seeds": [
+  100,
+  101
+ ],
+ "default_file_applies": [],
+ "summary": [
+  {
+   "model": "Ridge regression",
+   "raw_mean": 0.6205341165447569,
+   "tuned_mean": 0.6205341165447569,
+   "mean_change": 0.0,
+   "seeds_better": 0,
+   "seeds_worse": 0,
+   "cleaned_in_seeds": 0,
+   "noise_floor": 0.003,
+   "verdict": "no change (kept the raw rows)",
+   "repairs_chosen": {}
+  },
+  {
+   "model": "Random forest",
+   "raw_mean": 0.7224087710192068,
+   "tuned_mean": 0.7224087710192068,
+   "mean_change": 0.0,
+   "seeds_better": 0,
+   "seeds_worse": 0,
+   "cleaned_in_seeds": 0,
+   "noise_floor": 0.012117900180554243,
+   "verdict": "no change (kept the raw rows)",
+   "repairs_chosen": {}
+  },
+  {
+   "model": "Gradient boosting",
+   "raw_mean": 0.7620785930319091,
+   "tuned_mean": 0.7532019932457512,
+   "mean_change": -0.008876599786157902,
+   "seeds_better": 0,
+   "seeds_worse": 1,
+   "cleaned_in_seeds": 1,
+   "noise_floor": 0.01234764533727746,
+   "verdict": "within noise",
+   "repairs_chosen": {
+    "aggressive": 1
+   }
+  },
+  {
+   "model": "Neural net (MLP)",
+   "raw_mean": 0.726512295454112,
+   "tuned_mean": 0.7176342552579009,
+   "mean_change": -0.008878040196211079,
+   "seeds_better": 0,
+   "seeds_worse": 1,
+   "cleaned_in_seeds": 1,
+   "noise_floor": 0.14174093560211037,
+   "verdict": "within noise",
+   "repairs_chosen": {
+    "label_errors": 1
+   }
+  }
+ ],
+ "per_seed": [
+  {
+   "seed": 100,
+   "model": "ridge",
+   "chosen": "dirty",
+   "raw": 0.6546123409215308,
+   "tuned": 0.6546123409215308,
+   "delta": 0.0
+  },
+  {
+   "seed": 100,
+   "model": "random_forest",
+   "chosen": "dirty",
+   "raw": 0.7313507139900788,
+   "tuned": 0.7313507139900788,
+   "delta": 0.0
+  },
+  {
+   "seed": 100,
+   "model": "gradient_boosting",
+   "chosen": "dirty",
+   "raw": 0.769241963998093,
+   "tuned": 0.769241963998093,
+   "delta": 0.0
+  },
+  {
+   "seed": 100,
+   "model": "neural_net",
+   "chosen": "dirty",
+   "raw": 0.7395234764052454,
+   "tuned": 0.7395234764052454,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "ridge",
+   "chosen": "dirty",
+   "raw": 0.586455892167983,
+   "tuned": 0.586455892167983,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "random_forest",
+   "chosen": "dirty",
+   "raw": 0.7134668280483347,
+   "tuned": 0.7134668280483347,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "gradient_boosting",
+   "chosen": "aggressive",
+   "raw": 0.7549152220657251,
+   "tuned": 0.7371620224934093,
+   "delta": -0.017753199572315803
+  },
+  {
+   "seed": 101,
+   "model": "neural_net",
+   "chosen": "label_errors",
+   "raw": 0.7135011145029786,
+   "tuned": 0.6957450341105564,
+   "delta": -0.017756080392422158
+  }
+ ],
+ "seconds": 20.3
+}

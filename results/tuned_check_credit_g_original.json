@@ -1,0 +1,135 @@
+{
+ "file": "credit_g_original.csv",
+ "target": "class",
+ "task": "classification",
+ "metric": "macro-F1",
+ "rows_used": 1000,
+ "seeds": [
+  100,
+  101
+ ],
+ "default_file_applies": [],
+ "summary": [
+  {
+   "model": "Logistic regression",
+   "raw_mean": 0.708838005000658,
+   "tuned_mean": 0.708838005000658,
+   "mean_change": 0.0,
+   "seeds_better": 0,
+   "seeds_worse": 0,
+   "cleaned_in_seeds": 1,
+   "noise_floor": 0.02136166162107738,
+   "verdict": "no effect",
+   "repairs_chosen": {
+    "aggressive": 1
+   }
+  },
+  {
+   "model": "Random forest",
+   "raw_mean": 0.7389147916037451,
+   "tuned_mean": 0.7302931807355992,
+   "mean_change": -0.00862161086814578,
+   "seeds_better": 0,
+   "seeds_worse": 1,
+   "cleaned_in_seeds": 1,
+   "noise_floor": 0.028593256248328668,
+   "verdict": "within noise",
+   "repairs_chosen": {
+    "aggressive": 1
+   }
+  },
+  {
+   "model": "Gradient boosting",
+   "raw_mean": 0.7614093795782524,
+   "tuned_mean": 0.7629266423098995,
+   "mean_change": 0.001517262731647151,
+   "seeds_better": 1,
+   "seeds_worse": 0,
+   "cleaned_in_seeds": 1,
+   "noise_floor": 0.017688022420041905,
+   "verdict": "within noise",
+   "repairs_chosen": {
+    "aggressive": 1
+   }
+  },
+  {
+   "model": "Neural net (MLP)",
+   "raw_mean": 0.4518449731552937,
+   "tuned_mean": 0.4518449731552937,
+   "mean_change": 0.0,
+   "seeds_better": 0,
+   "seeds_worse": 0,
+   "cleaned_in_seeds": 0,
+   "noise_floor": 0.1271646334525221,
+   "verdict": "no change (kept the raw rows)",
+   "repairs_chosen": {}
+  }
+ ],
+ "per_seed": [
+  {
+   "seed": 100,
+   "model": "logistic_regression",
+   "chosen": "aggressive",
+   "raw": 0.7466666666666666,
+   "tuned": 0.7466666666666666,
+   "delta": 0.0
+  },
+  {
+   "seed": 100,
+   "model": "random_forest",
+   "chosen": "aggressive",
+   "raw": 0.7382462498741569,
+   "tuned": 0.7210030281378653,
+   "delta": -0.01724322173629156
+  },
+  {
+   "seed": 100,
+   "model": "gradient_boosting",
+   "chosen": "dirty",
+   "raw": 0.7843734145104009,
+   "tuned": 0.7843734145104009,
+   "delta": 0.0
+  },
+  {
+   "seed": 100,
+   "model": "neural_net",
+   "chosen": "dirty",
+   "raw": 0.4117647058823529,
+   "tuned": 0.4117647058823529,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "logistic_regression",
+   "chosen": "dirty",
+   "raw": 0.6710093433346493,
+   "tuned": 0.6710093433346493,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "random_forest",
+   "chosen": "dirty",
+   "raw": 0.7395833333333333,
+   "tuned": 0.7395833333333333,
+   "delta": 0.0
+  },
+  {
+   "seed": 101,
+   "model": "gradient_boosting",
+   "chosen": "aggressive",
+   "raw": 0.7384453446461038,
+   "tuned": 0.7414798701093981,
+   "delta": 0.003034525463294302
+  },
+  {
+   "seed": 101,
+   "model": "neural_net",
+   "chosen": "dirty",
+   "raw": 0.49192524042823443,
+   "tuned": 0.49192524042823443,
+   "delta": 0.0
+  }
+ ],
+ "seconds": 17.8
+}
