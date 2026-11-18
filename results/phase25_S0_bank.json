@@ -1,0 +1,13 @@
+{
+ "file": "bank_marketing_original.csv",
+ "target": "Class",
+ "flagged": {},
+ "majority": {
+  "V14": {
+   "codes": [
+    -1
+   ],
+   "share": 0.8173674548229414
+  }
+ }
+}

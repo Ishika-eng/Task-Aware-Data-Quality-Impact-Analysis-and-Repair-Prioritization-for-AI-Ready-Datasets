@@ -1,0 +1,17 @@
+{
+ "id": "R",
+ "same_decisions_and_counts": false,
+ "differences": [
+  "/spot_check/Potential wrong target value/sample[0]/proposed: new='45.30458333333327' old='45.30458333333328'",
+  "/spot_check/Potential wrong target value/sample[1]/proposed: new='37.0645' old='37.06450000000001'",
+  "/spot_check/Potential wrong target value/sample[6]/proposed: new='46.672' old='46.67199999999999'"
+ ],
+ "float_cells_compared": 237,
+ "max_relative_float_deviation": 0.0,
+ "float_tolerance": 0.002,
+ "code_is_phase25": false,
+ "limitations_changed": false,
+ "new_digest": "ff63f8d42813",
+ "old_digest": "0ace0d4fbee5",
+ "wall_seconds": 5.5
+}

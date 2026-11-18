@@ -33,8 +33,11 @@ function problems(s: HealthSnapshot): Problem[] {
   const a = s.anomalies;
   const out: Problem[] = [
     { key: "miss", problem: "Missing cells", count: c.missing_cells, share: c.missing_pct, unit: "cells", source: "audit",
-      detail: `${int(c.blank_cells)} blank and ${int(c.placeholder_cells)} placeholder cells (such as ?, N/A, -). ` +
-        topColumns(Object.fromEntries(s.columns.filter((x) => x.missing > 0).map((x) => [x.name, x.missing]))) },
+      detail: `${int(c.blank_cells)} blank and ${int(c.placeholder_cells)} placeholder cells (such as ?, N/A, -)` +
+        (c.code_cells ? ` and ${int(c.code_cells)} cells that hold a code such as -1 or a word such as “Unknown” (read as missing; the file is not changed). ` : ". ") +
+        topColumns(Object.fromEntries(s.columns.filter((x) => x.missing > 0).map((x) => [x.name, x.missing]))) +
+        (c.code_majority_columns && Object.keys(c.code_majority_columns).length
+          ? `. Kept as a category, not missing (a code or word fills most of the column): ${Object.entries(c.code_majority_columns).map(([k, v]) => `${k} (${Math.round(v.share * 100)}% are ${v.codes.join(" / ")})`).join(", ")}` : "") },
     { key: "missrows", problem: "Rows with at least one missing cell", count: c.rows_with_missing, share: c.rows_with_missing_pct, unit: "rows", source: "audit",
       detail: c.columns_entirely_missing.length ? `Entirely empty columns: ${c.columns_entirely_missing.join(", ")}` : "" },
   ];
@@ -169,9 +172,12 @@ export function HealthReport({ snapshot: s, target, actions, auditTarget }: { sn
 
       <Card title="What is wrong with it" description="Counts and rates, not a score. “Same as the audit” means the audit uses the same definition and will report the same number; “report-only” checks are not validated and nothing is repaired from them." pad={false}>
         <div className="p-2"><ProblemsTable s={s} /></div>
+        <p className="border-t border-line px-5 py-3 text-xs leading-relaxed text-muted">
+          This report is fixed at upload, so it uses automatic detection only. Values you declare as missing on the Start page (such as <code>0</code> or <code>999</code>) and columns you ask to keep as real values apply to the audit, not to these counts.
+        </p>
         {auditTarget && (
           <p className="border-t border-line px-5 py-3 text-xs leading-relaxed text-muted">
-            This snapshot is taken at upload, before a target is chosen, so it treats <b className="text-fg">{auditTarget}</b> like any other column. The audit leaves the target out of its outlier check, so “same as the audit” counts can differ slightly (for example outlier rows) when the target is numeric.
+            This snapshot is taken at upload, before a target is chosen, so it treats <b className="text-fg">{auditTarget}</b> like any other column. The audit leaves the target out of its outlier check and treats a code such as -1 in a numeric target, or a value you declare as missing in the target, as a missing target, so “same as the audit” counts can differ slightly (for example outlier rows or missing cells) when the target is numeric.
           </p>
         )}
       </Card>

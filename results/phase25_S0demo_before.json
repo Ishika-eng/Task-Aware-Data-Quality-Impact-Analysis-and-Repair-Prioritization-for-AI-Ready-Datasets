@@ -1,0 +1,8 @@
+{
+ "rows": 6300,
+ "cleaned_sha256": "08abe9e549dbb380568357228b3915a8e9b3387990ae7ea4ea8d7919fc6e76d2",
+ "aggressive_sha256": "08abe9e549dbb380568357228b3915a8e9b3387990ae7ea4ea8d7919fc6e76d2",
+ "repair_log_sha256": "0af93ea1f3e4ed0026014b9b7855309defc64f5f5022e4b59251430c7a628f27",
+ "code_is_phase25": false,
+ "wall_seconds": 0.6
+}

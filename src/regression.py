@@ -89,11 +89,21 @@ def target_profile_regression(df: pd.DataFrame, target: str) -> dict:
     num = pd.to_numeric(raw, errors="coerce").astype(float)
     num[~np.isfinite(num)] = np.nan
     n = len(raw)
-    labelled = num.dropna()
     bad = int((raw.notna() & num.isna()).sum())
+    # Phase 25: a code such as -1 in a numeric target is a missing target, exactly as the audit reads it (lazy import: taskclean imports this module)
+    from taskclean import _numeric_codes
+    res = _numeric_codes(num)
+    coded = int(res["mask"].sum()) if res is not None and res["status"] == "flag" else 0
+    if coded:
+        num = num.where(~res["mask"])
+    labelled = num.dropna()
     out = {"target": str(target), "task": "regression", "rows": int(n), "rows_without_target": int(n - len(labelled)),
            "rows_without_target_pct": float((n - len(labelled)) / n) if n else 0.0, "non_numeric_values": bad,
            "n_distinct": int(labelled.nunique()), "usable": True, "warnings": []}
+    if coded:
+        out["code_values"] = coded
+        out["warnings"].append(f"{coded:,} value(s) are the code {' / '.join(str(c) for c in res['codes'])}: they are treated as a missing target "
+                               "(left out of training and evaluation, never repaired), and the figures below leave them out")
     if len(labelled) == 0:
         out["usable"] = False
         out["warnings"].append("no numeric values: regression needs a numeric target")

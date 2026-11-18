@@ -45,6 +45,8 @@ export interface AuditRequest {
   model_panel: boolean;
   seeds: number;
   max_model_rows: number;
+  declared_missing?: Record<string, string[]>;   // Phase 26: values the user says mean "missing", per column
+  keep_values?: string[];                        // Phase 26: columns whose automatic placeholder detection is off
 }
 
 export interface PanelModel { key: string; label: string; role: string; noise_floor: number | null; noise_floor_auc: number | null }
@@ -237,6 +239,13 @@ export interface Calibration {
   metric_disagreement?: { error_type: string; disagree: boolean; note: string }[];
 }
 
+export interface HeldBack {
+  count: number;
+  columns: Record<string, number>;
+  calibration?: { count: number; columns: Record<string, number> };   // columns the calibration did not cover
+  codes?: { count: number; columns: Record<string, number> };         // cells that hold a code such as -1 (never filled automatically)
+}
+
 export interface HealthColumn {
   name: string;
   kind: string;
@@ -244,6 +253,7 @@ export interface HealthColumn {
   missing: number;
   blank_cells: number;
   placeholder_cells: number;
+  code_cells?: number;
   missing_pct: number;
   examples: string[];
   flags: string[];
@@ -285,6 +295,9 @@ export interface HealthSnapshot {
     missing_cells: number;
     blank_cells: number;
     placeholder_cells: number;
+    code_cells?: number;
+    code_columns?: Record<string, { codes: (number | string)[]; count: number }>;
+    code_majority_columns?: Record<string, { codes: (number | string)[]; share: number }>;
     missing_pct: number;
     rows_with_missing: number;
     rows_with_missing_pct: number;
@@ -363,7 +376,7 @@ export interface Audit {
   files: { name: string; bytes: number }[];
   never_auto_apply: string[];
   /** Phase 23 A1: proposals left in the review queue because the calibration did not cover their column, per issue type. */
-  held_back?: Record<string, { count: number; columns: Record<string, number> }>;
+  held_back?: Record<string, HeldBack>;
   baseline: HealthSnapshot | null;
   baseline_target: TargetProfile | null;
 }

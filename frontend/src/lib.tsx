@@ -103,3 +103,17 @@ export const lastAudit = () => {
     return null;
   }
 };
+
+/** Why proposals of an auto-applied repair type stayed in the review queue (Phase 23 A1 and Phase 25), as plain sentences. */
+export function heldBackReasons(h: import("./api").HeldBack): string[] {
+  const list = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} (${n.toLocaleString()})`).join(", ");
+  const out: string[] = [];
+  const cal = h.calibration ?? (h.codes ? undefined : { count: h.count, columns: h.columns });
+  if (cal && cal.count > 0) {
+    const k = Object.keys(cal.columns).length;
+    out.push(`${cal.count.toLocaleString()} are in ${k} column${k === 1 ? "" : "s"} the calibration could not benchmark (too empty to build a clean reference), so its evidence does not cover them: ${list(cal.columns)}. A blank there may mean "not applicable" rather than "missing".`);
+  }
+  if (h.codes && h.codes.count > 0)
+    out.push(`${h.codes.count.toLocaleString()} cell${h.codes.count === 1 ? "" : "s"} hold a code such as -1 or a word such as “Unknown” that is read as missing. Only you know whether it is a real value, so they are never filled automatically: ${list(h.codes.columns)}.`);
+  return out;
+}

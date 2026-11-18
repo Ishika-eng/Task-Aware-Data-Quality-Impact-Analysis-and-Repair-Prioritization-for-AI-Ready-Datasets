@@ -215,12 +215,226 @@ def _looks_numeric(masked: pd.Series):
     return None, False
 
 
-def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification"):
+# Phase 25 (docs/PHASE25_SPEC.md): numeric placeholder codes read as missing values. Candidate codes are negative on purpose: positive
+# ones (9, 99, 999) and 0 collide with real ages, counts and amounts.
+CODE_CANDIDATES = (-1, -9, -99, -999, -9999)
+CODE_MIN_COUNT = 3          # a code must occur at least this often in a column
+CODE_MAX_SHARE = 0.5        # above this share the code is a category ("not applicable"), not missingness (R5)
+
+
+def _code_result(is_code: pd.Series, present: list, n_rows: int) -> dict:
+    """Shared tail of the numeric and text rules: a majority code is reported, not flagged (R5)."""
+    count = int(is_code.sum())
+    share = count / n_rows if n_rows else 0.0
+    shown = [int(v) for v in present]
+    if share > CODE_MAX_SHARE:
+        return {"status": "majority", "codes": shown, "count": count, "share": share}
+    return {"status": "flag", "codes": shown, "count": count, "share": share, "mask": is_code}
+
+
+def _numeric_codes(num: pd.Series) -> dict | None:
+    """R2: candidate codes seen at least CODE_MIN_COUNT times in a numeric column whose other values are all >= 0. None when the rule
+    does not apply, otherwise {'status': 'flag' | 'majority', 'codes', 'count', 'share', 'mask' (flag only)}."""
+    nn = num.dropna()
+    if nn.empty:
+        return None
+    present = [v for v in CODE_CANDIDATES if int((nn == v).sum()) >= CODE_MIN_COUNT]
+    if not present:
+        return None
+    is_code = num.isin(present)
+    rest = nn[~nn.isin(present)]
+    if rest.empty or (rest < 0).any():                  # genuine negatives, or nothing but codes: not a code column
+        return None
+    return _code_result(is_code, present, len(num))
+
+
+def _text_codes(masked: pd.Series) -> dict | None:
+    """R3: the same rule for a text column (after token masking) whose remaining values are not all numeric. Matches '-1' and '-1.0'."""
+    strip = masked.map(lambda v: v.strip() if isinstance(v, str) else v)
+    hit = {v: strip.isin({str(v), f"{v}.0"}) for v in CODE_CANDIDATES}
+    present = [v for v, m in hit.items() if int(m.sum()) >= CODE_MIN_COUNT]
+    if not present:
+        return None
+    is_code = pd.concat([hit[v] for v in present], axis=1).any(axis=1)
+    rest = strip[~is_code].dropna()
+    if rest.empty or pd.to_numeric(rest, errors="coerce").notna().all():
+        return None                                     # all-numeric text (ZIP-like codes) is not a code column
+    return _code_result(is_code, present, len(masked))
+
+
+def _code_label(codes: list) -> str:
+    return " / ".join(str(c) for c in codes)
+
+
+# Phase 26 (docs/PHASE26_SPEC.md): word placeholders ('Unknown', 'Unspecified', ...), placeholders the user declares, two diagnostics.
+# The list is short on purpose: 'none' and 'other' are real categories (Credit-g, Adult), so they are not here.
+WORD_PLACEHOLDERS = frozenset({"unknown", "unspecified", "not available", "not applicable", "non-applicable", "non applicable",
+                               "undefined", "missing", "tbd", "no data"})
+MAX_DECLARED_VALUES = 20
+MAX_DECLARED_LENGTH = 40
+DIAG_SAMPLE = 5000                 # F3 judges the pattern on at most this many non-missing cells (the first ones, deterministic)
+_RANGE_TEXT = re.compile(r"^[$\u00a3\u20ac]?\d[\d,.]*[KkMm]?\s*[-\u2013]\s*[$\u00a3\u20ac]?\d[\d,.]*[KkMm]?(\s*\(.*\))?$")
+_GLUED_NUMBER = re.compile(r"\n\s*(-?\d+(?:\.\d+)?)\s*$")
+
+
+def _is_word_placeholder(v) -> bool:
+    """A whole cell made only of placeholder words, optionally joined by '/' ('Unknown / Non-Applicable')."""
+    if not isinstance(v, str):
+        return False
+    return all(p.strip().lower() in WORD_PLACEHOLDERS for p in v.split("/"))
+
+
+def _word_codes(masked: pd.Series) -> dict | None:
+    """F1: the same conditions as the numeric codes (at least CODE_MIN_COUNT cells, at most CODE_MAX_SHARE of the column)."""
+    hit = masked.map(_is_word_placeholder).astype(bool)
+    count = int(hit.sum())
+    if count < CODE_MIN_COUNT:
+        return None
+    forms = masked[hit].map(lambda v: v.strip()).value_counts().index[:3].tolist()
+    share = count / len(masked) if len(masked) else 0.0
+    if share > CODE_MAX_SHARE:
+        return {"status": "majority", "codes": forms, "count": count, "share": share}
+    return {"status": "flag", "codes": forms, "count": count, "share": share, "mask": hit}
+
+
+def _declared_mask(s: pd.Series, values) -> pd.Series:
+    """F2: cells equal to a value the user declared as missing: stripped, case-insensitive text equality, or, for a declared number,
+    numeric equality ('0' matches 0, 0.0 and the text '0.0')."""
+    texts = {str(v).strip().lower() for v in values}
+    nums = set()
+    for v in values:
+        try:
+            nums.add(float(str(v).strip()))
+        except ValueError:
+            pass
+    if pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s):
+        return pd.to_numeric(s, errors="coerce").isin(nums).fillna(False).astype(bool)
+
+    def hit(v) -> bool:
+        if pd.isna(v):
+            return False
+        t = str(v).strip().lower()
+        if t in texts:
+            return True
+        try:
+            return float(t) in nums
+        except ValueError:
+            return False
+
+    return s.map(hit).astype(bool)
+
+
+def _clean_declarations(df: pd.DataFrame, declared, keep) -> tuple[dict, set]:
+    """Validate and normalise what the user declared. Raises ValueError (the API turns it into a 400) for a column that does not
+    exist, too many values or an over-long one; a value that matches no cell is reported later, not an error."""
+    out: dict[str, list[str]] = {}
+    for col, vals in (declared or {}).items():
+        if col not in df.columns:
+            raise ValueError(f"declared placeholders name a column that does not exist: '{col}'")
+        vals = [str(v).strip() for v in (vals if isinstance(vals, (list, tuple, set)) else [vals])]
+        vals = [v for v in dict.fromkeys(vals) if v != ""]
+        if len(vals) > MAX_DECLARED_VALUES:
+            raise ValueError(f"at most {MAX_DECLARED_VALUES} declared values per column ('{col}' has {len(vals)})")
+        if any(len(v) > MAX_DECLARED_LENGTH for v in vals):
+            raise ValueError(f"a declared value for '{col}' is longer than {MAX_DECLARED_LENGTH} characters")
+        if vals:
+            out[col] = vals
+    kept = set(keep or [])
+    missing = sorted(kept - set(df.columns))
+    if missing:
+        raise ValueError(f"keep_values names a column that does not exist: '{missing[0]}'")
+    return out, kept
+
+
+def _diagnostic_notes(df: pd.DataFrame, target: str | None) -> list[str]:
+    """F3: two report-only findings (no cell, repair or analysis value changes). Judged on at most DIAG_SAMPLE non-missing cells."""
+    notes: list[str] = []
+    numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and not pd.api.types.is_bool_dtype(df[c])]
+    for col in df.columns:
+        s = df[col]
+        if pd.api.types.is_bool_dtype(s) or pd.api.types.is_numeric_dtype(s) or not (
+                pd.api.types.is_string_dtype(s) or s.dtype == object):
+            continue
+        nn = s.dropna()
+        nn = nn[nn.map(lambda v: isinstance(v, str))].head(DIAG_SAMPLE).astype(object)      # python `re`, not the Arrow engine
+        if nn.empty:
+            continue
+        if nn.map(lambda v: bool(_RANGE_TEXT.match(v.strip()))).mean() >= 0.9:
+            notes.append(f"'{col}' holds numeric ranges stored as text ({s.nunique():,} distinct values), so it is analysed as a "
+                         "category; split it into a low and a high column to use it as a number. Nothing was converted.")
+        glued = nn.map(lambda v: (lambda m: m.group(1) if m else None)(_GLUED_NUMBER.search(v)))
+        has = glued.notna()
+        if has.mean() < 0.5:
+            continue
+        nums = pd.to_numeric(glued[has])
+        best, best_share = None, 0.0
+        for other in numeric_cols:
+            o = pd.to_numeric(df[other], errors="coerce").loc[nums.index]
+            share = float(np.isclose(o.to_numpy(float), nums.to_numpy(float), equal_nan=False).mean())
+            if share > best_share:
+                best, best_share = other, share
+        if best is not None and best_share >= 0.95:
+            msg = (f"'{col}' carries the value of '{best}' as a second line in {has.mean():.0%} of its cells (equal to '{best}' in "
+                   f"{best_share:.1%} of those rows). The file was not changed.")
+            if best == target:
+                msg += f" '{best}' is the target, so this column contains the answer: drop it before modelling."
+            notes.append(msg)
+    return notes
+
+
+def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification",
+             declared: dict | None = None, keep: set | None = None):
+    """Returns (X, y, integer_like, excluded, notes, comma_cols). Phase 25: X.attrs['codes'] maps each column (or the regression target)
+    whose placeholder codes were read as missing to {'codes', 'count', 'share', 'rows', 'is_target'} (Phase 26 adds 'n_code' and 'n_word':
+    a cell holds either a numeric code such as -1 or a placeholder word such as 'Unknown'), and X.attrs['code_majority'] maps a
+    column whose code is a majority category to {'codes', 'share'}. Phase 26: `declared` ({column: [values]}) are cells the user says are
+    missing, X.attrs['declared'] maps each such column to {'values', 'count', 'rows', 'is_target'}; `keep` is the set of columns whose
+    automatic detection (codes and words) is switched off. Read the attrs right after the call."""
+    declared, keep = declared or {}, set(keep or ())
     if target is not None and target not in df.columns:
         raise ValueError(f"target column '{target}' not found in the dataset")
 
     excluded, feats, integer_like, notes = {}, {}, {}, []
     placeholder_counts, numeric_text, comma_cols = {}, [], set()
+    codes: dict[str, dict] = {}
+    majority: dict[str, dict] = {}
+    declared_info: dict[str, dict] = {}
+
+    def note_codes(col: str, res: dict | None, is_target: bool = False, kind: str = "code"):
+        """Record a flagged code/word column (returns the cell mask to blank) or a majority column (returns None). A column can hold
+        both kinds (-1 and 'Unknown'): the rows are merged and counted per kind."""
+        if res is None or col in keep:
+            return None
+        if res["status"] == "majority":
+            if col in majority:
+                majority[col]["codes"] = majority[col]["codes"] + res["codes"]
+            else:
+                majority[col] = {"codes": res["codes"], "share": res["share"]}
+            return None
+        mask = res["mask"]
+        rows = [int(i) for i in np.flatnonzero(mask.to_numpy())]
+        if col in codes:
+            prev = codes[col]
+            merged = sorted(set(prev["rows"]) | set(rows))
+            prev.update(codes=prev["codes"] + res["codes"], rows=merged, count=len(merged),
+                        share=len(merged) / len(mask) if len(mask) else 0.0)
+            prev["n_" + kind] = prev.get("n_" + kind, 0) + len(rows)
+        else:
+            codes[col] = {"codes": res["codes"], "count": res["count"], "share": res["share"], "rows": rows,
+                          "is_target": is_target, "n_code": len(rows) if kind == "code" else 0,
+                          "n_word": len(rows) if kind == "word" else 0}
+        return mask
+
+    def note_declared(col: str, s: pd.Series, is_target: bool = False):
+        """F2: the cells the user declared missing in this column (a boolean mask), recorded even when nothing matches."""
+        vals = declared.get(col)
+        if not vals:
+            return None
+        dm = _declared_mask(s, vals)
+        declared_info[col] = {"values": list(vals), "count": int(dm.sum()), "is_target": is_target,
+                              "rows": [int(i) for i in np.flatnonzero(dm.to_numpy())]}
+        return dm
+
     for col in df.columns:
         if col == target:
             continue
@@ -230,14 +444,27 @@ def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification")
         elif pd.api.types.is_datetime64_any_dtype(s) or pd.api.types.is_timedelta64_dtype(s):
             excluded[col] = "datetime column (not analysed)"
         elif pd.api.types.is_bool_dtype(s):
-            feats[col] = _to_category(s)
+            dm = note_declared(col, s)
+            feats[col] = _to_category(s if dm is None else s.astype(object).where(~dm))
         elif pd.api.types.is_numeric_dtype(s):
             num = pd.to_numeric(s, errors="coerce").astype(float)
+            dm = note_declared(col, s)
+            if dm is not None:
+                num = num.where(~dm)
+            cm = note_codes(col, _numeric_codes(num))
+            if cm is not None:
+                num = num.where(~cm)                    # the analysis copy only: the cell in the file is never rewritten here
             feats[col] = num
             nn = num.dropna()
             integer_like[col] = bool(len(nn) and (nn % 1 == 0).all())
         else:
             masked, n_ph = _mask_placeholders(s)
+            dm = note_declared(col, s)
+            if dm is not None:
+                masked = masked.where(~dm, np.nan)
+            wm = note_codes(col, _word_codes(masked), kind="word")           # F1: 'Unknown', 'Unspecified', ...
+            if wm is not None:
+                masked = masked.where(~wm, np.nan)
             if masked.isna().all():
                 excluded[col] = "entirely missing (placeholders only)"
                 continue
@@ -245,17 +472,27 @@ def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification")
                 placeholder_counts[col] = n_ph
             num, uses_comma = _looks_numeric(masked)
             if num is not None:
-                feats[col] = num.astype(float)
+                num = num.astype(float)
+                cm = note_codes(col, _numeric_codes(num))
+                if cm is not None:
+                    num = num.where(~cm)
+                feats[col] = num
                 nn = feats[col].dropna()
                 integer_like[col] = bool(len(nn) and (nn % 1 == 0).all())
                 numeric_text.append(col)
                 if uses_comma:
                     comma_cols.add(col)
             else:
+                cm = note_codes(col, _text_codes(masked))
+                if cm is not None:
+                    masked = masked.where(~cm, np.nan)
                 feats[col] = _to_category(masked)
 
     if not feats:
         raise ValueError("no usable feature columns after excluding the target")
+    for col, vals in declared.items():                      # declared for a column that was not analysed (datetime, empty): say so
+        if col not in declared_info and col != target:
+            declared_info[col] = {"values": list(vals), "count": 0, "is_target": False, "rows": []}
     if placeholder_counts:
         top = sorted(placeholder_counts.items(), key=lambda kv: -kv[1])
         shown = ", ".join(f"{c} ({n:,})" for c, n in top[:6]) + (f", and {len(top) - 6} more" if len(top) > 6 else "")
@@ -266,17 +503,64 @@ def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification")
                      f"analysed as numeric: {', '.join(numeric_text[:6])}" + (", ..." if len(numeric_text) > 6 else "")
                      + (f" (decimal comma in {len(comma_cols)})" if comma_cols else ""))
 
+    def finish(y_out):
+        X_out = pd.DataFrame(feats, index=df.index)
+        feat_codes = {c: v for c, v in codes.items() if not v["is_target"]}
+        for kind, text in (("code", "hold a code such as -1 that cannot be a real value in its column"),
+                           ("word", "hold a placeholder word such as 'Unknown'")):
+            per = {c: v["n_" + kind] for c, v in feat_codes.items() if v.get("n_" + kind, 0)}
+            if per:
+                top = sorted(per.items(), key=lambda kv: -kv[1])
+                shown = ", ".join(f"{c} ({n:,})" for c, n in top[:6]) + (f", and {len(top) - 6} more" if len(top) > 6 else "")
+                notes.append(f"{sum(per.values()):,} cell(s) {text} and are treated as "
+                             f"missing (the cell in your file is not changed): {shown}")
+        for c, v in codes.items():
+            if v["is_target"]:
+                notes.append(f"{v['count']:,} value(s) of the target '{c}' are the code {_code_label(v['codes'])}: they are treated as a "
+                             "missing target, so those rows are left out of training and evaluation and are never repaired")
+        if majority:
+            shown = ", ".join(f"{c} ({v['share']:.0%} are {_code_label(v['codes'])})" for c, v in majority.items())
+            notes.append(f"A placeholder such as -1 or 'Unknown' fills most of a column, so it is kept as a category ('not applicable'), "
+                         f"not treated as missing: {shown}")
+        feat_decl = {c: v for c, v in declared_info.items() if not v["is_target"] and v["count"]}
+        if feat_decl:
+            top = sorted(feat_decl.items(), key=lambda kv: -kv[1]["count"])
+            shown = ", ".join(f"{c}: {', '.join(v['values'])} ({v['count']:,})" for c, v in top[:6]) + (
+                f", and {len(top) - 6} more" if len(top) > 6 else "")
+            notes.append(f"You declared values as missing: {shown}. They are treated as missing cells (the cell in your file is not changed).")
+        for c, v in declared_info.items():
+            if v["is_target"] and v["count"]:
+                notes.append(f"You declared {', '.join(v['values'])} as missing in the target '{c}' ({v['count']:,} row(s)): they are "
+                             "treated as a missing target, so those rows are left out of training and evaluation and are never repaired")
+        unmatched = [f"{c}: {', '.join(v['values'])}" for c, v in declared_info.items() if not v["count"]]
+        if unmatched:
+            notes.append("You declared values that match no cell, so nothing was changed for: " + "; ".join(unmatched))
+        notes.extend(_diagnostic_notes(df, target))
+        X_out.attrs["codes"] = codes
+        X_out.attrs["code_majority"] = majority
+        X_out.attrs["declared"] = declared_info
+        return X_out, y_out, integer_like, excluded, notes, comma_cols
+
     if target is None:
-        return pd.DataFrame(feats, index=df.index), None, integer_like, excluded, notes, comma_cols
+        return finish(None)
 
     if task == "regression":
         y_num, target_notes = prepare_target(df, target)
         notes.extend(target_notes)
-        return pd.DataFrame(feats, index=df.index), y_num, integer_like, excluded, notes, comma_cols
+        dt = note_declared(target, df[target], is_target=True)              # F2: a declared value in the target is a missing target
+        if dt is not None:
+            y_num = y_num.where(~dt)
+        tm = note_codes(target, _numeric_codes(y_num), is_target=True)     # R4: a code in the target is a missing target
+        if tm is not None:
+            y_num = y_num.where(~tm)
+        return finish(y_num)
 
     # y covers every row (NaN where the target is missing) so the cheap checks can still clean unlabeled rows;
     # only the label / model-based detectors restrict themselves to labeled rows.
     y = df[target].astype(object).map(lambda v: np.nan if pd.isna(v) else str(v))
+    dt = note_declared(target, df[target], is_target=True)
+    if dt is not None:
+        y = y.where(~dt, np.nan)
     n_classes = y.nunique()
     if n_classes < 2:
         raise ValueError(f"target '{target}' has fewer than 2 distinct values -- nothing to classify")
@@ -285,7 +569,7 @@ def _prepare(df: pd.DataFrame, target: str | None, task: str = "classification")
             f"target '{target}' has {n_classes} distinct values; TaskClean supports classification only "
             f"(<= {MAX_CLASSES} classes). This looks like a regression target or an ID column: if it is a number to predict, choose the regression task.")
 
-    return pd.DataFrame(feats, index=df.index), y, integer_like, excluded, notes, comma_cols
+    return finish(y)
 
 
 def _full_record(X: pd.DataFrame, y: pd.Series | None) -> pd.DataFrame:
@@ -778,7 +1062,8 @@ def _stratified_sample_index(y: pd.Series | None, index: pd.Index, n: int, seed:
 def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalies: bool = False, seed: int = 42,
                   progress: Progress | None = None, max_model_rows: int = MAX_MODEL_ROWS,
                   input_info: dict | None = None, detectors: set[str] | None = None,
-                  include_joint_outliers: bool = False, task: str = "classification") -> AuditState:
+                  include_joint_outliers: bool = False, task: str = "classification",
+                  declared_missing: dict | None = None, keep_values: list | None = None) -> AuditState:
     """Detect problems and propose repairs. Expensive (model-based detectors).
 
     target=None runs in no-target mode: missing values, duplicates, outliers and inconsistent values are
@@ -798,7 +1083,8 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
     df = df.reset_index(drop=True).copy()
     if df.empty:
         raise ValueError("the dataset has no rows")
-    X, y, integer_like, excluded, notes, comma_cols = _prepare(df, target, task)
+    declared, keep = _clean_declarations(df, declared_missing, keep_values)      # Phase 26 F2
+    X, y, integer_like, excluded, notes, comma_cols = _prepare(df, target, task, declared, keep)
 
     unmodeled = {c: f"{X[c].nunique()} distinct values (> {MAX_CAT_LEVELS}); skipped by model-based detectors"
                  for c in X.columns if not pd.api.types.is_numeric_dtype(X[c]) and X[c].nunique() > MAX_CAT_LEVELS}
@@ -931,6 +1217,18 @@ def audit_dataset(df: pd.DataFrame, target: str | None, include_feature_anomalie
         "no_target_mode": target is None, "task": task,
         "model_detector_rows": len(X_model), "model_detectors_sampled": sampled,
         "input_format": input_info or {}, "notes": notes,
+        # Phase 25: cells read as missing because they hold a code such as -1 (feature columns only; a code in the regression target
+        # becomes a missing target instead and is never repaired), and columns whose code is a majority category
+        "code_cells": {c: v["rows"] for c, v in X.attrs.get("codes", {}).items() if not v["is_target"]},
+        "codes": {c: {"codes": v["codes"], "count": v["count"], "is_target": v["is_target"],
+                      "n_code": v.get("n_code", 0), "n_word": v.get("n_word", 0)}
+                  for c, v in X.attrs.get("codes", {}).items()},
+        "code_majority": dict(X.attrs.get("code_majority", {})),
+        # Phase 26: what the user declared (the request) and what it matched, and the columns whose automatic detection was switched off
+        "declared_request": declared, "keep_values": sorted(keep),
+        "declared": {c: {"values": v["values"], "count": v["count"], "is_target": v["is_target"]}
+                     for c, v in X.attrs.get("declared", {}).items()},
+        "declared_cells": {c: v["rows"] for c, v in X.attrs.get("declared", {}).items() if not v["is_target"]},
         "detector_seconds": timings, "audit_seconds": round(time.monotonic() - t0, 2),
     }
     say(1.0, "Audit complete")
@@ -987,7 +1285,9 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str], resp
 
     respect_scope (Phase 23 A1): the evidence-based file only applies column-level repairs in columns the calibration actually
     covered. The self-benchmark's reference leaves out columns that are mostly empty, so its evidence says nothing about them;
-    repairs there stay proposals unless a human overrides the whole issue type. Off by default so every other caller is unchanged."""
+    repairs there stay proposals unless a human overrides the whole issue type. Phase 25 adds a second reason to hold a repair back
+    under the same switch: a cell read as missing only because it holds a code such as -1 (state.meta['code_cells']) is never imputed
+    automatically, because only the user knows whether the code is a value. Off by default so every other caller is unchanged."""
     cleaned = state.df.copy()
     prop = state.proposals.copy()
     prop["action"] = np.where(prop.tier == "loose", "flagged_only", "flagged_for_review")
@@ -1003,6 +1303,20 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str], resp
     sb = getattr(state, "selfbench", None)
     out_of_scope = set(sb.reference.get("columns_left_out", {})) if (respect_scope and sb is not None and sb.ok) else set()
     held_back: dict[str, int] = {}
+    code_rows = {c: set(r) for c, r in state.meta.get("code_cells", {}).items()}
+    held_codes: dict[str, int] = {}
+    word_only = {c for c, v in state.meta.get("codes", {}).items() if v.get("n_word", 0) and not v.get("n_code", 0)}
+    declared_rows = {c: set(r) for c, r in state.meta.get("declared_cells", {}).items()}
+    if code_rows and len(prop):                             # the log says why a cell was proposed (all callers; text only)
+        is_code = prop.apply(lambda r: r["issue_key"] == "missing_values" and r["row_id"] in code_rows.get(r["column"], ()),
+                             axis=1).astype(bool)
+        words = is_code & prop["column"].isin(word_only)
+        prop.loc[is_code & ~words, "method"] = prop.loc[is_code & ~words, "method"].astype(str) + " (the cell holds a code such as -1, read as missing)"
+        prop.loc[words, "method"] = prop.loc[words, "method"].astype(str) + " (the cell holds a word such as 'Unknown', read as missing)"
+    if declared_rows and len(prop):
+        is_decl = prop.apply(lambda r: r["issue_key"] == "missing_values" and r["row_id"] in declared_rows.get(r["column"], ()),
+                             axis=1).astype(bool)
+        prop.loc[is_decl, "method"] = prop.loc[is_decl, "method"].astype(str) + " (declared missing by you)"
     if "duplicates" in apply_issues:
         dup_idx = prop.index[(prop.issue_key == "duplicates") & prop.tier.isin(["exact", "strict"])]
         drop_set = set(prop.loc[dup_idx, "row_id"])
@@ -1025,6 +1339,13 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str], resp
             if not is_label and col in out_of_scope and issue not in overrides:
                 held_back[col] = held_back.get(col, 0) + len(g)       # stays flagged_for_review
                 continue
+            if respect_scope and issue == "missing_values" and col in code_rows and issue not in overrides:
+                coded = g.row_id.isin(code_rows[col]).values
+                if coded.any():
+                    held_codes[col] = held_codes.get(col, 0) + int(coded.sum())    # stays flagged_for_review
+                    g = g[~coded]
+                    if g.empty:
+                        continue
             in_drop = g.row_id.isin(drop_set).values
             conflict = np.array([(r, col) in modified for r in g.row_id], dtype=bool)
             prop.loc[g.index[in_drop], "action"] = "skipped_row_dropped"
@@ -1044,7 +1365,14 @@ def _apply(state: AuditState, apply_issues: set[str], overrides: list[str], resp
 
     if respect_scope:                                       # idempotent: replace an earlier note from a previous apply
         prefix = "Held back for review:"
-        notes = [n for n in state.meta.get("notes", []) if not str(n).startswith(prefix)]
+        code_prefix = "Held back for review (codes):"
+        notes = [n for n in state.meta.get("notes", []) if not str(n).startswith((prefix, code_prefix))]
+        if held_codes:
+            cols = ", ".join(f"{c} ({n:,})" for c, n in sorted(held_codes.items(), key=lambda kv: -kv[1])[:8])
+            notes.append(f"{code_prefix} {sum(held_codes.values()):,} cell(s) hold a code such as -1 or a word such as 'Unknown' and are treated as missing, but "
+                         f"their repair is not applied automatically because only you know whether it is a real value: {cols}. "
+                         "The aggressive file fills them; overriding the missing-values repair on the Repair plan does too. "
+                         "If it is a real value, run the audit again with that column set to keep its values.")
         if held_back:
             cols = ", ".join(f"{c} ({n:,})" for c, n in sorted(held_back.items(), key=lambda kv: -kv[1])[:8])
             notes.append(f"{prefix} {sum(held_back.values()):,} proposed repair(s) were not applied because the calibration did "
@@ -1082,8 +1410,8 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
     cleaned_agg, log_agg = _apply(state, aggressive_issues, aggressive_overrides)
     summary_agg = _summary(state, log_agg, cleaned_agg, aggressive_issues, aggressive_overrides)
 
-    after = _after_cleaning_rates(cleaned, state.target, state.task)
-    after_agg = _after_cleaning_rates(cleaned_agg, state.target, state.task)
+    after = _after_cleaning_rates(cleaned, state.target, state.task, state.meta.get("declared_request"), state.meta.get("keep_values"))
+    after_agg = _after_cleaning_rates(cleaned_agg, state.target, state.task, state.meta.get("declared_request"), state.meta.get("keep_values"))
     quality = _quality_report(state)
     impact = _impact_report(state, apply_issues)
     summary = _summary(state, repair_log, cleaned, apply_issues, overrides)
@@ -1105,10 +1433,11 @@ def apply_repairs(state: AuditState, apply_issues: set[str] | None = None) -> Ta
 # ---------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------
-def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None, task: str = "classification") -> dict:
+def _after_cleaning_rates(cleaned: pd.DataFrame, target: str | None, task: str = "classification",
+                          declared: dict | None = None, keep: list | None = None) -> dict:
     """Cheap, deterministic detectors only -- the model-based ones are not re-run."""
     try:
-        X, y, _, _, _, _ = _prepare(cleaned.reset_index(drop=True), target, task)
+        X, y, _, _, _, _ = _prepare(cleaned.reset_index(drop=True), target, task, declared, set(keep or ()))
     except ValueError:
         return {}
     return {"missing_values": detect_missing(X).rate,
@@ -1290,7 +1619,18 @@ def _summary(state, repair_log, cleaned, apply_issues, overrides) -> dict:
         "skipped_conflicts": int((repair_log.action == "skipped_conflict").sum()),
         "skipped_row_dropped": int((repair_log.action == "skipped_row_dropped").sum()),
         "issues_applied": sorted(apply_issues), "human_overrides": overrides,
+        **_declared_summary(state),
     }
+
+
+def _declared_summary(state) -> dict:
+    """Phase 26: what the user declared, only when something was declared (so audits without declarations are unchanged)."""
+    out = {}
+    if state.meta.get("declared"):
+        out["declared_missing"] = state.meta["declared"]
+    if state.meta.get("keep_values"):
+        out["keep_values"] = state.meta["keep_values"]
+    return out
 
 
 def _readiness(state, quality, impact, apply_issues, overrides, after, summary) -> dict:
@@ -1421,7 +1761,8 @@ LIMITATIONS = [
     "(features + target).",
     "Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted as missing in the analysis; the original cell is "
     "left as-is unless a missing-value repair is applied. A token that is a genuine category in your data will "
-    "be over-counted as missing.",
+    "be over-counted as missing. A code such as -1 (also -9, -99, -999, -9999) in a column whose other values are all non-negative "
+    "is read as missing too and is never filled in automatically; a real value that looks like such a code is over-counted.",
     "Files above the model-detector row limit are audited on a stratified sample for the label/feature "
     "detectors; their findings and proposals then cover only the sampled rows.",
     "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs. In the Random Forest "
@@ -1472,7 +1813,9 @@ REGRESSION_LIMITATIONS = [
     "No before/after model metrics are reported in the audit itself: an uploaded dataset has no clean held-out test set. The "
     "model panel compares models on held-out rows that are as dirty as your file, so a gain there does not prove a repair was right.",
     "Duplicates are full-record duplicates (features + target). Placeholder tokens ('?', 'N/A', '-', empty, ...) are counted "
-    "as missing in the analysis; a token that is a genuine category in your data will be over-counted as missing.",
+    "as missing in the analysis; a token that is a genuine category in your data will be over-counted as missing. A code such as -1 "
+    "(also -9, -99, -999, -9999) in a column whose other values are all non-negative is read as missing too and is never filled in "
+    "automatically; a real value that looks like such a code is over-counted.",
     "Files above the model-detector row limit are audited on a sample (stratified by target quintile) for the target and "
     "feature detectors; their findings and proposals then cover only the sampled rows.",
     "The 'aggressive' variant applies every proposed repair except feature-anomaly repairs; with no calibration no repair in it "

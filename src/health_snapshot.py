@@ -113,6 +113,9 @@ def build_snapshot(df: pd.DataFrame, info: dict | None = None, file_name: str = 
         X, integer_like, excluded = pd.DataFrame(index=df.index), {}, {}
         notes.append(f"the problem checks could not run: {e}")
 
+    code_info = dict(X.attrs.get("codes", {}))                 # no target here, so a would-be target is counted like any column
+    code_majority = dict(X.attrs.get("code_majority", {}))
+
     # --- per-column profile ----------------------------------------------------------------------------------------
     masked_cols, placeholders = {}, {}
     for c in df.columns:
@@ -137,9 +140,10 @@ def build_snapshot(df: pd.DataFrame, info: dict | None = None, file_name: str = 
         counts[kind] = counts.get(kind, 0) + 1
         blanks = int(raw.isna().sum())
         ph = int(placeholders.get(c, 0))
+        cc = int(code_info.get(c, {}).get("count", 0))                     # Phase 25: cells holding a code such as -1
         flags = []
-        entry = {"name": str(c), "kind": kind, "n_unique": n_unique, "missing": blanks + ph, "blank_cells": blanks,
-                 "placeholder_cells": ph, "missing_pct": (blanks + ph) / n_rows if n_rows else 0.0,
+        entry = {"name": str(c), "kind": kind, "n_unique": n_unique, "missing": blanks + ph + cc, "blank_cells": blanks,
+                 "placeholder_cells": ph, "code_cells": cc, "missing_pct": (blanks + ph + cc) / n_rows if n_rows else 0.0,
                  "examples": [str(v) for v in raw.dropna().unique()[:EXAMPLES]]}
         if c in excluded:
             flags.append(f"not analysed by the problem checks: {excluded[c]}")
@@ -171,12 +175,17 @@ def build_snapshot(df: pd.DataFrame, info: dict | None = None, file_name: str = 
     total_cells = n_rows * n_cols
     blank_total = int(df.isna().sum().sum())
     ph_total = int(sum(placeholders.values()))
-    cell_missing = pd.DataFrame({c: (df[c].isna() | (masked_cols[c].isna() if c in masked_cols else False)) for c in df.columns})
+    code_total = int(sum(v["count"] for v in code_info.values()))
+    cell_missing = pd.DataFrame({c: (df[c].isna() | (masked_cols[c].isna() if c in masked_cols else False)
+                                     | (X[c].isna() if c in code_info else False)) for c in df.columns})
     rows_missing = int(cell_missing.any(axis=1).sum()) if n_cols else 0
     all_missing = [str(c) for c in df.columns if cell_missing[c].all()] if n_rows else []
     completeness = {
-        "total_cells": total_cells, "missing_cells": blank_total + ph_total, "blank_cells": blank_total,
-        "placeholder_cells": ph_total, "missing_pct": (blank_total + ph_total) / total_cells if total_cells else 0.0,
+        "total_cells": total_cells, "missing_cells": blank_total + ph_total + code_total, "blank_cells": blank_total,
+        "placeholder_cells": ph_total, "code_cells": code_total,
+        "code_columns": {str(c): {"codes": v["codes"], "count": v["count"]} for c, v in code_info.items()},
+        "code_majority_columns": {str(c): {"codes": v["codes"], "share": v["share"]} for c, v in code_majority.items()},
+        "missing_pct": (blank_total + ph_total + code_total) / total_cells if total_cells else 0.0,
         "rows_with_missing": rows_missing, "rows_with_missing_pct": rows_missing / n_rows if n_rows else 0.0,
         "columns_entirely_missing": all_missing,
         "placeholder_tokens": sorted(t if t else "(empty text)" for t in PLACEHOLDER_TOKENS)}
@@ -299,7 +308,7 @@ def snapshot_rows(s: dict) -> pd.DataFrame:
             add("completeness", "", k, v)
     add("completeness", "", "columns_entirely_missing", "; ".join(s["completeness"]["columns_entirely_missing"]))
     for c in s["columns"]:
-        for k in ("kind", "n_unique", "missing", "blank_cells", "placeholder_cells", "missing_pct",
+        for k in ("kind", "n_unique", "missing", "blank_cells", "placeholder_cells", "code_cells", "missing_pct",
                   "min", "max", "mean", "median", "std", "skew"):
             if k in c:
                 add("columns", c["name"], k, c[k])

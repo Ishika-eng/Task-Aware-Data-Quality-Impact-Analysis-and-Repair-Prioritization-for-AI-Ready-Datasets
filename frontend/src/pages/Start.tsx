@@ -116,9 +116,12 @@ export function Start() {
   const [seeds, setSeeds] = useState(3);
   const [maxRows, setMaxRows] = useState(30000);
   const [jobId, setJobId] = useState<string | null>(null);
+  // Phase 26: placeholders the user declares (comma-separated values per column) and columns whose automatic detection is off
+  const [declRows, setDeclRows] = useState<{ col: string; text: string }[]>([]);
+  const [keepCols, setKeepCols] = useState<string[]>([]);
 
   const load = useCallback((d: DatasetInfo) => {
-    setDs(d); setTarget(d.suggested_target ?? NO_TARGET); setTask("classification"); setTaskTouched(false); setCalibrate(false); setFeat(false); setJoint(false); setJobId(null);
+    setDs(d); setTarget(d.suggested_target ?? NO_TARGET); setTask("classification"); setTaskTouched(false); setCalibrate(false); setFeat(false); setJoint(false); setJobId(null); setDeclRows([]); setKeepCols([]);
   }, []);
   const upload = useMutation({ mutationFn: api.uploadDataset, onSuccess: load });
   const demo = useMutation({ mutationFn: api.demoDataset, onSuccess: load });
@@ -143,9 +146,16 @@ export function Start() {
   useEffect(() => { if (hasTarget && suggested && !taskTouched && suggested !== task) setTask(suggested); }, [suggested, hasTarget, taskTouched, task]);
   const error = (upload.error ?? demo.error ?? sheet.error ?? start.error) as Error | null;
 
+  const detected = Object.keys(health.data?.snapshot.completeness.code_columns ?? {});
+  const declaredMissing: Record<string, string[]> = {};
+  for (const r of declRows) {
+    const vals = r.text.split(",").map((v) => v.trim()).filter(Boolean);
+    if (r.col && vals.length) declaredMissing[r.col] = [...(declaredMissing[r.col] ?? []), ...vals];
+  }
   const run = () => ds && start.mutate({
     dataset_id: ds.id, target: hasTarget ? target : null, task, include_feature_anomalies: feat, include_joint_outliers: joint,
     calibrate: calibrate && hasTarget, model_panel: panel && hasTarget, seeds, max_model_rows: maxRows,
+    declared_missing: declaredMissing, keep_values: keepCols.filter((c) => detected.includes(c)),
   });
 
   if (!ds)
@@ -295,6 +305,37 @@ export function Start() {
                   </div>
                   <Switch label="Unusual combinations detector" checked={joint} onChange={setJoint} />
                 </div>
+
+                <details className="rounded-lg border border-line px-3 py-2 text-sm" open={declRows.length > 0 || keepCols.length > 0}>
+                  <summary className="cursor-pointer font-medium">Placeholders <span className="font-normal text-muted">(optional)</span></summary>
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs text-muted">Tell the tool which values mean “missing” in your data, such as <code>0</code> in a cholesterol column or <code>999</code> in an age column. It cannot guess these: a zero is often a real value. Declared cells are treated as missing and repaired like any other missing value; your file is not changed unless the repair is applied. They apply to the audit, not to the baseline report above.</p>
+                    {declRows.map((r, i) => (
+                      <div key={i} className="flex gap-2">
+                        <select aria-label="Column" value={r.col} onChange={(e) => setDeclRows(declRows.map((x, j) => (j === i ? { ...x, col: e.target.value } : x)))} className="w-2/5 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm">
+                          {ds.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </select>
+                        <input aria-label="Values that mean missing" placeholder="values, comma separated" value={r.text} onChange={(e) => setDeclRows(declRows.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+                        <button type="button" aria-label="Remove" className="px-1 text-muted hover:text-text" onClick={() => setDeclRows(declRows.filter((_, j) => j !== i))}>×</button>
+                      </div>
+                    ))}
+                    <Button variant="secondary" onClick={() => setDeclRows([...declRows, { col: ds.columns[0].name, text: "" }])}>Declare values as missing</Button>
+                    {detected.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium uppercase tracking-wide text-muted">Detected automatically</div>
+                        <p className="mt-1 text-xs text-muted">These columns hold codes such as -1 or words such as “Unknown” that are read as missing. Tick one if its values are real and must be kept.</p>
+                        <div className="mt-1.5 space-y-1">
+                          {detected.map((c) => (
+                            <label key={c} className="flex items-center gap-2 text-sm">
+                              <input type="checkbox" checked={keepCols.includes(c)} onChange={(e) => setKeepCols(e.target.checked ? [...keepCols, c] : keepCols.filter((x) => x !== c))} />
+                              <span>Treat <b>{c}</b> as real values <span className="text-muted">({int(health.data!.snapshot.completeness.code_columns![c].count)} cells: {health.data!.snapshot.completeness.code_columns![c].codes.join(" / ")})</span></span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </details>
 
                 <details className="rounded-lg border border-line px-3 py-2 text-sm">
                   <summary className="cursor-pointer font-medium">Advanced</summary>

@@ -44,7 +44,7 @@ from selfbench_regression import run_self_benchmark_regression  # noqa: E402
 from selfbench import IMBALANCE_WARNING_SHARE, NULL_DROP_FRACTION, run_self_benchmark  # noqa: E402
 from taskclean import (ISSUES, MAX_CAT_LEVELS, MAX_CERTIFIABLE_NOISE_FLOOR, MAX_CLASSES, MAX_MODEL_ROWS,  # noqa: E402
                        NEVER_AUTO_APPLY, PROBLEM_TEXT, PROBLEM_TEXT_REGRESSION, SAFE_REPAIR_MIN_PRECISION, TASKCLEAN_VERSION, _sanitize,
-                       apply_repairs, attach_self_benchmark, audit_dataset, default_apply_issues, load_csv,
+                       _clean_declarations, apply_repairs, attach_self_benchmark, audit_dataset, default_apply_issues, load_csv,
                        outputs_as_bytes)
 
 DEMO_PATH = ROOT / "data" / "demo_dirty_adult.csv"
@@ -221,6 +221,8 @@ class AuditRequest(BaseModel):
     model_panel: bool = True                  # Phase 19: 4-model before/after on the user's own data (background, report-only)
     seeds: int = Field(3, ge=2, le=5)
     max_model_rows: int = Field(MAX_MODEL_ROWS, ge=2000, le=500_000)
+    declared_missing: dict[str, list[str]] = {}   # Phase 26 F2: values the user says mean "missing", per column
+    keep_values: list[str] = []                   # Phase 26 F2: columns whose automatic placeholder detection is switched off
 
 
 def run_audit_job(job_id: str, req: AuditRequest):
@@ -236,7 +238,8 @@ def run_audit_job(job_id: str, req: AuditRequest):
 
         state = audit_dataset(df, req.target, include_feature_anomalies=req.include_feature_anomalies,
                               include_joint_outliers=req.include_joint_outliers, max_model_rows=req.max_model_rows, progress=on_audit,
-                              input_info=ds["info"], task=req.task)
+                              input_info=ds["info"], task=req.task,
+                              declared_missing=req.declared_missing, keep_values=req.keep_values)
         if req.calibrate and req.target:
             def on_cal(f: float, m: str):
                 job.update(progress=0.4 + 0.6 * min(f, 1.0), message=f"Calibrating: {m}", stage="calibration")
@@ -315,6 +318,10 @@ def start_audit(req: AuditRequest):
         raise HTTPException(400, f"target column '{req.target}' not found in the dataset")
     if req.calibrate and req.target is None:
         raise HTTPException(400, "calibration needs a target column")
+    try:                                                          # Phase 26: a bad declaration is a 400, never silently ignored
+        _clean_declarations(ds["df"], req.declared_missing, req.keep_values)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if req.task not in TASKS:
         raise HTTPException(400, f"task must be one of {list(TASKS)}")
     job_id = uuid.uuid4().hex[:10]
@@ -376,12 +383,16 @@ def review_summary(result) -> dict:
 
 
 def held_back_summary(audit: dict) -> dict:
-    """Phase 23 A1, for the UI: per issue type, the proposals that stayed in the review queue only because the calibration did not
-    cover their column (so the Repair plan and Review queue can say why a type that is "auto-repair" was not fully applied)."""
+    """Phase 23 A1 + Phase 25, for the UI: per issue type, the proposals that stayed in the review queue although the type is
+    auto-applied, so the Repair plan and Review queue can say why. `calibration` counts the ones in columns the calibration did not cover
+    (too empty to benchmark); `codes` counts the cells read as missing only because they hold a code such as -1, which are never
+    imputed automatically. The two never overlap (a column outside the calibration holds all of its proposals under `calibration`).
+    Shape: {issue: {count, columns, calibration: {count, columns}, codes: {count, columns}}}; `count`/`columns` cover both."""
     state, result = audit["state"], audit["result"]
     sb = state.selfbench
     left = set(sb.reference.get("columns_left_out", {})) if (sb is not None and getattr(sb, "ok", False)) else set()
-    if not left:
+    code_rows = {c: set(r) for c, r in state.meta.get("code_cells", {}).items()}
+    if not left and not code_rows:
         return {}
     texts = PROBLEM_TEXT_REGRESSION if state.task == "regression" else PROBLEM_TEXT
     log = result.repair_log
@@ -389,9 +400,19 @@ def held_back_summary(audit: dict) -> dict:
     for issue in audit["applied"] & default_apply_issues(state):          # a human override of the whole type applies everything
         if issue in ("label_errors", "duplicates") or issue not in texts:
             continue
-        g = log[(log.problem == texts[issue]) & (log.action == "flagged_for_review") & log.column.isin(left)]
-        if len(g):
-            out[issue] = {"count": int(len(g)), "columns": {str(c): int(n) for c, n in g.column.value_counts().items()}}
+        g = log[(log.problem == texts[issue]) & (log.action == "flagged_for_review")]
+        cal = g[g.column.isin(left)]
+        cod = g[~g.column.isin(left)]
+        if issue == "missing_values" and code_rows:
+            cod = cod[[r in code_rows.get(c, ()) for r, c in zip(cod.row_id, cod.column)]]
+        else:
+            cod = cod.iloc[0:0]
+        if len(cal) or len(cod):
+            both = pd.concat([cal, cod])
+            out[issue] = {"count": int(len(both)),
+                          "columns": {str(c): int(n) for c, n in both.column.value_counts().items()},
+                          "calibration": {"count": int(len(cal)), "columns": {str(c): int(n) for c, n in cal.column.value_counts().items()}},
+                          "codes": {"count": int(len(cod)), "columns": {str(c): int(n) for c, n in cod.column.value_counts().items()}}}
     return out
 
 

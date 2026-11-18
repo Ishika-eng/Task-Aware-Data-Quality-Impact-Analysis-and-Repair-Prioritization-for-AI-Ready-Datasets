@@ -1,0 +1,13 @@
+{
+ "id": "A",
+ "same_decisions_and_counts": true,
+ "differences": [],
+ "float_cells_compared": 896,
+ "max_relative_float_deviation": 0.001572,
+ "float_tolerance": 0.002,
+ "code_is_phase25": true,
+ "limitations_changed": true,
+ "new_digest": "9ef1d442136f",
+ "old_digest": "89a46deb7a5c",
+ "wall_seconds": 118.4
+}

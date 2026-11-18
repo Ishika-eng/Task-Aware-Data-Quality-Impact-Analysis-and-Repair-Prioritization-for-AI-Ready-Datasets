@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { api, type RepairLogRow } from "../api";
 import { useAudit } from "../audit-context";
 import { Alert, Badge, Button, ButtonLink, Card, DataTable, Dot, EmptyState, Page, Segmented, Stat, Status, type Col } from "../components/ui";
-import { ISSUE_COLOR, issueName, cellText, int, num, pct } from "../lib";
+import { ISSUE_COLOR, heldBackReasons, issueName, cellText, int, num, pct } from "../lib";
 
 type Kind = "all" | "flagged_for_review" | "flagged_only";
 
@@ -96,9 +96,11 @@ export function Review() {
                 </div>
                 <p className="mt-1 text-sm text-muted"><b className="text-fg">{int(r.proposed)}</b> repair proposed · <b className="text-fg">{int(r.flag_only)}</b> detected only</p>
                 {a.held_back?.[r.issue_key] && (
-                  <p className="mt-2 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[13px] leading-relaxed text-fg">
-                    <b>{int(a.held_back[r.issue_key].count)}</b> of these are here only because the calibration did not cover their column ({Object.entries(a.held_back[r.issue_key].columns).map(([c, n]) => `${c} ${int(n)}`).join(", ")}). The rule below is met for the columns it did cover, which were applied. A blank in these columns may mean "not applicable" rather than "missing".
-                  </p>
+                  <div className="mt-2 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[13px] leading-relaxed text-fg">
+                    <b>{int(a.held_back[r.issue_key].count)}</b> of these are here only because of the following:
+                    {heldBackReasons(a.held_back[r.issue_key]).map((t, k) => <span key={k} className="mt-1 block">{t}</span>)}
+                    <span className="mt-1 block">The rule below is met for the rest, which were applied.</span>
+                  </div>
                 )}
                 {p && <p className="mt-2 text-[13px] leading-relaxed text-muted">{p.reason}</p>}
                 {p && (

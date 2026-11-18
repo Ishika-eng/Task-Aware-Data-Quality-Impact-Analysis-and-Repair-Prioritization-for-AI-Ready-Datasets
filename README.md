@@ -239,6 +239,9 @@ boosting (see the model check below).
 |---|---|
 | Unknown encoding / delimiter / decimal mark | detects UTF-8, cp1252 or Latin-1; `,` `;` tab `|`; decimal comma for `;` files |
 | Missing values written as `?`, `N/A`, `-`, `null`, empty text | counted as missing in the analysis; the original cell is shown as-is in the log and left unchanged unless a missing-value repair is applied |
+| Codes such as `-1`, `-9`, `-99`, `-999`, `-9999` standing for "unknown" (Phase 25) | read as missing when a column has at least 3 of them and every other value is non-negative, in numeric and text columns; never filled in automatically (held back for review; the aggressive file fills them); a code in a regression target makes that row a missing target; a code that fills more than half a column (`pdays = -1`) is kept as a category |
+| Words such as `Unknown`, `Unspecified`, `Not available`, `Unknown / Non-Applicable` (Phase 26) | read as missing under the same rules as the codes above (at least 3 cells, at most half the column, never filled automatically); `none` and `other` are real categories and are not touched |
+| Values you say mean "missing", such as `0` or `999` (Phase 26) | declared per column on the Start page (a "Placeholders" card), treated as ordinary missing cells for the audit; the same card has a switch to keep a detected column's values as real |
 | Numbers stored as text (including `3,5`) | analysed as numeric; imputed values are written back in the same format. Values with leading zeros (ZIP codes) stay text |
 | ID columns / high-cardinality text | still checked for missing values and duplicates, skipped by the model-based detectors |
 | Rows with no target value | still checked for missing values, duplicates and outliers; excluded from the label and model-based detectors |
@@ -507,6 +510,8 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
 | 22 | `python3 test_phase22.py` | Excel intake: round trip, sheets, layout, robustness, upload equals the same CSV ([spec](docs/PHASE22_SPEC.md)) |
 | 23 | `python3 test_phase23.py` (run: `python3 validate_new_datasets.py T`, `A`, `R`, `O`, `C`) | amendment A1 invariants; validation on five genuine files (data in `data/new/`, not committed) |
+| 26 | `python3 test_phase26.py` (run: `python3 validate_phase26.py D`, `S0 T`/`A`/`R`/`O`, `S0files`, `S0demo`, `S2`, `B`, `Boff`) | word placeholders, declared values and the keep switch, two report-only diagnostics: planted truth, policy, targets, no change elsewhere ([spec](docs/PHASE26_SPEC.md)) |
+| 25 | `python3 test_phase25.py` (run: `python3 validate_sentinels.py D`, `S0 T`/`A`/`R`/`O`/`C`, `S0demo`, `S2`) | placeholder codes read as missing: planted truth, policy, target, no change elsewhere; DS-jobs file in `data/new/` (not committed) |
 
 Every model fit is recorded in [`results/training_log.csv`](results/training_log.csv) (timestamp, duration, model,
 hyperparameters, dataset shape, seed). Random Forest has no epochs; the log records fits, not per-epoch loss.
@@ -553,6 +558,29 @@ repairs stay in the review queue; 860 are still applied, about 590 of them still
 precision 0.09-0.21 on injected errors and none of 60 sampled real flags was an error, so read outlier flags as "unusual values to
 look at". Cleaning did not improve any model on these files.
 
+## Placeholder codes such as -1 (Phase 25)
+
+Using the tool on a scraped job-listings file (`Uncleaned_DS_jobs.csv`) showed that it reported **0 missing cells** on a file that marks "unknown" with `-1`
+in nine columns, proposed "clip `Founded` to 1781", and scored models on 50 `-1` ratings. The rule, criteria and results are in
+[docs/PHASE25_SPEC.md](docs/PHASE25_SPEC.md) (results in `results/phase25_*.json`): a candidate code (`-1, -9, -99, -999, -9999`) is read as missing when a column has at
+least 3 of them, they fill at most half the column, and every other value is non-negative. Measured: planted codes were found with recall and precision 1.00 (36 cases and an Excel
+workbook); on the DS-jobs file the audit now finds exactly 372 feature cells and 50 target rows (4.19% of the file, was 0%); the five Phase 23 files, Bank Marketing and the demo
+file are unchanged (same counts and decisions; cleaned files byte-identical). Such cells are never filled in automatically, because only you know whether the code is a real value.
+Two honest consequences on that file: calibration now declines (544 complete rows, 600 needed; before, it ran on a reference that secretly contained the codes), and the model
+score it gave before (Ridge R-squared 0.54) was an artifact of the coded targets (0.03 without them). Cleaning still did not improve any model on it.
+
+## Words, declared values and two diagnostics (Phase 26)
+
+Phase 25 left a list of things it could not handle. Phase 26 ([spec](docs/PHASE26_SPEC.md), results in `results/phase26_*.json`) handles them as far as the evidence allows and says plainly where it does not.
+**Words** such as `Unknown` or `Unspecified` (a short list; `none` and `other` are real categories) are read as missing on the same rules as `-1`: at least 3 cells, at most half the column, never filled in automatically.
+**`0`, `999` and anything else the tool cannot guess** are declared by you, per column, on the Start page: a scan of every file in the project found real zeros in more than 20 columns and real 999s in three, so no rule could
+catch a zero that means "missing" without also flagging correct data. Declared cells are ordinary missing cells; a switch on the same card keeps a detected column's values as real (the way out for a genuine `-1`).
+Two **report-only** notes: numeric ranges stored as text (`Salary Estimate`), and a number glued onto a text column that equals another column of the same row (`Company Name` carries `Rating`; with `Rating` as the target that column contains the answer).
+Neither is converted: a midpoint would put numbers into a text column or change the model's input without evidence it helps, and rewriting the cell is not something the tool can justify.
+Measured: planted words were found with recall and precision 1.00 (63 cases); a declared value matched exactly the planted cells and nothing else changed (9 cases); on the DS-jobs file the audit finds 606 feature cells and 50 target rows (6.51% of the file, was 4.19%),
+and on Bank Marketing 15,165 `unknown` cells (the evidence-based file is unchanged, the aggressive file now fills them). Nine files without these patterns give identical results with the feature on and off. Cleaning still did not improve any model on DS jobs.
+Not tested: the declared-value path on a real file whose zeros mean "missing" (none was available), Concrete (no `xlrd`), and the hold-back of words on a real file (calibration approved nothing on the files tried).
+
 ## Limitations
 
 - **Estimate-based audit.** On an uploaded dataset the true errors are unknown; every rate comes from a detector
@@ -570,7 +598,7 @@ look at". Cleaning did not improve any model on these files.
 - **Before/after model metrics for uploads are indicative only.** The Model panel (Phase 19) compares models trained on raw and
   repaired rows, but an uploaded dataset has no clean held-out test set: the held-out rows are as dirty as the file, so a gain
   does not prove a repair correct. Changes below the measured noise floor are labelled as such.
-- **Placeholders and blanks that mean "absent".** A token such as `-`, `N/A` or `None` that is a genuine category in your data is over-counted as missing, and a blank that means "no such feature" (Ames: no pool, no garage) looks like a missing value. Imputation of columns the calibration could not cover is held back (Phase 23 A1), but the rest is still imputed under calibration. Only you know which blanks are real.
+- **Placeholders and blanks that mean "absent".** A token such as `-`, `N/A` or `None` that is a genuine category in your data is over-counted as missing, and a blank that means "no such feature" (Ames: no pool, no garage) looks like a missing value. Imputation of columns the calibration could not cover is held back (Phase 23 A1), but the rest is still imputed under calibration. Only you know which blanks are real. Codes such as `-1` (Phase 25) and a short list of words such as `Unknown` (Phase 26) are read as missing but never filled automatically; a real `-1` or `Unknown` is flagged too, and the Start page has a switch to keep a column's values. `0` and `999` are never guessed: declare them on the Start page. The word list is English only, and declared values apply to the audit, not to the stored Baseline report.
 - **Sampling.** On files above the row limit, label/feature findings and proposals cover only the sampled rows.
 - **Clustering is not supported.** The tool covers two ML tasks: **classification** and **regression**. Choosing no target audits and cleans
   the file (Quality audit, Baseline, repairs), but it does not rank issues by their impact on a clustering task or compare clustering before and

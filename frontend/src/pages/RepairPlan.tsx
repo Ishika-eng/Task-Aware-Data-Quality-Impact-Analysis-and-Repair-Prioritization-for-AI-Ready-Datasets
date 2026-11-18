@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAudit } from "../audit-context";
 import { Alert, Badge, Button, Card, Dot, Page, Status, Switch } from "../components/ui";
-import { ISSUE_COLOR, issueName, int, num, pct } from "../lib";
+import { ISSUE_COLOR, heldBackReasons, issueName, int, num, pct } from "../lib";
 
 export function RepairPlan() {
   const a = useAudit();
@@ -48,7 +48,8 @@ export function RepairPlan() {
                   </p>
                   {a.held_back?.[p.issue_key] && (
                     <div className="mt-2"><Alert tone="warn" title={`${int(a.held_back[p.issue_key].count)} of these ${int(candidates)} are held back for review`}>
-                      The calibration could not benchmark {Object.keys(a.held_back[p.issue_key].columns).length} column{Object.keys(a.held_back[p.issue_key].columns).length === 1 ? "" : "s"} (too empty to build a clean reference), so its evidence does not cover them: {Object.entries(a.held_back[p.issue_key].columns).map(([c, n]) => `${c} (${int(n)})`).join(", ")}. Only the other {int(candidates - a.held_back[p.issue_key].count)} are applied. A blank in those columns may mean "not applicable" rather than "missing". The held-back items are in the review queue; the aggressive file applies them.
+                      {heldBackReasons(a.held_back[p.issue_key]).map((t, k) => <span key={k} className="block">{t}</span>)}
+                      <span className="block">Only the other {int(candidates - a.held_back[p.issue_key].count)} are applied. The held-back items are in the review queue; the aggressive file applies them.</span>
                     </Alert></div>
                   )}
                   <p className="mt-2 text-[13px] leading-relaxed text-muted">{p.reason}</p>

@@ -1,0 +1,15 @@
+{
+ "id": "A",
+ "same_decisions_and_counts": true,
+ "differences": [],
+ "float_cells_compared": 896,
+ "max_relative_float_deviation": 0.00083,
+ "float_tolerance": 0.002,
+ "code_is_phase25": true,
+ "limitations_changed": true,
+ "new_digest": "4f5a522c0adb",
+ "old_digest": "89a46deb7a5c",
+ "expected_to_change": false,
+ "wall_seconds": 184.1,
+ "code_has_phase26": true
+}

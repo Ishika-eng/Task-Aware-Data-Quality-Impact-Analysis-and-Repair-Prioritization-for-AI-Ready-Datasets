@@ -1,0 +1,15 @@
+{
+ "id": "A",
+ "same_decisions_and_counts": false,
+ "differences": [
+  "/policy[3]/reason: new='this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 0.8' old='this dataset (self-benchmark), nearest evaluated rate (5%): repair precision 0.8'"
+ ],
+ "float_cells_compared": 896,
+ "max_relative_float_deviation": 0.000302,
+ "float_tolerance": 0.002,
+ "code_is_phase25": false,
+ "limitations_changed": false,
+ "new_digest": "a261b4104b77",
+ "old_digest": "89a46deb7a5c",
+ "wall_seconds": 201.5
+}
