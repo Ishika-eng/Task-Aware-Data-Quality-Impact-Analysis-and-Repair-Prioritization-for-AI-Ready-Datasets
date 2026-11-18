@@ -1,0 +1,7 @@
+dataset,noise,model,clean,dirty,drop_p<0.2,drop_p<0.3,drop_p<0.4,drop_p<0.5,clean_gap
+adult,0.1,gradient_boosting,0.016,0.0,0.0008,0.0026,0.0042,0.0051,0.016
+adult,0.1,logistic_regression,0.0154,0.0,0.0058,0.0083,0.0046,0.0007,0.0154
+adult,0.1,random_forest,0.0121,0.0,0.006,0.007,0.012,0.0149,0.0121
+adult,0.2,gradient_boosting,0.0369,0.0,-0.0124,0.003,0.0067,0.0117,0.0369
+adult,0.2,logistic_regression,0.0303,0.0,0.0049,0.0105,0.0129,0.0131,0.0303
+adult,0.2,random_forest,0.0538,0.0,0.0111,0.0239,0.0337,0.0431,0.0538
