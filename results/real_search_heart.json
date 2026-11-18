@@ -1,0 +1,1 @@
+{"name": "heart", "task": "classification", "rows": 303, "status": "declined", "reason": "the panel needs at least 600 labelled rows in two or more classes; this file has 303 usable rows", "seconds": 0.4, "rows_used": null, "default_issues": null, "results": []}

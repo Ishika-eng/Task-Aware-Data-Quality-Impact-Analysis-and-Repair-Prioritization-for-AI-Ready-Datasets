@@ -1,0 +1,218 @@
+file,model,arm,delta,verdict,agree,floor
+adult_original,logistic_regression,before,0.0,baseline,1.0,0.0033771644087856488
+adult_original,logistic_regression,aggressive,-0.003907515891344282,worse,0.8,0.0033771644087856488
+adult_original,logistic_regression,duplicates,0.0,no change,1.0,0.0033771644087856488
+adult_original,logistic_regression,missing_values,0.0,no effect,1.0,0.0033771644087856488
+adult_original,logistic_regression,outliers,-0.005497303566326761,worse,1.0,0.0033771644087856488
+adult_original,logistic_regression,inconsistency,0.0,no change,1.0,0.0033771644087856488
+adult_original,logistic_regression,label_errors,-4.598377199032111e-05,within noise,0.8,0.0033771644087856488
+adult_original,random_forest,before,0.0,baseline,1.0,0.005000448173196006
+adult_original,random_forest,aggressive,-0.0025407288749185407,within noise,0.8,0.005000448173196006
+adult_original,random_forest,duplicates,0.0,no change,1.0,0.005000448173196006
+adult_original,random_forest,missing_values,0.0,no effect,1.0,0.005000448173196006
+adult_original,random_forest,outliers,-0.0045031969454764065,within noise,1.0,0.005000448173196006
+adult_original,random_forest,inconsistency,0.0,no change,1.0,0.005000448173196006
+adult_original,random_forest,label_errors,-0.0007014478533284629,within noise,0.8,0.005000448173196006
+adult_original,gradient_boosting,before,0.0,baseline,1.0,0.005098584124604568
+adult_original,gradient_boosting,aggressive,0.002506496949179482,within noise,0.6,0.005098584124604568
+adult_original,gradient_boosting,duplicates,0.0,no change,1.0,0.005098584124604568
+adult_original,gradient_boosting,missing_values,0.0,no effect,1.0,0.005098584124604568
+adult_original,gradient_boosting,outliers,0.0037485002843731462,within noise,0.6,0.005098584124604568
+adult_original,gradient_boosting,inconsistency,0.0,no change,1.0,0.005098584124604568
+adult_original,gradient_boosting,label_errors,0.007972349378949705,improved,0.8,0.005098584124604568
+adult_original,neural_net,before,0.0,baseline,1.0,0.019145579688873784
+adult_original,neural_net,aggressive,-0.009226781549466634,within noise,0.8,0.019145579688873784
+adult_original,neural_net,duplicates,0.0,no change,1.0,0.019145579688873784
+adult_original,neural_net,missing_values,0.0,no effect,1.0,0.019145579688873784
+adult_original,neural_net,outliers,-0.0016990587350241392,within noise,0.6,0.019145579688873784
+adult_original,neural_net,inconsistency,0.0,no change,1.0,0.019145579688873784
+adult_original,neural_net,label_errors,-0.01847339119781981,within noise,0.6,0.019145579688873784
+ames,ridge,before,0.0,baseline,1.0,0.026259564589046335
+ames,ridge,aggressive,-0.018308982478837922,within noise,0.6,0.026259564589046335
+ames,ridge,duplicates,0.0,no change,1.0,0.026259564589046335
+ames,ridge,missing_values,0.00030447623959730665,within noise,0.6,0.026259564589046335
+ames,ridge,outliers,-0.035778767661068266,worse,0.8,0.026259564589046335
+ames,ridge,inconsistency,0.0,no change,1.0,0.026259564589046335
+ames,ridge,label_errors,0.011027666524568058,within noise,0.8,0.026259564589046335
+ames,random_forest,before,0.0,baseline,1.0,0.013406634563951492
+ames,random_forest,aggressive,-0.021139925120254845,worse,1.0,0.013406634563951492
+ames,random_forest,duplicates,0.0,no change,1.0,0.013406634563951492
+ames,random_forest,missing_values,0.00024001890128275694,within noise,0.8,0.013406634563951492
+ames,random_forest,outliers,-0.0020927425419105415,within noise,0.6,0.013406634563951492
+ames,random_forest,inconsistency,0.0,no change,1.0,0.013406634563951492
+ames,random_forest,label_errors,-0.0265046123697829,worse,1.0,0.013406634563951492
+ames,gradient_boosting,before,0.0,baseline,1.0,0.014399600694841657
+ames,gradient_boosting,aggressive,0.001239295806574625,within noise,0.6,0.014399600694841657
+ames,gradient_boosting,duplicates,0.0,no change,1.0,0.014399600694841657
+ames,gradient_boosting,missing_values,0.0033643797042016478,within noise,0.8,0.014399600694841657
+ames,gradient_boosting,outliers,0.002677401371396959,within noise,0.6,0.014399600694841657
+ames,gradient_boosting,inconsistency,0.0,no change,1.0,0.014399600694841657
+ames,gradient_boosting,label_errors,0.0020616268335461154,within noise,0.6,0.014399600694841657
+ames,neural_net,before,0.0,baseline,1.0,0.17987120734232345
+ames,neural_net,aggressive,-0.021909265119104314,within noise,0.8,0.17987120734232345
+ames,neural_net,duplicates,0.0,no change,1.0,0.17987120734232345
+ames,neural_net,missing_values,-0.00027627997742190046,within noise,0.6,0.17987120734232345
+ames,neural_net,outliers,-0.06082992349347629,within noise,0.8,0.17987120734232345
+ames,neural_net,inconsistency,0.0,no change,1.0,0.17987120734232345
+ames,neural_net,label_errors,0.013628358127206908,within noise,0.8,0.17987120734232345
+bank,logistic_regression,before,0.0,baseline,1.0,0.006273446959874023
+bank,logistic_regression,aggressive,0.024443754930749063,improved,0.8,0.006273446959874023
+bank,logistic_regression,duplicates,0.0,no change,1.0,0.006273446959874023
+bank,logistic_regression,missing_values,0.0,no effect,1.0,0.006273446959874023
+bank,logistic_regression,outliers,0.024872284760809448,improved,0.8,0.006273446959874023
+bank,logistic_regression,inconsistency,0.0,no change,1.0,0.006273446959874023
+bank,logistic_regression,label_errors,-0.001083914927634977,within noise,0.4,0.006273446959874023
+bank,random_forest,before,0.0,baseline,1.0,0.013753964511713313
+bank,random_forest,aggressive,-0.009052592587869456,within noise,0.8,0.013753964511713313
+bank,random_forest,duplicates,0.0,no change,1.0,0.013753964511713313
+bank,random_forest,missing_values,0.0,no effect,1.0,0.013753964511713313
+bank,random_forest,outliers,-0.007422277947334854,within noise,0.8,0.013753964511713313
+bank,random_forest,inconsistency,0.0,no change,1.0,0.013753964511713313
+bank,random_forest,label_errors,-0.00578424418342618,within noise,0.6,0.013753964511713313
+bank,gradient_boosting,before,0.0,baseline,1.0,0.01600596375350134
+bank,gradient_boosting,aggressive,-0.007841851303180181,within noise,0.6,0.01600596375350134
+bank,gradient_boosting,duplicates,0.0,no change,1.0,0.01600596375350134
+bank,gradient_boosting,missing_values,0.0,no effect,1.0,0.01600596375350134
+bank,gradient_boosting,outliers,-0.009488839352351897,within noise,0.6,0.01600596375350134
+bank,gradient_boosting,inconsistency,0.0,no change,1.0,0.01600596375350134
+bank,gradient_boosting,label_errors,0.0032795643118167296,within noise,0.6,0.01600596375350134
+bank,neural_net,before,0.0,baseline,1.0,0.03739813676609471
+bank,neural_net,aggressive,0.024779989376070198,within noise,1.0,0.03739813676609471
+bank,neural_net,duplicates,0.0,no change,1.0,0.03739813676609471
+bank,neural_net,missing_values,0.0,no effect,1.0,0.03739813676609471
+bank,neural_net,outliers,0.02111613515056765,within noise,1.0,0.03739813676609471
+bank,neural_net,inconsistency,0.0,no change,1.0,0.03739813676609471
+bank,neural_net,label_errors,-0.008756211729359299,within noise,0.6,0.03739813676609471
+california,ridge,before,0.0,baseline,1.0,0.005298434670109506
+california,ridge,aggressive,-0.33008356619425816,worse,1.0,0.005298434670109506
+california,ridge,duplicates,0.0,no change,1.0,0.005298434670109506
+california,ridge,missing_values,0.0,no change,1.0,0.005298434670109506
+california,ridge,outliers,-0.3385886253943779,worse,1.0,0.005298434670109506
+california,ridge,inconsistency,0.0,no change,1.0,0.005298434670109506
+california,ridge,label_errors,0.0017358718271668794,within noise,0.6,0.005298434670109506
+california,random_forest,before,0.0,baseline,1.0,0.005345208010181042
+california,random_forest,aggressive,-0.0014196710749660557,within noise,0.8,0.005345208010181042
+california,random_forest,duplicates,0.0,no change,1.0,0.005345208010181042
+california,random_forest,missing_values,0.0,no change,1.0,0.005345208010181042
+california,random_forest,outliers,-0.0006443206425210013,within noise,0.6,0.005345208010181042
+california,random_forest,inconsistency,0.0,no change,1.0,0.005345208010181042
+california,random_forest,label_errors,-0.0022449680790720184,within noise,0.6,0.005345208010181042
+california,gradient_boosting,before,0.0,baseline,1.0,0.0050967753217108095
+california,gradient_boosting,aggressive,-0.0045416835280542855,within noise,1.0,0.0050967753217108095
+california,gradient_boosting,duplicates,0.0,no change,1.0,0.0050967753217108095
+california,gradient_boosting,missing_values,0.0,no change,1.0,0.0050967753217108095
+california,gradient_boosting,outliers,-0.002749914482823357,within noise,0.8,0.0050967753217108095
+california,gradient_boosting,inconsistency,0.0,no change,1.0,0.0050967753217108095
+california,gradient_boosting,label_errors,-0.004244706948962729,within noise,0.8,0.0050967753217108095
+california,neural_net,before,0.0,baseline,1.0,0.012171191892948635
+california,neural_net,aggressive,-0.3277365492087065,worse,0.8,0.012171191892948635
+california,neural_net,duplicates,0.0,no change,1.0,0.012171191892948635
+california,neural_net,missing_values,0.0,no change,1.0,0.012171191892948635
+california,neural_net,outliers,-0.28157866335642445,worse,0.8,0.012171191892948635
+california,neural_net,inconsistency,0.0,no change,1.0,0.012171191892948635
+california,neural_net,label_errors,0.006128356801246815,within noise,0.8,0.012171191892948635
+credit_g,logistic_regression,before,0.0,baseline,1.0,0.016070047158471445
+credit_g,logistic_regression,aggressive,0.007873601118405049,within noise,0.8,0.016070047158471445
+credit_g,logistic_regression,duplicates,0.0,no change,1.0,0.016070047158471445
+credit_g,logistic_regression,missing_values,0.0,no change,1.0,0.016070047158471445
+credit_g,logistic_regression,outliers,0.0062759050637761545,within noise,0.8,0.016070047158471445
+credit_g,logistic_regression,inconsistency,0.0,no change,1.0,0.016070047158471445
+credit_g,logistic_regression,label_errors,-0.0016935660121196073,within noise,0.2,0.016070047158471445
+credit_g,random_forest,before,0.0,baseline,1.0,0.028829256992566495
+credit_g,random_forest,aggressive,-0.005398252055558772,within noise,0.8,0.028829256992566495
+credit_g,random_forest,duplicates,0.0,no change,1.0,0.028829256992566495
+credit_g,random_forest,missing_values,0.0,no change,1.0,0.028829256992566495
+credit_g,random_forest,outliers,-0.011995820148003688,within noise,1.0,0.028829256992566495
+credit_g,random_forest,inconsistency,0.0,no change,1.0,0.028829256992566495
+credit_g,random_forest,label_errors,0.002671703533819314,within noise,0.2,0.028829256992566495
+credit_g,gradient_boosting,before,0.0,baseline,1.0,0.028774815850575893
+credit_g,gradient_boosting,aggressive,-0.00318113898797856,within noise,0.6,0.028774815850575893
+credit_g,gradient_boosting,duplicates,0.0,no change,1.0,0.028774815850575893
+credit_g,gradient_boosting,missing_values,0.0,no change,1.0,0.028774815850575893
+credit_g,gradient_boosting,outliers,-0.00411161321942366,within noise,0.6,0.028774815850575893
+credit_g,gradient_boosting,inconsistency,0.0,no change,1.0,0.028774815850575893
+credit_g,gradient_boosting,label_errors,0.005993648907190119,within noise,0.2,0.028774815850575893
+credit_g,neural_net,before,0.0,baseline,1.0,0.14458290125282688
+credit_g,neural_net,aggressive,-0.009163286864912057,within noise,0.8,0.14458290125282688
+credit_g,neural_net,duplicates,0.0,no change,1.0,0.14458290125282688
+credit_g,neural_net,missing_values,0.0,no change,1.0,0.14458290125282688
+credit_g,neural_net,outliers,0.02996475865518904,within noise,0.8,0.14458290125282688
+credit_g,neural_net,inconsistency,0.0,no change,1.0,0.14458290125282688
+credit_g,neural_net,label_errors,-0.013723433388253192,within noise,0.2,0.14458290125282688
+dsjobs,ridge,before,0.0,baseline,1.0,0.03519295993575755
+dsjobs,ridge,aggressive,0.0063096609451174235,within noise,0.6,0.03519295993575755
+dsjobs,ridge,duplicates,0.0,no change,1.0,0.03519295993575755
+dsjobs,ridge,missing_values,-0.00042281367548460127,within noise,0.8,0.03519295993575755
+dsjobs,ridge,outliers,-0.00012784466133701765,within noise,0.6,0.03519295993575755
+dsjobs,ridge,inconsistency,0.0,no effect,1.0,0.03519295993575755
+dsjobs,ridge,label_errors,0.008280933799438728,within noise,0.6,0.03519295993575755
+dsjobs,random_forest,before,0.0,baseline,1.0,0.031665958707974694
+dsjobs,random_forest,aggressive,0.0036119163115382992,within noise,0.6,0.031665958707974694
+dsjobs,random_forest,duplicates,0.0,no change,1.0,0.031665958707974694
+dsjobs,random_forest,missing_values,-0.0019236125460737829,within noise,0.6,0.031665958707974694
+dsjobs,random_forest,outliers,-0.0026286691254051365,within noise,0.6,0.031665958707974694
+dsjobs,random_forest,inconsistency,2.2204460492503132e-17,within noise,0.2,0.031665958707974694
+dsjobs,random_forest,label_errors,-0.0032916723084502665,within noise,0.6,0.031665958707974694
+dsjobs,gradient_boosting,before,0.0,baseline,1.0,0.07011429333931982
+dsjobs,gradient_boosting,aggressive,-0.011663431731422392,within noise,0.6,0.07011429333931982
+dsjobs,gradient_boosting,duplicates,0.0,no change,1.0,0.07011429333931982
+dsjobs,gradient_boosting,missing_values,-0.0032244264307964123,within noise,0.6,0.07011429333931982
+dsjobs,gradient_boosting,outliers,-0.002669644229062329,within noise,0.8,0.07011429333931982
+dsjobs,gradient_boosting,inconsistency,0.0,no effect,1.0,0.07011429333931982
+dsjobs,gradient_boosting,label_errors,0.0015077076039868853,within noise,0.6,0.07011429333931982
+telco,logistic_regression,before,0.0,baseline,1.0,0.003
+telco,logistic_regression,aggressive,0.0007820029076121005,within noise,0.8,0.003
+telco,logistic_regression,duplicates,-0.0013221809414105002,within noise,0.6,0.003
+telco,logistic_regression,missing_values,-0.0002854513939346104,within noise,0.4,0.003
+telco,logistic_regression,outliers,0.0,no change,1.0,0.003
+telco,logistic_regression,inconsistency,0.0,no change,1.0,0.003
+telco,logistic_regression,label_errors,0.0007853259582611072,within noise,0.6,0.003
+telco,random_forest,before,0.0,baseline,1.0,0.005952993223209711
+telco,random_forest,aggressive,-0.002123952591302003,within noise,0.8,0.005952993223209711
+telco,random_forest,duplicates,-0.004098968618913168,within noise,0.6,0.005952993223209711
+telco,random_forest,missing_values,0.0025220951404806512,within noise,0.8,0.005952993223209711
+telco,random_forest,outliers,0.0,no change,1.0,0.005952993223209711
+telco,random_forest,inconsistency,0.0,no change,1.0,0.005952993223209711
+telco,random_forest,label_errors,-0.0031849393686725234,within noise,0.8,0.005952993223209711
+telco,gradient_boosting,before,0.0,baseline,1.0,0.010359600309468883
+telco,gradient_boosting,aggressive,0.003970816237514186,within noise,0.8,0.010359600309468883
+telco,gradient_boosting,duplicates,-0.0009388425868215756,within noise,0.6,0.010359600309468883
+telco,gradient_boosting,missing_values,0.003866664509771889,within noise,0.8,0.010359600309468883
+telco,gradient_boosting,outliers,0.0,no change,1.0,0.010359600309468883
+telco,gradient_boosting,inconsistency,0.0,no change,1.0,0.010359600309468883
+telco,gradient_boosting,label_errors,0.002884594823831388,within noise,0.6,0.010359600309468883
+telco,neural_net,before,0.0,baseline,1.0,0.019039289146660494
+telco,neural_net,aggressive,0.007365675615246437,within noise,0.6,0.019039289146660494
+telco,neural_net,duplicates,0.004925814533485684,within noise,0.6,0.019039289146660494
+telco,neural_net,missing_values,-0.0019986506892950783,within noise,0.4,0.019039289146660494
+telco,neural_net,outliers,0.0,no change,1.0,0.019039289146660494
+telco,neural_net,inconsistency,0.0,no change,1.0,0.019039289146660494
+telco,neural_net,label_errors,0.012389113163116616,within noise,0.8,0.019039289146660494
+titanic,logistic_regression,before,0.0,baseline,1.0,0.0077780339118585905
+titanic,logistic_regression,aggressive,-0.008025167640208997,worse,1.0,0.0077780339118585905
+titanic,logistic_regression,duplicates,0.0,no change,1.0,0.0077780339118585905
+titanic,logistic_regression,missing_values,-0.0006815770368792107,within noise,0.4,0.0077780339118585905
+titanic,logistic_regression,outliers,-0.007625292475907974,within noise,1.0,0.0077780339118585905
+titanic,logistic_regression,inconsistency,0.0,no change,1.0,0.0077780339118585905
+titanic,logistic_regression,label_errors,-0.006096223772011444,within noise,0.6,0.0077780339118585905
+titanic,random_forest,before,0.0,baseline,1.0,0.022879644989699105
+titanic,random_forest,aggressive,-0.01360619710073685,within noise,0.8,0.022879644989699105
+titanic,random_forest,duplicates,0.0,no change,1.0,0.022879644989699105
+titanic,random_forest,missing_values,-0.013618189895147492,within noise,0.6,0.022879644989699105
+titanic,random_forest,outliers,-0.0031029937556176002,within noise,0.6,0.022879644989699105
+titanic,random_forest,inconsistency,0.0,no change,1.0,0.022879644989699105
+titanic,random_forest,label_errors,0.00646829901298831,within noise,1.0,0.022879644989699105
+titanic,gradient_boosting,before,0.0,baseline,1.0,0.013819588617746225
+titanic,gradient_boosting,aggressive,-0.001733814581273463,within noise,0.8,0.013819588617746225
+titanic,gradient_boosting,duplicates,0.0,no change,1.0,0.013819588617746225
+titanic,gradient_boosting,missing_values,-0.018402468396774306,worse,0.8,0.013819588617746225
+titanic,gradient_boosting,outliers,-0.0045650149497708185,within noise,0.6,0.013819588617746225
+titanic,gradient_boosting,inconsistency,0.0,no change,1.0,0.013819588617746225
+titanic,gradient_boosting,label_errors,0.003055118586862626,within noise,0.6,0.013819588617746225
+titanic,neural_net,before,0.0,baseline,1.0,0.04529589613197676
+titanic,neural_net,aggressive,-0.0027773246810766095,within noise,0.6,0.04529589613197676
+titanic,neural_net,duplicates,0.0,no change,1.0,0.04529589613197676
+titanic,neural_net,missing_values,0.02656602781388564,within noise,0.6,0.04529589613197676
+titanic,neural_net,outliers,0.03040860219016086,within noise,0.8,0.04529589613197676
+titanic,neural_net,inconsistency,0.0,no change,1.0,0.04529589613197676
+titanic,neural_net,label_errors,0.03603222944697528,within noise,0.8,0.04529589613197676

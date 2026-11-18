@@ -1,0 +1,1 @@
+{"name": "realestate", "task": "regression", "rows": 414, "status": "declined", "reason": "the panel needs at least 600 rows with a numeric target; this file has 414", "seconds": 0.2, "rows_used": null, "default_issues": null, "results": []}

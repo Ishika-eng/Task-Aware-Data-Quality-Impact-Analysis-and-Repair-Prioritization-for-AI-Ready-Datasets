@@ -510,6 +510,7 @@ Run from `src/`. Adult is fetched via OpenML on first use (copies are in `data/`
 | 21 | `python3 test_phase21.py` (run: `python3 controlled_proof_regression.py`) | regression: target handling, wrong-target detector, no silent repair, split integrity, tuned-selection leakage, end to end |
 | 22 | `python3 test_phase22.py` | Excel intake: round trip, sheets, layout, robustness, upload equals the same CSV ([spec](docs/PHASE22_SPEC.md)) |
 | 23 | `python3 test_phase23.py` (run: `python3 validate_new_datasets.py T`, `A`, `R`, `O`, `C`) | amendment A1 invariants; validation on five genuine files (data in `data/new/`, not committed) |
+| 27 | `python3 explore_phase27.py select`, `confirm 0.4`, `gated`; `real_file_search.py`; `real_confirm_bank.py` | exploratory (not pre-registered): noisy-label filter; real-file search and confirmation of cleaning improving a model |
 | 26 | `python3 test_phase26.py` (run: `python3 validate_phase26.py D`, `S0 T`/`A`/`R`/`O`, `S0files`, `S0demo`, `S2`, `B`, `Boff`) | word placeholders, declared values and the keep switch, two report-only diagnostics: planted truth, policy, targets, no change elsewhere ([spec](docs/PHASE26_SPEC.md)) |
 | 25 | `python3 test_phase25.py` (run: `python3 validate_sentinels.py D`, `S0 T`/`A`/`R`/`O`/`C`, `S0demo`, `S2`) | placeholder codes read as missing: planted truth, policy, target, no change elsewhere; DS-jobs file in `data/new/` (not committed) |
 
@@ -580,6 +581,14 @@ Neither is converted: a midpoint would put numbers into a text column or change 
 Measured: planted words were found with recall and precision 1.00 (63 cases); a declared value matched exactly the planted cells and nothing else changed (9 cases); on the DS-jobs file the audit finds 606 feature cells and 50 target rows (6.51% of the file, was 4.19%),
 and on Bank Marketing 15,165 `unknown` cells (the evidence-based file is unchanged, the aggressive file now fills them). Nine files without these patterns give identical results with the feature on and off. Cleaning still did not improve any model on DS jobs.
 Not tested: the declared-value path on a real file whose zeros mean "missing" (none was available), Concrete (no `xlrd`), and the hold-back of words on a real file (calibration approved nothing on the files tried).
+
+## Does cleaning improve the model? (Phase 27, exploratory)
+
+Not pre-registered, written after the results, and labelled so ([docs/PHASE27_EXPLORATION.md](docs/PHASE27_EXPLORATION.md), `results/phase27_*`, `results/real_*`).
+A stronger noisy-label filter helps when label noise is high (Adult, 10-20% flips) but hurts clean or lightly noisy data and does not transfer to Bank Marketing, so it was **not** added to the tool.
+Searching all real files with the Model panel (217 comparisons) found 3 improvements and 11 harms; the strongest, Bank Marketing logistic regression, was confirmed on a fresh sample and fresh seeds with the claim fixed in advance:
+the tool's per-model tuned cleaning improved it in 5 of 5 seeds (mean +0.030 macro-F1, about five times the noise floor) while random forest and gradient boosting did not gain. One dataset, held-out rows as dirty as the file, and the default file
+applies nothing there: the gain comes from the validation-based selection.
 
 ## Limitations
 

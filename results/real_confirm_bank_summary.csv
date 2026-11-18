@@ -1,0 +1,5 @@
+model,mean_delta,seeds_improved,seeds_worse,chose_cleaning,most_chosen
+gradient_boosting,-0.007624463125776337,1,2,3,label_errors
+logistic_regression,0.030234385017853714,5,0,5,aggressive
+neural_net,0.01468754315458085,3,0,3,outliers
+random_forest,-0.00209731760198677,1,2,3,label_errors

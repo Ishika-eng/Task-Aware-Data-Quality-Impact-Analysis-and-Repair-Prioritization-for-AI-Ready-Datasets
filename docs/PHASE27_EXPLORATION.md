@@ -112,3 +112,43 @@ Bank was used twice (confirmation of the fixed filter, then the gated version on
 
 ## Next, if more is wanted
 A class-balanced threshold (per-class) is the obvious fix for the Bank failure; it would have to be evaluated on new seeds and a third dataset, as everything here has already been looked at.
+
+
+---
+
+# Part 2: a real-file result (searched, then confirmed)
+
+Requested by the user after Part 1: show, on at least one real file, that cleaning improved a model. Still **exploratory, not pre-registered**. The honest way to do this
+is to search widely, report every result, then confirm the one candidate on data the search never used, with the claim written down before the confirmation ran.
+
+## The search (`src/real_file_search.py`, `results/real_search_*.json`, `results/real_search_all.csv`)
+The product's Model panel (repairs fitted on training rows only; models scored on untouched held-out rows of the user's own file; "improved" needs to clear the measured noise
+floor with at least 80% of 5 seeds agreeing) was run on every real file in the project. Heart (303 rows) and Real Estate (414) are below the panel's minimum and were declined.
+On the other eight files there were 217 model-by-repair comparisons: **3 improved, 11 got worse, 203 were within noise or unchanged.** The three improvements: Bank Marketing logistic
+regression with outlier capping (+0.025 macro-F1, about 4 times the floor) and with the aggressive file (+0.024); Adult (original, dirty) gradient boosting with label fixes (+0.008, small).
+The 11 "worse" include the same outlier capping on California: Ridge -0.33 and the neural net -0.28 R-squared. A scan like this finds some improvements by chance, so the best one needed confirming.
+
+## The confirmation (`src/real_confirm_bank.py`, `results/real_confirm_bank*.{json,csv}`)
+Claim fixed before the run: *the tool's tuned cleaning (Phase 20 rule: the repair is chosen per model on a validation slice of the training rows, kept only if it beats raw by more than 0.005;
+nothing re-tuned) improves at least one model on real Bank Marketing rows in at least 4 of 5 seeds, and no model gets worse by more than its noise floor.* Fresh sample of 8,000 Bank rows
+(sample seed 99, not the one used before), fresh seeds 100-104, 20% test rows never looked at until scoring. The test rows are raw rows of the file, as dirty as the file.
+
+| Model | Mean change in macro-F1 | Seeds improved / worse | Chose a cleaning in | Noise floor |
+|---|---|---|---|---|
+| **Logistic regression** | **+0.030** (every seed: +0.014 to +0.041; raw 0.65-0.71) | **5 / 0** | 5 of 5 seeds | 0.006 |
+| Neural net | +0.015 | 3 / 0 | 3 of 5 | 0.037 |
+| Random forest | -0.002 | 1 / 2 | 3 of 5 | 0.014 |
+| Gradient boosting | -0.008 (two seeds -0.019 and -0.021) | 1 / 2 | 3 of 5 | 0.016 |
+
+**First part of the claim met:** logistic regression improved in 5 of 5 seeds by about five times its noise floor, on rows the search never saw, with the repair chosen by the tool from the training rows alone.
+**Second part met on means, not on every seed:** the mean change of every other model is inside its noise floor, but gradient boosting was worse than its floor in two individual seeds (-0.0208, -0.0193 against 0.016).
+Cleaning was selected (outlier capping, or the aggressive combination, for logistic regression) only where the validation slice supported it; when it did not, the raw rows were kept, which is why several cells are exactly 0.
+
+## What this does and does not show
+* **Shows:** on a real file, the tool's own impact-driven selection improved a real model's performance on held-out rows, reproducibly across fresh rows and seeds (the earlier panel runs on Bank
+  also showed it: +0.024 and +0.034). The mechanism is plausible, not accidental: logistic regression is sensitive to extreme values in heavy-tailed numeric columns, which capping removes; the same capping badly hurts
+  Ridge on California, which is exactly why the repair has to be chosen per model and per file, and not applied blindly.
+* **Does not show:** (1) a gain for every model: random forest and gradient boosting did not gain, and gradient boosting lost a little; (2) a gain from the **default** file: the evidence-based default applies nothing on Bank, the gain came
+  from the per-model tuned selection; (3) that the repairs were correct, because the held-out rows are as dirty as the file; (4) generalisation to other datasets: one dataset, a fresh sample of the same file, not an independent file;
+  (5) anything pre-registered: the search and the choice of Bank came after seeing results, which is why the confirmation used fresh rows and a claim written in advance.
+* **Selection caveat:** this is the best of 217 comparisons, confirmed once. The confirmation lowers, but does not remove, the chance that it is partly luck; the five per-seed gains were all positive and all at least twice the floor.
